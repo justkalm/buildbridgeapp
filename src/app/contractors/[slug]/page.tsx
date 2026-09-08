@@ -145,7 +145,7 @@ export default function ContractorProfilePage() {
       <Nav />
 
       <header className="bg-paper text-ink border-b border-line pt-11 pb-9">
-        <div className="max-w-[1180px] mx-auto px-8">
+        <div className="max-w-[1440px] mx-auto px-8">
           <div className="flex items-start gap-5 flex-wrap justify-between">
             <div className="flex gap-5">
               <div className="w-[84px] h-[84px] rounded-xl bg-paper-dim border border-line text-ink font-display text-3xl flex items-center justify-center shrink-0 overflow-hidden">
@@ -186,7 +186,7 @@ export default function ContractorProfilePage() {
         </div>
       </header>
 
-      <div className="max-w-[1180px] mx-auto px-8 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-11 py-12">
+      <div className="max-w-[1440px] mx-auto px-8 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-11 py-12">
         <div>
           {contractor.bio && <p className="text-[15px] text-stone leading-relaxed mb-8">{contractor.bio}</p>}
 

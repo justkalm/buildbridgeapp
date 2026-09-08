@@ -156,7 +156,10 @@ async function seed() {
     return Number.isNaN(n) ? max : Math.max(max, n);
   }, 0);
 
-  const contractors = Array.from({ length: 50 }, (_, i) => generateContractor(highestExisting + i + 1));
+  const countArg = process.argv.find((a) => a.startsWith('--count='));
+  const count = countArg ? parseInt(countArg.replace('--count=', ''), 10) : 50;
+
+  const contractors = Array.from({ length: count }, (_, i) => generateContractor(highestExisting + i + 1));
 
   for (const c of contractors) {
     const slug = slugify(c.name) + '-' + c.licenseNumber.split('/')[1];
@@ -224,7 +227,7 @@ async function seed() {
     console.log(`Upserted: ${contractor.name} (${c.projects.length} projects)`);
   }
 
-  console.log(`\nDone. 50 demo contractors seeded.`);
+  console.log(`\nDone. ${count} demo contractor(s) seeded.`);
   console.log(`Run "npx tsx prisma/seed-demo.ts --clean" to remove them all before launch.`);
 }
 

@@ -14,7 +14,7 @@ export default function Nav() {
 
   return (
     <nav className="sticky top-0 z-50 bg-paper/90 backdrop-blur-sm border-b border-line">
-      <div className="max-w-[1180px] mx-auto px-8 h-[76px] flex items-center justify-between">
+      <div className="max-w-[1440px] mx-auto px-8 h-[76px] flex items-center justify-between">
         <Link href="/" className="font-display text-2xl text-ink tracking-tight">
           (kalm)
         </Link>
