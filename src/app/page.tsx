@@ -44,6 +44,12 @@ export default function Home() {
               Get Started
             </Link>
           </div>
+          <p className="text-sm text-stone mt-6">
+            Are you a contractor?{' '}
+            <Link href="/contractor/signup" className="text-ink underline underline-offset-2 hover:text-stone">
+              List your business
+            </Link>
+          </p>
         </div>
       </header>
 
