@@ -1,0 +1,239 @@
+// BuildBridge — Prisma schema
+//
+// This is the first real slice: manual contractor entry (by admin), real
+// developer accounts, and a quote-request flow that fires an email.
+//
+// Deliberately NOT in this schema yet: Supplier, Review (as a submittable
+// entity), InteriorDesigner. Those come once this slice is proven — adding
+// them now would mean guessing at shapes we don't have real usage for yet.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  
+}
+
+// ---------------------------------------------------------------------------
+// Contractor
+// ---------------------------------------------------------------------------
+// Added by you (admin) by hand for this slice. `verificationStatus` is what
+// makes the "Verified" badge mean something — it's a real gate you control,
+// not decoration. Don't mark PENDING contractors as VERIFIED until you've
+// actually checked the license number against Maharashtra's contractor
+// registry (or whichever state's registry applies).
+//
+// `rating` and `reviewCount` are plain fields you set by hand for now. Once
+// real developers can submit reviews tied to real projects, these should
+// become computed aggregates (avg of Review.rating, count of Review rows)
+// instead of values anyone can just set. Flagging that now so it isn't
+// forgotten later.
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+// Paid listing tier. Everyone starts on LISTED (free) — this exists now so
+// the badge UI and contractor dashboard have a real field to read from, but
+// billing doesn't actually start until the trial period ends. Don't wire up
+// Razorpay or any charge logic against this yet; it's schema-first on
+// purpose so tier display and payment can be built independently.
+enum ContractorTier {
+  LISTED    // free — default for everyone during the trial period
+  PLUS
+  PRO
+}
+
+model Contractor {
+  id     String @id @default(cuid())
+  name   String
+  slug   String @unique // used in profile URLs — e.g. /contractors/kunal-raut-constructions
+
+  // Logo shown on browse cards and the profile header. Stored as a full
+  // URL pointing at Vercel Blob storage — nothing about images lives in
+  // this database except the URL itself. Optional: a contractor with no
+  // logo yet falls back to their initials, same as before this feature
+  // existed — never block anything on a logo being present.
+  logoUrl String?
+
+  // Location
+  city   String
+  area   String // e.g. "Thane", "Andheri West" — the neighborhood-level filter
+
+  // Trade / work type — stored as a simple string array for this slice.
+  // If the list of trades needs its own metadata later (icons, descriptions),
+  // split this into a proper WorkType model with a join table. Not needed yet.
+  tradeTypes String[]
+
+  // Licensing & verification
+  licenseNumber      String              @unique
+  verificationStatus VerificationStatus  @default(PENDING)
+  verifiedAt         DateTime?
+
+  // Paid tier — see ContractorTier comment above. Defaults to free for
+  // everyone during the trial period.
+  tier ContractorTier @default(LISTED)
+
+  // Data-sharing consent: whether this contractor has agreed to have their
+  // business data (not developer/quote data) shared with material
+  // suppliers. Two fields, not one boolean — dataSharingConsentAt records
+  // *when* consent was given, which matters if consent language changes
+  // later and existing consents need to be re-confirmed. Both null means
+  // "never asked / not consented" — never assume consent by default.
+  dataSharingConsent   Boolean   @default(false)
+  dataSharingConsentAt DateTime?
+
+  // Track record — set by hand when you add the contractor, based on what
+  // they tell you / what you can confirm. Not yet derived from real Project
+  // rows submitted through the app.
+  yearsInBusiness    Int?
+  teamSizeMin        Int?
+  teamSizeMax        Int?
+  gstRegistered      Boolean @default(false)
+  insuranceCoverLakh Int?    // insurance cover in ₹ lakh, if disclosed
+
+  // Rating — see note above. Plain fields for now.
+  rating      Float @default(0)
+  reviewCount Int   @default(0)
+
+  // Contact — the number a developer's quote request notifies. Not shown
+  // publicly on the profile; only released to a developer via a quote
+  // request, matching the original "provide your number, they call you"
+  // flow.
+  phone String
+  email String?
+
+  bio String? // short "about" text for the profile page
+
+  projects      Project[]
+  quoteRequests QuoteRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([city, area])
+  @@index([tradeTypes])
+  @@index([verificationStatus])
+}
+
+// ---------------------------------------------------------------------------
+// Project
+// ---------------------------------------------------------------------------
+// A contractor's completed-project history, shown on their profile. For this
+// slice, you (admin) enter these by hand alongside the contractor — there's
+// no flow yet for a contractor or developer to submit one themselves. That's
+// fine: the profile page needs real rows to read from, and manual entry is
+// the honest reflection of where "verification" actually stands right now.
+
+model Project {
+  id           String  @id @default(cuid())
+  contractorId String
+  contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+
+  title            String
+  developerName    String? // the developer/client this was built for — omit if they asked not to be named
+  projectType      String? // e.g. "Residential, 18 floors"
+  completedYear    Int?
+
+  squareFeet       Int?    // built-up area in sq ft
+  elevationFloors  Int?    // number of floors, e.g. 18 for a "G+18" building
+
+  // Timeline as committed to the developer vs how long the project actually
+  // took, both in months. Committed comes from what the contractor promised
+  // up front; actual is filled in once the project wrapped. Either can be
+  // left blank if unknown — this is admin-entered from what the contractor
+  // reports, not independently verified.
+  committedDurationMonths Int?
+  actualDurationMonths    Int?
+
+  // Photos of the completed project — stored as an array of Vercel Blob
+  // URLs, in the order they should be displayed. A project can have zero
+  // photos (the profile page falls back to the existing placeholder
+  // gradient block) or several.
+  imageUrls String[] @default([])
+
+  createdAt DateTime @default(now())
+
+  @@index([contractorId])
+}
+// ---------------------------------------------------------------------------
+// Developer
+// ---------------------------------------------------------------------------
+// Real accounts. Password hash lives here for credentials-based auth via
+// NextAuth. If you later want Google/phone-OTP sign-in instead of email +
+// password, this model extends cleanly — NextAuth's adapter pattern doesn't
+// require reshaping this table.
+
+model Developer {
+  id           String @id @default(cuid())
+  name         String
+  email        String @unique
+  passwordHash String
+
+  phone String? // required at signup going forward; stays nullable so accounts created before this change don't break
+
+  // Email verification — set on signup, cleared once the link is clicked.
+  // Login is NOT blocked on this being true (see verify-email route
+  // comment for why); it's tracked so a fake/mistyped email is visible in
+  // admin, not to gate access.
+  emailVerified              Boolean   @default(false)
+  emailVerifyToken           String?   @unique
+  emailVerifyTokenExpiresAt  DateTime?
+
+  // Password reset — same one-time-token pattern as email verification,
+  // kept as separate fields (not reused) so a live password-reset link
+  // can't also be replayed to verify an email, or vice versa.
+  passwordResetToken          String?   @unique
+  passwordResetTokenExpiresAt DateTime?
+
+  quoteRequests QuoteRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// QuoteRequest
+// ---------------------------------------------------------------------------
+// The core mechanic of this whole slice. Creating one of these is what fires
+// the notification email. `status` exists so a future "your requests" view
+// on the developer dashboard has something real to show — for now, every
+// request lands as PENDING and you update it by hand if you hear back from
+// a contractor (there's no contractor-side app yet for them to update it
+// themselves).
+
+enum QuoteRequestStatus {
+  PENDING
+  CONTACTED
+  DECLINED
+}
+
+model QuoteRequest {
+  id String @id @default(cuid())
+
+  contractorId String
+  contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  projectType    String
+  location       String
+  budgetRangeLabel String // e.g. "₹1 Cr – ₹3 Cr" — stored as the label shown, not a numeric range, since this is what the notification email should read naturally
+  details        String
+  contactPhone   String // developer's number, captured at request time even if it's already on their account — keeps the record self-contained
+
+  status QuoteRequestStatus @default(PENDING)
+
+  emailSentAt DateTime? // null if the notification email failed — lets you spot silently-dropped requests
+
+  createdAt DateTime @default(now())
+
+  @@index([contractorId])
+  @@index([developerId])
+  @@index([status])
+}
