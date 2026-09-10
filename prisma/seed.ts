@@ -110,7 +110,7 @@ async function main() {
         rating: c.rating ?? 0,
         reviewCount: c.reviewCount ?? 0,
         phone: c.phone,
-        email: c.email,
+        email: c.email ?? `seed.${c.licenseNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}@placeholder.buildbridge.dev`,
         bio: c.bio,
       },
       create: {
@@ -129,7 +129,7 @@ async function main() {
         rating: c.rating ?? 0,
         reviewCount: c.reviewCount ?? 0,
         phone: c.phone,
-        email: c.email,
+        email: c.email ?? `seed.${c.licenseNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}@placeholder.buildbridge.dev`,
         bio: c.bio,
       },
     });

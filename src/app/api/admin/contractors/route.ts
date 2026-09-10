@@ -38,7 +38,7 @@ const contractorSchema = z.object({
   gstRegistered: z.boolean().default(false),
   insuranceCoverLakh: z.number().int().positive().optional(),
   phone: z.string().trim().min(6).max(20),
-  email: z.string().trim().email().optional().or(z.literal('')),
+  email: z.string().trim().email('A valid email is required').toLowerCase(),
    bio: z.string().trim().max(2000).optional(),
   logoUrl: z.string().url().optional(),
   projects: z.array(projectSchema).default([]),
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       gstRegistered: data.gstRegistered,
       insuranceCoverLakh: data.insuranceCoverLakh,
       phone: data.phone,
-      email: data.email || undefined,
+      email: data.email,
            bio: data.bio,
       logoUrl: data.logoUrl,
       projects: {
