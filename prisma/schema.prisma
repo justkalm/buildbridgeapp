@@ -37,6 +37,17 @@ enum VerificationStatus {
   REJECTED
 }
 
+// Paid listing tier. Everyone starts on LISTED (free) — this exists now so
+// the badge UI and contractor dashboard have a real field to read from, but
+// billing doesn't actually start until the trial period ends. Don't wire up
+// Razorpay or any charge logic against this yet; it's schema-first on
+// purpose so tier display and payment can be built independently.
+enum ContractorTier {
+  LISTED    // free — default for everyone during the trial period
+  PLUS
+  PRO
+}
+
 model Contractor {
   id     String @id @default(cuid())
   name   String
@@ -62,6 +73,19 @@ model Contractor {
   licenseNumber      String              @unique
   verificationStatus VerificationStatus  @default(PENDING)
   verifiedAt         DateTime?
+
+  // Paid tier — see ContractorTier comment above. Defaults to free for
+  // everyone during the trial period.
+  tier ContractorTier @default(LISTED)
+
+  // Data-sharing consent: whether this contractor has agreed to have their
+  // business data (not developer/quote data) shared with material
+  // suppliers. Two fields, not one boolean — dataSharingConsentAt records
+  // *when* consent was given, which matters if consent language changes
+  // later and existing consents need to be re-confirmed. Both null means
+  // "never asked / not consented" — never assume consent by default.
+  dataSharingConsent   Boolean   @default(false)
+  dataSharingConsentAt DateTime?
 
   // Track record — set by hand when you add the contractor, based on what
   // they tell you / what you can confirm. Not yet derived from real Project
