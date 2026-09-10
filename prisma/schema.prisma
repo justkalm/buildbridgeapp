@@ -105,7 +105,26 @@ model Contractor {
   // request, matching the original "provide your number, they call you"
   // flow.
   phone String
-  email String?
+
+  // Login credential as of the contractor dashboard — required and unique
+  // now, unlike the Developer model's nullable early days. There are no
+  // real contractor accounts yet (only admin-entered placeholders), so no
+  // backfill/migration concern here.
+  email        String  @unique
+  passwordHash String?
+  // Nullable on purpose: an admin-entered placeholder contractor has no
+  // password until they actually sign up and claim/set one. Treat a null
+  // passwordHash as "no dashboard account yet" — never let a contractor
+  // log in until this is set.
+
+  // Email verification & password reset — same one-time-token pattern as
+  // Developer, kept as separate token fields so a live reset link can't
+  // also be replayed to verify an email.
+  emailVerified               Boolean   @default(false)
+  emailVerifyToken            String?   @unique
+  emailVerifyTokenExpiresAt   DateTime?
+  passwordResetToken          String?   @unique
+  passwordResetTokenExpiresAt DateTime?
 
   bio String? // short "about" text for the profile page
 

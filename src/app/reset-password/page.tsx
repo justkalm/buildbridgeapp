@@ -12,6 +12,7 @@ function ResetPasswordInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token');
+  const role = searchParams.get('role') === 'contractor' ? 'contractor' : 'developer';
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -23,7 +24,7 @@ function ResetPasswordInner() {
     setSubmitting(true);
 
     try {
-      const res = await fetch('/api/developers/reset-password', {
+      const res = await fetch(`/api/${role}s/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password }),

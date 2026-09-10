@@ -28,7 +28,15 @@ export default function LoginPage() {
     });
 
     if (result?.ok) {
-      router.push('/browse');
+      // Role isn't known from the signIn result itself — fetch the session
+      // to find out whether this was a developer or contractor login, and
+      // route to the right home page. A contractor visiting /browse post-
+      // login would just see the developer-facing marketplace with no
+      // obvious way back to their own dashboard, so this matters.
+      const sessionRes = await fetch('/api/auth/session');
+      const session = await sessionRes.json();
+      const role = session?.user?.role;
+      router.push(role === 'contractor' ? '/contractor/dashboard' : '/browse');
     } else {
       setError('Incorrect email or password');
       setSubmitting(false);

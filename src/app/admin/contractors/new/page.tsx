@@ -93,7 +93,7 @@ export default function NewContractorPage() {
       gstRegistered,
       insuranceCoverLakh: insuranceCoverLakh ? Number(insuranceCoverLakh) : undefined,
       phone,
-      email: email || undefined,
+      email,
       bio: bio || undefined,
       logoUrl: logoUrl || undefined,
       projects: projects
@@ -245,8 +245,8 @@ export default function NewContractorPage() {
             <Field label="Phone (used for quote notifications)">
               <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91XXXXXXXXXX" className={inputCls} />
             </Field>
-            <Field label="Email (optional)">
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
+            <Field label="Email (required — this becomes their dashboard login)">
+              <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
             </Field>
           </div>
 

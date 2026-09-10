@@ -119,6 +119,11 @@ function generateContractor(index: number) {
     area,
     tradeTypes,
     licenseNumber: `${DEMO_LICENSE_PREFIX}${String(index).padStart(4, '0')}`,
+    // Placeholder email — required + unique on Contractor now that the
+    // dashboard needs a login identity. These are demo/load-test rows with
+    // no real passwordHash, so they can never actually log in; the email
+    // just satisfies the unique constraint.
+    email: `demo.contractor.${index}@placeholder.buildbridge.dev`,
     verificationStatus: 'VERIFIED' as VerificationStatus,
     yearsInBusiness: randomInt(3, 35),
     teamSizeMin: randomInt(5, 30),

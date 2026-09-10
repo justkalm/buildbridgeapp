@@ -16,6 +16,9 @@ import Footer from '@/components/Footer';
 function VerifyEmailInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
+  // Defaults to 'developer' so links already sent before this change (with
+  // no ?role= param) keep working exactly as before.
+  const role = searchParams.get('role') === 'contractor' ? 'contractor' : 'developer';
   const [status, setStatus] = useState<'checking' | 'success' | 'error'>('checking');
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +29,7 @@ function VerifyEmailInner() {
       return;
     }
 
-    fetch('/api/developers/verify-email', {
+    fetch(`/api/${role}s/verify-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
@@ -44,7 +47,7 @@ function VerifyEmailInner() {
         setStatus('error');
         setError('Something went wrong. Please try again.');
       });
-  }, [token]);
+  }, [token, role]);
 
   return (
     <main className="flex-1 flex items-center justify-center px-6 py-20">
@@ -56,10 +59,10 @@ function VerifyEmailInner() {
             <h1 className="font-display font-light text-2xl mb-3">Email verified</h1>
             <p className="text-stone text-sm mb-8">Your email is confirmed. You&apos;re all set.</p>
             <Link
-              href="/browse"
+              href={role === 'contractor' ? '/contractor/dashboard' : '/browse'}
               className="inline-flex items-center justify-center text-sm px-6 py-3 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
             >
-              Browse Contractors
+              {role === 'contractor' ? 'Go to dashboard' : 'Browse Contractors'}
             </Link>
           </>
         )}

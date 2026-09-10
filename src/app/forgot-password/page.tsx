@@ -2,12 +2,15 @@
 
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordInner() {
+  const searchParams = useSearchParams();
+  const role = searchParams.get('role') === 'contractor' ? 'contractor' : 'developer';
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -16,7 +19,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await fetch('/api/developers/forgot-password', {
+      await fetch(`/api/${role}s/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -28,8 +31,6 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <>
-      <Nav />
       <main className="flex-1 flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-[420px]">
           {submitted ? (
@@ -73,6 +74,16 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
       </main>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <>
+      <Nav />
+      <Suspense fallback={null}>
+        <ForgotPasswordInner />
+      </Suspense>
       <Footer />
     </>
   );
