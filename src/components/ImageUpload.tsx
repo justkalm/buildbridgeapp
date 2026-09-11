@@ -27,9 +27,21 @@ type ImageUploadProps = {
   // Without this, submitting while an upload is in flight silently drops
   // that photo — the form has no way to know to wait for it.
   onUploadStateChange?: (uploading: boolean) => void;
+  // Which endpoint actually handles the upload. Defaults to the admin
+  // route (original/only caller until the contractor dashboard needed its
+  // own auth-gated equivalent) — pass '/api/contractors/upload' when using
+  // this from a contractor-facing page so the request is checked against
+  // contractor session instead of the admin cookie.
+  uploadUrl?: string;
 };
 
-export default function ImageUpload({ label, value, onChange, onUploadStateChange }: ImageUploadProps) {
+export default function ImageUpload({
+  label,
+  value,
+  onChange,
+  onUploadStateChange,
+  uploadUrl = '/api/admin/upload',
+}: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +57,7 @@ export default function ImageUpload({ label, value, onChange, onUploadStateChang
     formData.append('file', file);
 
     try {
-      const res = await fetch('/api/admin/upload', {
+      const res = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
       });
