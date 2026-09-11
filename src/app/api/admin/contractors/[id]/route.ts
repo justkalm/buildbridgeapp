@@ -34,11 +34,15 @@ export async function DELETE(
   return NextResponse.json({ ok: true, deletedName: existing.name });
 }
 
-// PATCH updates a contractor's verification status only. Gated the same
-// way as DELETE above. Rejects anything that isn't one of the three valid
-// enum values so a bad request can't write garbage into the column.
+// PATCH updates a contractor's verification status and/or tier. Gated the
+// same way as DELETE above. Both fields are optional in the request body —
+// existing callers that only send verificationStatus keep working
+// unchanged; tier is a manual admin override only, not tied to billing
+// (see the zod comment in the create route for why).
 const VALID_STATUSES = ['PENDING', 'VERIFIED', 'REJECTED'] as const;
 type VerificationStatus = (typeof VALID_STATUSES)[number];
+const VALID_TIERS = ['LISTED', 'PLUS', 'PRO'] as const;
+type ContractorTier = (typeof VALID_TIERS)[number];
 
 export async function PATCH(
   req: NextRequest,
@@ -50,10 +54,20 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const verificationStatus = body?.verificationStatus as VerificationStatus;
 
-  if (!VALID_STATUSES.includes(verificationStatus)) {
+  const hasStatus = 'verificationStatus' in body;
+  const hasTier = 'tier' in body;
+
+  if (!hasStatus && !hasTier) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+  }
+
+  if (hasStatus && !VALID_STATUSES.includes(body.verificationStatus)) {
     return NextResponse.json({ error: 'Invalid verification status' }, { status: 400 });
+  }
+
+  if (hasTier && !VALID_TIERS.includes(body.tier)) {
+    return NextResponse.json({ error: 'Invalid tier' }, { status: 400 });
   }
 
   const existing = await prisma.contractor.findUnique({ where: { id } });
@@ -63,7 +77,10 @@ export async function PATCH(
 
   const updated = await prisma.contractor.update({
     where: { id },
-    data: { verificationStatus },
+    data: {
+      ...(hasStatus ? { verificationStatus: body.verificationStatus as VerificationStatus } : {}),
+      ...(hasTier ? { tier: body.tier as ContractorTier } : {}),
+    },
   });
 
   return NextResponse.json({ ok: true, contractor: updated });

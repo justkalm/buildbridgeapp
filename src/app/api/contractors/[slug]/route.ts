@@ -28,6 +28,7 @@ export async function GET(
       area: true,
       tradeTypes: true,
       verificationStatus: true,
+      tier: true,
       yearsInBusiness: true,
       teamSizeMin: true,
       teamSizeMax: true,

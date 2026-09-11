@@ -37,13 +37,18 @@ export async function GET(req: NextRequest) {
       area: true,
       tradeTypes: true,
       verificationStatus: true,
+      tier: true,
       yearsInBusiness: true,
       rating: true,
       reviewCount: true,
       licenseNumber: true,
       _count: { select: { projects: true } },
     },
-    orderBy: { rating: 'desc' },
+    // Paid tiers surface first — the visible payoff for paying, once
+    // tiers actually cost anything. PRO > PLUS > LISTED, then by rating
+    // within each tier. Prisma's enum sort follows declaration order
+    // (LISTED, PLUS, PRO) ascending, so 'desc' puts PRO first.
+    orderBy: [{ tier: 'desc' }, { rating: 'desc' }],
   });
 
   return NextResponse.json(contractors);

@@ -20,6 +20,7 @@ type ContractorRow = {
   area: string;
   tradeTypes: string[];
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  tier: 'LISTED' | 'PLUS' | 'PRO';
   licenseNumber: string;
   _count: { projects: number; quoteRequests: number };
 };
@@ -110,6 +111,33 @@ export default function AdminContractorsPage() {
     }
   }
 
+  async function handleTierChange(contractor: ContractorRow, tier: ContractorRow['tier']) {
+    const previous = contractor.tier;
+    setContractors((prev) =>
+      prev ? prev.map((c) => (c.id === contractor.id ? { ...c, tier } : c)) : prev
+    );
+
+    try {
+      const res = await fetch(`/api/admin/contractors/${contractor.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error ?? 'Failed to update tier');
+        setContractors((prev) =>
+          prev ? prev.map((c) => (c.id === contractor.id ? { ...c, tier: previous } : c)) : prev
+        );
+      }
+    } catch {
+      alert('Failed to update tier. Please try again.');
+      setContractors((prev) =>
+        prev ? prev.map((c) => (c.id === contractor.id ? { ...c, tier: previous } : c)) : prev
+      );
+    }
+  }
+
   return (
     <main className="min-h-screen bg-paper py-10 px-6">
       <div className="max-w-4xl mx-auto">
@@ -151,6 +179,7 @@ export default function AdminContractorsPage() {
                   <th className="px-4 py-3 border-b border-line">Name</th>
                   <th className="px-4 py-3 border-b border-line">Location</th>
                   <th className="px-4 py-3 border-b border-line">Status</th>
+                  <th className="px-4 py-3 border-b border-line">Tier</th>
                   <th className="px-4 py-3 border-b border-line">Projects</th>
                   <th className="px-4 py-3 border-b border-line">Quotes</th>
                   <th className="px-4 py-3 border-b border-line"></th>
@@ -175,6 +204,17 @@ export default function AdminContractorsPage() {
                         <option value="PENDING">PENDING</option>
                         <option value="VERIFIED">VERIFIED</option>
                         <option value="REJECTED">REJECTED</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-4">
+                      <select
+                        value={c.tier}
+                        onChange={(e) => handleTierChange(c, e.target.value as ContractorRow['tier'])}
+                        className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-line cursor-pointer bg-paper-dim"
+                      >
+                        <option value="LISTED">LISTED</option>
+                        <option value="PLUS">PLUS</option>
+                        <option value="PRO">PRO</option>
                       </select>
                     </td>
                     <td className="px-4 py-4 text-stone">{c._count.projects}</td>

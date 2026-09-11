@@ -37,6 +37,7 @@ export default function NewContractorPage() {
   const [tradeTypesInput, setTradeTypesInput] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [verificationStatus, setVerificationStatus] = useState<'PENDING' | 'VERIFIED'>('PENDING');
+  const [tier, setTier] = useState<'LISTED' | 'PLUS' | 'PRO'>('LISTED');
   const [yearsInBusiness, setYearsInBusiness] = useState('');
   const [teamSizeMin, setTeamSizeMin] = useState('');
   const [teamSizeMax, setTeamSizeMax] = useState('');
@@ -87,6 +88,7 @@ export default function NewContractorPage() {
       tradeTypes: tradeTypesInput.split(',').map((t) => t.trim()).filter(Boolean),
       licenseNumber,
       verificationStatus,
+      tier,
       yearsInBusiness: yearsInBusiness ? Number(yearsInBusiness) : undefined,
       teamSizeMin: teamSizeMin ? Number(teamSizeMin) : undefined,
       teamSizeMax: teamSizeMax ? Number(teamSizeMax) : undefined,
@@ -218,6 +220,18 @@ export default function NewContractorPage() {
               </select>
             </Field>
           </div>
+
+          <Field label="Tier (free during trial — this is a manual override, not billing)">
+            <select
+              value={tier}
+              onChange={(e) => setTier(e.target.value as 'LISTED' | 'PLUS' | 'PRO')}
+              className={inputCls}
+            >
+              <option value="LISTED">Listed (default, free)</option>
+              <option value="PLUS">Plus</option>
+              <option value="PRO">Pro</option>
+            </select>
+          </Field>
 
           <div className="grid grid-cols-3 gap-4">
             <Field label="Years in business">

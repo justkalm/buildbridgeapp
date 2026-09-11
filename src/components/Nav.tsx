@@ -11,6 +11,7 @@ import { useSession, signOut } from 'next-auth/react';
 
 export default function Nav() {
   const { data: session, status } = useSession();
+  const role = (session?.user as { role?: string })?.role;
 
   return (
     <nav className="sticky top-0 z-50 bg-paper/90 backdrop-blur-sm border-b border-line">
@@ -23,8 +24,16 @@ export default function Nav() {
           <Link href="/browse" className="text-sm text-stone hover:text-ink transition-colors">
             Browse Contractors
           </Link>
+          {status !== 'authenticated' && (
+            <Link href="/contractor/signup" className="text-sm text-stone hover:text-ink transition-colors">
+              List Your Business
+            </Link>
+          )}
           {status === 'authenticated' && (
-            <Link href="/dashboard" className="text-sm text-stone hover:text-ink transition-colors">
+            <Link
+              href={role === 'contractor' ? '/contractor/dashboard' : '/dashboard'}
+              className="text-sm text-stone hover:text-ink transition-colors"
+            >
               Dashboard
             </Link>
           )}

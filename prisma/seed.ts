@@ -43,6 +43,8 @@ type SeedContractor = {
   rating?: number;
   reviewCount?: number;
   phone: string;
+  // Required on the schema now (contractor dashboard login). This seed
+  // file's hardcoded entries don't set one — see the fallback below.
   email?: string;
   bio?: string;
   projects?: {
@@ -110,6 +112,10 @@ async function main() {
         rating: c.rating ?? 0,
         reviewCount: c.reviewCount ?? 0,
         phone: c.phone,
+        // Falls back to a placeholder derived from license number when
+        // this seed entry doesn't set a real email — required + unique on
+        // the schema now. Swap for a real address before anyone actually
+        // needs to log in as this contractor.
         email: c.email ?? `seed.${c.licenseNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}@placeholder.buildbridge.dev`,
         bio: c.bio,
       },

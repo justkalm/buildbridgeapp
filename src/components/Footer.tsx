@@ -6,6 +6,18 @@ export default function Footer() {
   return (
     <footer className="bg-paper-dim text-stone pt-16 pb-8 mt-auto border-t border-line">
       <div className="max-w-[1440px] mx-auto px-8">
+        {/*
+          Ad banner slot — placeholder only, no ad network wired up yet.
+          Intentionally plain (dashed border, "Advertise here" label) so
+          it reads as an empty slot rather than a broken image once real
+          ad creative starts filling it. Swap the inner div for whatever
+          the actual ad unit turns out to be (self-sold banner img+link,
+          or a network's embed script) when that's ready.
+        */}
+        <div className="mb-12 border border-dashed border-line rounded-md h-24 flex items-center justify-center text-xs text-stone/70">
+          Advertise here — contact us for placements
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10 pb-12 border-b border-line">
           <div>
             <div className="font-display text-xl text-ink mb-3.5">(kalm)</div>
@@ -24,6 +36,7 @@ export default function Footer() {
             <h4 className="text-xs text-stone mb-4">For Business</h4>
             <ul className="flex flex-col gap-3">
               <li><Link href="/signup" className="text-sm hover:text-ink transition-colors">Register as Developer</Link></li>
+              <li><Link href="/contractor/signup" className="text-sm hover:text-ink transition-colors">List Your Business</Link></li>
             </ul>
           </div>
           <div>

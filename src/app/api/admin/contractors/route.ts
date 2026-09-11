@@ -32,12 +32,19 @@ const contractorSchema = z.object({
   tradeTypes: z.array(z.string().trim().min(1)).min(1, 'At least one trade type is required'),
   licenseNumber: z.string().trim().min(1).max(100),
   verificationStatus: z.enum(['PENDING', 'VERIFIED', 'REJECTED']).default('PENDING'),
+  // Manual override only — not tied to billing. Trial period means no
+  // contractor is actually paying yet; this exists so tier display and
+  // sorting can be tested/used ahead of Razorpay integration.
+  tier: z.enum(['LISTED', 'PLUS', 'PRO']).default('LISTED'),
   yearsInBusiness: z.number().int().min(0).max(150).optional(),
   teamSizeMin: z.number().int().min(0).optional(),
   teamSizeMax: z.number().int().min(0).optional(),
   gstRegistered: z.boolean().default(false),
   insuranceCoverLakh: z.number().int().positive().optional(),
   phone: z.string().trim().min(6).max(20),
+  // Required now — this becomes the contractor's dashboard login. The
+  // admin form's UI-level `required` attribute doesn't stop a raw API
+  // call, so it needs enforcing here too.
   email: z.string().trim().email('A valid email is required').toLowerCase(),
    bio: z.string().trim().max(2000).optional(),
   logoUrl: z.string().url().optional(),
@@ -108,6 +115,7 @@ export async function POST(req: NextRequest) {
       licenseNumber: data.licenseNumber,
       verificationStatus: data.verificationStatus,
       verifiedAt: data.verificationStatus === 'VERIFIED' ? new Date() : null,
+      tier: data.tier,
       yearsInBusiness: data.yearsInBusiness,
       teamSizeMin: data.teamSizeMin,
       teamSizeMax: data.teamSizeMax,
@@ -115,7 +123,7 @@ export async function POST(req: NextRequest) {
       insuranceCoverLakh: data.insuranceCoverLakh,
       phone: data.phone,
       email: data.email,
-           bio: data.bio,
+      bio: data.bio,
       logoUrl: data.logoUrl,
       projects: {
         create: data.projects.map((p) => ({

@@ -17,6 +17,7 @@ type Contractor = {
   area: string;
   tradeTypes: string[];
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  tier: 'LISTED' | 'PLUS' | 'PRO';
   yearsInBusiness: number | null;
   rating: number;
   reviewCount: number;
@@ -237,6 +238,16 @@ function BrowsePageInner() {
                           {c.verificationStatus === 'VERIFIED' && (
                             <span className="inline-flex items-center gap-1.5 text-[11px] text-sage bg-sage-soft border border-sage/25 rounded-full px-2.5 py-1">
                               ✓ Verified
+                            </span>
+                          )}
+                          {c.tier === 'PRO' && (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-paper bg-ink rounded-full px-2.5 py-1 font-medium">
+                              Pro
+                            </span>
+                          )}
+                          {c.tier === 'PLUS' && (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-ink bg-paper-dim border border-line rounded-full px-2.5 py-1 font-medium">
+                              Plus
                             </span>
                           )}
                         </div>
