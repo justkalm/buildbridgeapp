@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendQuoteRequestEmail } from '@/lib/email';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const quoteRequestSchema = z.object({
   contractorId: z.string().min(1),
@@ -42,6 +43,19 @@ export async function POST(req: NextRequest) {
   // generated.
   if (!session?.user?.id || (session.user as { role?: string }).role !== 'developer') {
     return NextResponse.json({ error: 'You must be signed in to request a quote' }, { status: 401 });
+  }
+
+  // Rate limited per developer (not per IP) — this route is already behind
+  // login, so the realistic abuse case is a logged-in account blasting
+  // quote requests at many contractors, spamming their inboxes and
+  // burning email-sending cost. 20/hour is generous for a genuine
+  // developer shortlisting contractors, while still capping a scripted or
+  // malicious burst.
+  if (!checkRateLimit(`quote-request:${session.user.id}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    );
   }
 
   let body: unknown;

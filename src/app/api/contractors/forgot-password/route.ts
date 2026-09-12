@@ -1,13 +1,16 @@
 // src/app/api/contractors/forgot-password/route.ts
 //
 // Mirrors src/app/api/developers/forgot-password/route.ts exactly, against
-// the Contractor table instead. Same generic-response reasoning applies.
+// the Contractor table instead. Same generic-response reasoning, and same
+// email-keyed (not just IP-keyed) rate limiting reasoning — see that
+// file's header comment.
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { sendPasswordResetEmail } from '@/lib/email';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const schema = z.object({
   email: z.string().trim().email().max(320),
@@ -31,6 +34,11 @@ export async function POST(req: NextRequest) {
   }
 
   const normalizedEmail = parsed.data.email.toLowerCase();
+
+  if (!checkRateLimit(`contractor-forgot-password:${normalizedEmail}`, { maxAttempts: 3, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(GENERIC_RESPONSE);
+  }
+
   const contractor = await prisma.contractor.findUnique({ where: { email: normalizedEmail } });
 
   // Only send a reset link if this contractor already has a password set —

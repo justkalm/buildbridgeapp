@@ -5,12 +5,21 @@
 // deliberate, same reasoning as the signup route's duplicate-email
 // handling: returning "no account with that email" here would let anyone
 // probe which emails have accounts.
+//
+// Rate limited by the TARGET EMAIL, not just IP. IP-only limiting is weak
+// here specifically: the actual harm is spam-bombing one person's inbox
+// with reset emails, which an attacker can do from many different IPs (a
+// botnet, a VPN, a simple retry loop) all aimed at the same address. Keying
+// the limit on the email itself protects the victim regardless of where
+// the requests originate. Deliberately generous (3/hour) since it's rare
+// for someone to legitimately need more than a couple reset attempts.
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { sendPasswordResetEmail } from '@/lib/email';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const schema = z.object({
   email: z.string().trim().email().max(320),
@@ -34,6 +43,15 @@ export async function POST(req: NextRequest) {
   }
 
   const normalizedEmail = parsed.data.email.toLowerCase();
+
+  // Checked (and consumes a slot) even when the email doesn't match an
+  // account, and the response is identical either way — otherwise an
+  // attacker could distinguish "real account, rate-limited" from "no such
+  // account" by which response they get.
+  if (!checkRateLimit(`developer-forgot-password:${normalizedEmail}`, { maxAttempts: 3, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(GENERIC_RESPONSE);
+  }
+
   const developer = await prisma.developer.findUnique({ where: { email: normalizedEmail } });
 
   if (developer) {

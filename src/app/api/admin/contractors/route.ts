@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
+import { ADMIN_SAFE_CONTRACTOR_SELECT } from '@/lib/admin-contractor-select';
 
 const projectSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -66,7 +67,11 @@ export async function GET() {
 
   const contractors = await prisma.contractor.findMany({
     orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { projects: true, quoteRequests: true } } },
+    // Explicit select (shared constant — see src/lib/admin-contractor-select.ts
+    // for why this isn't a bare `include`), not `include` on a bare findMany —
+    // that used to return the ENTIRE Contractor row, passwordHash and reset/
+    // verify tokens included, to the admin's browser on every page load.
+    select: ADMIN_SAFE_CONTRACTOR_SELECT,
   });
 
   return NextResponse.json(contractors);
@@ -139,7 +144,7 @@ export async function POST(req: NextRequest) {
         })),
       },
     },
-    include: { projects: true },
+    select: { ...ADMIN_SAFE_CONTRACTOR_SELECT, projects: true },
   });
 
   return NextResponse.json(contractor);

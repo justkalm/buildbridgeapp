@@ -1,12 +1,13 @@
 // src/app/api/contact/route.ts
 //
 // Handles the public contact form on /contact. No auth required — anyone
-// can reach out. Rate limiting isn't in place yet (same as signup/login),
-// worth adding if this gets abused.
+// can reach out. Rate limited per IP (5/hour) so this can't be scripted
+// into a spam vector against the inbox it forwards to.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendContactFormEmail } from '@/lib/email';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(200),
@@ -15,6 +16,14 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  if (!checkRateLimit(`contact-form:${ip}`, { maxAttempts: 5, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: 'Too many messages sent. Please try again later.' },
+      { status: 429 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();

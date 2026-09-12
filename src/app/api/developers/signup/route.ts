@@ -5,6 +5,12 @@
 // "that email is already registered" — this is a small but standard
 // precaution against using the signup endpoint to enumerate which emails
 // already have accounts.
+//
+// Rate limited per IP: without this, a script could create unlimited fake
+// accounts, spam this endpoint to burn database/email-sending cost, or use
+// it to enumerate real emails via timing even with the generic error above.
+// 5 signups per hour per IP is generous for real use (nobody creates more
+// than a couple accounts) while still blocking casual scripted abuse.
 
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
@@ -12,6 +18,7 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { sendVerificationEmail } from '@/lib/email';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(200),
@@ -21,6 +28,14 @@ const signupSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  if (!checkRateLimit(`developer-signup:${ip}`, { maxAttempts: 5, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: 'Too many attempts. Please try again later.' },
+      { status: 429 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();

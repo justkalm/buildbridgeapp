@@ -32,6 +32,7 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { sendVerificationEmail, sendClaimAccountEmail } from '@/lib/email';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(200),
@@ -55,6 +56,14 @@ function slugify(name: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  if (!checkRateLimit(`contractor-signup:${ip}`, { maxAttempts: 5, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: 'Too many attempts. Please try again later.' },
+      { status: 429 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();

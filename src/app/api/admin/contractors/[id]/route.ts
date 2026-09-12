@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
+import { ADMIN_SAFE_CONTRACTOR_SELECT } from '@/lib/admin-contractor-select';
 
 export async function DELETE(
   req: NextRequest,
@@ -24,7 +25,14 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const existing = await prisma.contractor.findUnique({ where: { id } });
+  // select here only pulls what this handler actually needs (existence
+  // check + the name for the response) — no reason to fetch the whole row,
+  // password hash and reset/verify tokens included, just to check it
+  // exists and delete it.
+  const existing = await prisma.contractor.findUnique({
+    where: { id },
+    select: { id: true, name: true },
+  });
   if (!existing) {
     return NextResponse.json({ error: 'Contractor not found' }, { status: 404 });
   }
@@ -70,7 +78,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid tier' }, { status: 400 });
   }
 
-  const existing = await prisma.contractor.findUnique({ where: { id } });
+  const existing = await prisma.contractor.findUnique({ where: { id }, select: { id: true } });
   if (!existing) {
     return NextResponse.json({ error: 'Contractor not found' }, { status: 404 });
   }
@@ -81,6 +89,7 @@ export async function PATCH(
       ...(hasStatus ? { verificationStatus: body.verificationStatus as VerificationStatus } : {}),
       ...(hasTier ? { tier: body.tier as ContractorTier } : {}),
     },
+    select: ADMIN_SAFE_CONTRACTOR_SELECT,
   });
 
   return NextResponse.json({ ok: true, contractor: updated });
