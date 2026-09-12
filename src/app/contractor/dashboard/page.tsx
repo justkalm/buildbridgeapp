@@ -21,9 +21,10 @@ type QuoteRequestRow = {
   projectType: string;
   location: string;
   budgetRangeLabel: string;
+  details: string;
   status: 'PENDING' | 'CONTACTED' | 'DECLINED';
   createdAt: string;
-  developer: { name: string };
+  developer: { name: string; email: string; phone: string };
 };
 
 type ContractorMe = {
@@ -157,7 +158,7 @@ export default function ContractorDashboardPage() {
           <div className="flex flex-col gap-3">
             {me.quoteRequests.map((r) => (
               <div key={r.id} className="border border-line rounded-[6px] p-4">
-                <div className="flex justify-between items-start flex-wrap gap-2">
+                <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
                   <div>
                     <p className="font-medium text-sm">{r.developer.name}</p>
                     <p className="text-stone text-xs mt-0.5">
@@ -167,6 +168,15 @@ export default function ContractorDashboardPage() {
                   <span className="text-xs text-stone">
                     {new Date(r.createdAt).toLocaleDateString()}
                   </span>
+                </div>
+                <p className="text-sm mb-3">{r.details}</p>
+                <div className="flex gap-4 text-xs text-stone border-t border-line pt-2.5">
+                  <a href={`mailto:${r.developer.email}`} className="hover:text-ink underline underline-offset-2">
+                    {r.developer.email}
+                  </a>
+                  <a href={`tel:${r.developer.phone}`} className="hover:text-ink underline underline-offset-2">
+                    {r.developer.phone}
+                  </a>
                 </div>
               </div>
             ))}

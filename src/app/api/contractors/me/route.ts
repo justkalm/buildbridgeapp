@@ -36,7 +36,19 @@ export async function GET() {
     where: { id: contractorId },
     include: {
       projects: { orderBy: { createdAt: 'desc' } },
-      quoteRequests: { orderBy: { createdAt: 'desc' }, take: 50 },
+      // Previously omitted `developer` entirely here, while the dashboard
+      // page reads `r.developer.name` on every quote request row — any
+      // contractor with at least one real quote request crashed the whole
+      // dashboard on load. Also including email/phone now, not just name:
+      // the point of a contractor seeing their quote requests at all is so
+      // they can reach out directly, not just see that someone asked.
+      quoteRequests: {
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        include: {
+          developer: { select: { name: true, email: true, phone: true } },
+        },
+      },
     },
   });
 
