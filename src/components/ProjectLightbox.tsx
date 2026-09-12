@@ -95,7 +95,7 @@ export default function ProjectLightbox({ project, onClose }: ProjectLightboxPro
               className="max-h-[50vh] md:max-h-[85vh] w-full h-full object-contain"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#4A4E55] to-[#2A2D32]" />
+            <div className="w-full h-full bg-gradient-to-br from-paper-dim to-line" />
           )}
 
           {hasMultiple && (

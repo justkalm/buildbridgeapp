@@ -56,7 +56,7 @@ export default function DashboardPage() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-[980px] mx-auto px-8 py-10 w-full">
+      <main className="flex-1 max-w-[1440px] mx-auto px-8 py-10 w-full">
         <div className="flex justify-between items-start flex-wrap gap-4 mb-9">
           <div>
             <h1 className="font-display font-light text-[28px] mb-1">Your Quotation Requests</h1>

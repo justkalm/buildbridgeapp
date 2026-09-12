@@ -16,6 +16,7 @@ import Link from 'next/link';
 type ContractorRow = {
   id: string;
   name: string;
+  email: string;
   city: string;
   area: string;
   tradeTypes: string[];
@@ -177,6 +178,7 @@ export default function AdminContractorsPage() {
               <thead>
                 <tr className="text-left font-mono text-[11px] tracking-wider uppercase text-stone">
                   <th className="px-4 py-3 border-b border-line">Name</th>
+                  <th className="px-4 py-3 border-b border-line">Email</th>
                   <th className="px-4 py-3 border-b border-line">Location</th>
                   <th className="px-4 py-3 border-b border-line">Status</th>
                   <th className="px-4 py-3 border-b border-line">Tier</th>
@@ -192,6 +194,7 @@ export default function AdminContractorsPage() {
                       <div className="font-medium">{c.name}</div>
                       <div className="text-xs text-stone font-mono">{c.licenseNumber}</div>
                     </td>
+                    <td className="px-4 py-4 text-stone text-xs">{c.email}</td>
                     <td className="px-4 py-4 text-stone">{c.area}, {c.city}</td>
                     <td className="px-4 py-4">
                       <select

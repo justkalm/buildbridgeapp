@@ -73,7 +73,21 @@ export default function ContractorDashboardPage() {
   }, [sessionStatus]);
 
   if (sessionStatus !== 'authenticated' || !me) {
-    return null;
+    // Previously returned null here — a fully blank white page (no Nav,
+    // no Footer) during the session check and the me-fetch, unlike every
+    // other dashboard/account page in the app which keeps the layout
+    // mounted and shows a "Loading…" message in the content area instead.
+    // Keeping Nav/Footer up avoids the blank-flash and matches the
+    // developer dashboard's loading treatment.
+    return (
+      <>
+        <Nav />
+        <main className="flex-1 max-w-[1440px] mx-auto px-8 py-10 w-full">
+          <p className="text-sm text-stone">Loading…</p>
+        </main>
+        <Footer />
+      </>
+    );
   }
 
   const verification = verificationCopy[me.verificationStatus];

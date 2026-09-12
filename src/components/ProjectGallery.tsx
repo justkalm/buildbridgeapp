@@ -15,7 +15,7 @@ export default function ProjectGallery({ imageUrls }: { imageUrls: string[] }) {
   const [index, setIndex] = useState(0);
 
   if (imageUrls.length === 0) {
-    return <div className="h-[100px] bg-gradient-to-br from-[#4A4E55] to-[#2A2D32]" />;
+    return <div className="h-[100px] bg-gradient-to-br from-paper-dim to-line" />;
   }
 
   const hasMultiple = imageUrls.length > 1;
