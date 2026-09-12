@@ -1,8 +1,14 @@
 // src/components/Footer.tsx
 
+'use client';
+
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 
 export default function Footer() {
+  const { status, data: session } = useSession();
+  const role = (session?.user as { role?: string })?.role;
+
   return (
     <footer className="bg-paper-dim text-stone pt-16 pb-8 mt-auto border-t border-line">
       <div className="max-w-[1440px] mx-auto px-8">
@@ -29,7 +35,9 @@ export default function Footer() {
             <h4 className="text-xs text-stone mb-4">Platform</h4>
             <ul className="flex flex-col gap-3">
               <li><Link href="/browse" className="text-sm hover:text-ink transition-colors">Browse Contractors</Link></li>
-              <li><Link href="/dashboard" className="text-sm hover:text-ink transition-colors">Post a Project</Link></li>
+              {status !== 'authenticated' || role === 'developer' ? (
+                <li><Link href="/post-project" className="text-sm hover:text-ink transition-colors">Post a Project</Link></li>
+              ) : null}
             </ul>
           </div>
           <div>

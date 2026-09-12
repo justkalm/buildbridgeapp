@@ -8,6 +8,7 @@
 import Link from 'next/link';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import AdminLoginForm from './login-form';
+import AdminTabs from '@/components/AdminTabs';
 
 export default async function AdminPage() {
   const authenticated = await isAdminAuthenticated();
@@ -19,6 +20,14 @@ export default async function AdminPage() {
   return (
     <main className="min-h-screen bg-paper py-10 px-6">
       <div className="max-w-2xl mx-auto">
+        {/*
+          AdminTabs has no "active" tab here on purpose — /admin itself
+          isn't one of Contractors/Developers/Project Posts, it's the home
+          screen above all three. Omitting active means none of the three
+          tabs render as "current", which is the honest state: you're not
+          currently inside any of them.
+        */}
+        <AdminTabs />
         <div className="flex items-center justify-between mb-8">
           <h1 className="font-display font-bold text-2xl tracking-tight">Admin</h1>
           <Link href="/browse" className="text-sm text-stone hover:text-ink">
@@ -39,9 +48,9 @@ export default async function AdminPage() {
             href="/admin/contractors"
             className="block bg-white border border-line rounded-md p-6 hover:border-ink transition-colors"
           >
-            <h2 className="font-display font-semibold text-lg mb-1">Manage Existing</h2>
+            <h2 className="font-display font-semibold text-lg mb-1">Contractors</h2>
             <p className="text-stone text-sm">
-              View all contractors, update verification status, or delete one.
+              View all contractors, update verification status or tier, or delete one.
             </p>
           </Link>
 
@@ -49,8 +58,18 @@ export default async function AdminPage() {
             href="/admin/developers"
             className="block bg-white border border-line rounded-md p-6 hover:border-ink transition-colors"
           >
-            <h2 className="font-display font-semibold text-lg mb-1">Current Users</h2>
-            <p className="text-stone text-sm">See everyone who has signed up on the site.</p>
+            <h2 className="font-display font-semibold text-lg mb-1">Developers</h2>
+            <p className="text-stone text-sm">See every developer account that has signed up on the site.</p>
+          </Link>
+
+          <Link
+            href="/admin/project-posts"
+            className="block bg-white border border-line rounded-md p-6 hover:border-ink transition-colors"
+          >
+            <h2 className="font-display font-semibold text-lg mb-1">Project Posts</h2>
+            <p className="text-stone text-sm">
+              Review projects submitted via &quot;Post a Project&quot; and alert PRO contractors.
+            </p>
           </Link>
         </div>
       </div>

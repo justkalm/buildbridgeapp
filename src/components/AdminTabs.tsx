@@ -9,7 +9,10 @@
 //
 // `active` tells this component which tab to visually highlight — pass the
 // current page's own key so it doesn't render its own link as clickable-
-// looking-different-from-current.
+// looking-different-from-current. Omit it (or leave undefined) on pages
+// that aren't any one of the three tabs themselves — /admin (the home
+// screen) uses this, since it sits above all three rather than being one
+// of them; no tab renders as "current" in that case, which is accurate.
 
 import Link from 'next/link';
 
@@ -21,22 +24,27 @@ const TABS = [
 
 export type AdminTabKey = (typeof TABS)[number]['key'];
 
-export default function AdminTabs({ active }: { active: AdminTabKey }) {
+export default function AdminTabs({ active }: { active?: AdminTabKey }) {
   return (
-    <nav className="flex gap-1 border-b border-line mb-6 -mt-2">
-      {TABS.map((tab) => (
-        <Link
-          key={tab.key}
-          href={tab.href}
-          className={`text-sm px-3 py-2.5 border-b-2 -mb-px transition-colors ${
-            tab.key === active
-              ? 'border-ink text-ink font-medium'
-              : 'border-transparent text-stone hover:text-ink'
-          }`}
-        >
-          {tab.label}
-        </Link>
-      ))}
-    </nav>
+    <div className="flex items-center justify-between mb-6 -mt-2 border-b border-line">
+      <nav className="flex gap-1">
+        {TABS.map((tab) => (
+          <Link
+            key={tab.key}
+            href={tab.href}
+            className={`text-sm px-3 py-2.5 border-b-2 -mb-px transition-colors ${
+              tab.key === active
+                ? 'border-ink text-ink font-medium'
+                : 'border-transparent text-stone hover:text-ink'
+            }`}
+          >
+            {tab.label}
+          </Link>
+        ))}
+      </nav>
+      <Link href="/admin" className="text-sm text-stone hover:text-ink pb-2.5">
+        ← Admin home
+      </Link>
+    </div>
   );
 }
