@@ -10,10 +10,14 @@
 //   project photos, not a general file-upload endpoint.
 // - 5MB max — generous for a logo or a project photo, but caps how much
 //   storage and bandwidth a single upload can consume.
+// - Content is verified against its actual magic bytes, not just the
+//   client-reported file.type — see src/lib/verify-image.ts for why
+//   trusting that header alone isn't enough.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
+import { verifyImageFileType } from '@/lib/verify-image';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -40,6 +44,13 @@ export async function POST(req: NextRequest) {
   if (file.size > MAX_SIZE_BYTES) {
     return NextResponse.json(
       { error: 'Image must be under 5MB' },
+      { status: 400 }
+    );
+  }
+
+  if (!(await verifyImageFileType(file, file.type))) {
+    return NextResponse.json(
+      { error: 'File content does not match a valid image of the declared type' },
       { status: 400 }
     );
   }

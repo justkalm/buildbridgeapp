@@ -159,6 +159,47 @@ export async function sendPasswordResetEmail(input: {
   }
 }
 
+// Sent when someone requests to claim an admin-entered contractor listing
+// by email — see the CLAIM path comment in
+// src/app/api/contractors/signup/route.ts for why this exists as a
+// separate step rather than accepting a password directly in the same
+// request that names the email. Deliberately doesn't call this a "password
+// reset" even though the underlying token mechanism is identical to one —
+// the person clicking this link is setting a FIRST password on a listing
+// they don't yet control, not recovering access to an account that was
+// already theirs. Copy should be honest about that distinction.
+export async function sendClaimAccountEmail(input: {
+  toEmail: string;
+  toName: string;
+  claimUrl: string;
+}): Promise<boolean> {
+  try {
+    const { error } = await getResendClient().emails.send({
+      from: '(kalm) <onboarding@resend.dev>',
+      to: input.toEmail,
+      subject: 'Claim your (kalm) contractor listing',
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px;">
+          <h2>Claim your listing</h2>
+          <p>Hi ${escapeHtml(input.toName)}, someone requested to set up dashboard access for your
+          (kalm) contractor listing using this email address. Click below to set a password and
+          claim it:</p>
+          <p><a href="${input.claimUrl}" style="display:inline-block;background:#1c1e22;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;">Claim my listing</a></p>
+          <p style="color:#666;font-size:13px;">This link expires in 1 hour. If this wasn't you, you can ignore this email — no changes will be made to your listing.</p>
+        </div>
+      `,
+    });
+    if (error) {
+      console.error('Resend error sending claim-account email:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Failed to send claim-account email:', err);
+    return false;
+  }
+}
+
 // Sends a contact-form submission to the fixed internal inbox
 // (QUOTE_NOTIFICATION_EMAIL — same address used for quote-request
 // notifications, since it's the one inbox actually monitored right now).

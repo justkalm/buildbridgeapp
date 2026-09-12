@@ -11,7 +11,11 @@ import { prisma } from '@/lib/prisma';
 export async function GET() {
   const session = await auth();
 
-  if (!session?.user?.id) {
+  // Explicit role check — same reasoning as the POST route in
+  // src/app/api/quote-requests/route.ts: this was already effectively
+  // safe (a contractor's ID never matches a developerId on any
+  // QuoteRequest row), but only incidentally so.
+  if (!session?.user?.id || (session.user as { role?: string }).role !== 'developer') {
     return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   }
 

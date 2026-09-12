@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import { auth } from '@/lib/auth';
+import { verifyImageFileType } from '@/lib/verify-image';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -38,6 +39,13 @@ export async function POST(req: NextRequest) {
   if (file.size > MAX_SIZE_BYTES) {
     return NextResponse.json(
       { error: 'Image must be under 5MB' },
+      { status: 400 }
+    );
+  }
+
+  if (!(await verifyImageFileType(file, file.type))) {
+    return NextResponse.json(
+      { error: 'File content does not match a valid image of the declared type' },
       { status: 400 }
     );
   }

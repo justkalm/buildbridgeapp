@@ -24,6 +24,7 @@ export default function ContractorSignupPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [claimRequested, setClaimRequested] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,6 +46,16 @@ export default function ContractorSignupPage() {
         return;
       }
 
+      if (data.claimRequested) {
+        // This email matches an existing listing — no account was created
+        // or signed into here. A claim link was emailed instead; the
+        // password only gets set once that link is clicked, which proves
+        // the signer-upper actually controls that inbox.
+        setClaimRequested(true);
+        setSubmitting(false);
+        return;
+      }
+
       const signInResult = await signIn('credentials', {
         email,
         password,
@@ -60,6 +71,24 @@ export default function ContractorSignupPage() {
       setError('Something went wrong. Please try again.');
       setSubmitting(false);
     }
+  }
+
+  if (claimRequested) {
+    return (
+      <>
+        <Nav />
+        <main className="flex-1 flex items-center justify-center px-6 py-16">
+          <div className="w-full max-w-[420px] text-center">
+            <h1 className="font-display font-light text-2xl mb-3">Check your email</h1>
+            <p className="text-stone text-sm">
+              This email is already listed on (kalm). If you own it, we&apos;ve sent a link to set
+              up your dashboard password.
+            </p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
   }
 
   return (

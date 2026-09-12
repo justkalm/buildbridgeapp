@@ -32,7 +32,15 @@ const quoteRequestSchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await auth();
 
-  if (!session?.user?.id) {
+  // Explicit role check, not just "is someone logged in". Before this,
+  // the check below (looking up a Developer row by session.user.id) would
+  // incidentally reject a contractor's session too, since contractor and
+  // developer IDs live in separate tables — but that was true by
+  // coincidence, not by design. A future refactor that shared an ID space
+  // between the two tables could silently reopen this. Checking the role
+  // directly makes the intent explicit regardless of how IDs happen to be
+  // generated.
+  if (!session?.user?.id || (session.user as { role?: string }).role !== 'developer') {
     return NextResponse.json({ error: 'You must be signed in to request a quote' }, { status: 401 });
   }
 
