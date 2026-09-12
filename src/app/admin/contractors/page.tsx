@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import AdminTabs from '@/components/AdminTabs';
 
 type ContractorRow = {
   id: string;
@@ -142,12 +143,10 @@ export default function AdminContractorsPage() {
   return (
     <main className="min-h-screen bg-paper py-10 px-6">
       <div className="max-w-4xl mx-auto">
+        <AdminTabs active="contractors" />
         <div className="flex items-center justify-between mb-1">
           <h1 className="font-display font-bold text-2xl tracking-tight">Contractors</h1>
           <div className="flex gap-3">
-            <Link href="/admin/project-posts" className="text-sm text-stone hover:text-ink">
-              Project posts
-            </Link>
             <Link href="/admin/contractors/new" className="text-sm font-medium text-sage">
               + Add contractor
             </Link>

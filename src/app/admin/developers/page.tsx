@@ -7,7 +7,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import AdminTabs from '@/components/AdminTabs';
 
 type DeveloperRow = {
   id: string;
@@ -41,11 +41,9 @@ export default function AdminDevelopersPage() {
   return (
     <main className="min-h-screen bg-paper py-10 px-6">
       <div className="max-w-4xl mx-auto">
+        <AdminTabs active="developers" />
         <div className="flex items-center justify-between mb-1">
           <h1 className="font-display font-bold text-2xl tracking-tight">Users</h1>
-          <Link href="/admin" className="text-sm text-stone hover:text-ink">
-            ← Back to admin
-          </Link>
         </div>
         <p className="text-stone text-sm mb-8">
           {developers ? `${developers.length} user${developers.length === 1 ? '' : 's'} total` : 'Loading…'}

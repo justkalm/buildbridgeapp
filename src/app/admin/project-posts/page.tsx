@@ -11,7 +11,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import AdminTabs from '@/components/AdminTabs';
 
 type Alert = {
   alertedAt: string;
@@ -112,11 +112,9 @@ export default function AdminProjectPostsPage() {
   return (
     <main className="min-h-screen bg-paper py-10 px-6">
       <div className="max-w-4xl mx-auto">
+        <AdminTabs active="project-posts" />
         <div className="flex items-center justify-between mb-1">
           <h1 className="font-display font-bold text-2xl tracking-tight">Project Posts</h1>
-          <Link href="/admin/contractors" className="text-sm text-stone hover:text-ink">
-            ← Back to contractors
-          </Link>
         </div>
         <p className="text-stone text-sm mb-8">
           {posts ? `${posts.length} project${posts.length === 1 ? '' : 's'} posted` : 'Loading…'}

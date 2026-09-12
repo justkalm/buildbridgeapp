@@ -19,7 +19,7 @@ import Footer from '@/components/Footer';
 const inputCls = 'w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink';
 
 export default function PostProjectPage() {
-  const { status: sessionStatus } = useSession();
+  const { status: sessionStatus, data: session } = useSession();
   const router = useRouter();
 
   const [projectType, setProjectType] = useState('');
@@ -35,7 +35,20 @@ export default function PostProjectPage() {
     if (sessionStatus === 'unauthenticated') {
       router.push('/login');
     }
-  }, [sessionStatus, router]);
+    // The nav link to this page is already hidden from contractors (see
+    // Nav.tsx), but that alone doesn't stop a contractor who bookmarks the
+    // URL or types it directly from landing here and being confused into
+    // thinking this is where THEY post a project — this form is
+    // developer-only. Redirect to their own dashboard instead of just
+    // showing a "not allowed" wall, since that's the page they actually
+    // meant to reach.
+    if (
+      sessionStatus === 'authenticated' &&
+      (session?.user as { role?: string })?.role !== 'developer'
+    ) {
+      router.push('/contractor/dashboard');
+    }
+  }, [sessionStatus, session, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,7 +74,10 @@ export default function PostProjectPage() {
     setSubmitting(false);
   }
 
-  if (sessionStatus !== 'authenticated') {
+  if (
+    sessionStatus !== 'authenticated' ||
+    (session?.user as { role?: string })?.role !== 'developer'
+  ) {
     return null;
   }
 
