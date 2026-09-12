@@ -145,6 +145,9 @@ export default function AdminContractorsPage() {
         <div className="flex items-center justify-between mb-1">
           <h1 className="font-display font-bold text-2xl tracking-tight">Contractors</h1>
           <div className="flex gap-3">
+            <Link href="/admin/project-posts" className="text-sm text-stone hover:text-ink">
+              Project posts
+            </Link>
             <Link href="/admin/contractors/new" className="text-sm font-medium text-sage">
               + Add contractor
             </Link>

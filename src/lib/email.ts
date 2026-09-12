@@ -78,6 +78,121 @@ export async function sendQuoteRequestEmail(input: QuoteRequestEmailInput): Prom
   }
 }
 
+type ProjectPostEmailInput = {
+  developerName: string;
+  developerEmail: string;
+  contactPhone: string;
+  projectType: string;
+  location: string;
+  budgetRangeLabel: string;
+  details: string;
+};
+
+// Notifies admin (QUOTE_NOTIFICATION_EMAIL — same inbox as quote requests
+// and contact form) that a developer posted a project via the general
+// "Post a Project" form. This is intentionally NOT visible to any
+// contractor at this point — see the ProjectPost schema comment. Admin
+// reads this, decides who (if anyone) should hear about it, and sends
+// that via sendProjectPostAlertEmail below — a completely separate,
+// later, manual step.
+export async function sendProjectPostAdminEmail(input: ProjectPostEmailInput): Promise<boolean> {
+  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+
+  if (!notifyAddress) {
+    console.error('QUOTE_NOTIFICATION_EMAIL is not set — cannot send project post email');
+    return false;
+  }
+
+  try {
+    const { error } = await getResendClient().emails.send({
+      from: '(Kalm) <onboarding@resend.dev>',
+      to: notifyAddress,
+      subject: `New project posted: ${input.projectType} in ${input.location}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 560px;">
+          <h2 style="margin-bottom: 4px;">New Project Posted</h2>
+          <p style="color: #666; margin-top: 0;">Not yet matched to any contractor — review and alert PRO contractors from admin.</p>
+
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <tr><td style="padding: 8px 0; color: #666; width: 140px;">From</td><td style="padding: 8px 0;">${escapeHtml(input.developerName)} (${escapeHtml(input.developerEmail)})</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Phone</td><td style="padding: 8px 0;">${escapeHtml(input.contactPhone)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Project type</td><td style="padding: 8px 0;">${escapeHtml(input.projectType)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Location</td><td style="padding: 8px 0;">${escapeHtml(input.location)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Budget range</td><td style="padding: 8px 0;">${escapeHtml(input.budgetRangeLabel)}</td></tr>
+          </table>
+
+          <p style="color: #666; margin-bottom: 4px;">Details</p>
+          <p style="white-space: pre-wrap;">${escapeHtml(input.details)}</p>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend returned an error sending project post admin email:', error);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Failed to send project post admin email:', err);
+    return false;
+  }
+}
+
+type ProjectPostAlertEmailInput = {
+  toEmail: string;
+  toName: string;
+  projectType: string;
+  location: string;
+  budgetRangeLabel: string;
+  details: string;
+};
+
+// Sent to a specific contractor when admin manually alerts them about a
+// posted project — this is the actual PRO perk landing in someone's inbox.
+// Deliberately does NOT include the developer's contact details in the
+// email itself: the contractor sees those in their dashboard
+// (/contractor/dashboard), which requires being logged in as that
+// contractor. Keeping contact info out of the email means a forwarded or
+// leaked email doesn't hand a developer's phone/email to whoever it ends
+// up with.
+export async function sendProjectPostAlertEmail(input: ProjectPostAlertEmailInput): Promise<boolean> {
+  try {
+    const { error } = await getResendClient().emails.send({
+      from: '(Kalm) <onboarding@resend.dev>',
+      to: input.toEmail,
+      subject: `New lead: ${input.projectType} in ${input.location}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 560px;">
+          <h2 style="margin-bottom: 4px;">A new project matches your profile</h2>
+          <p style="color: #666; margin-top: 0;">Hi ${escapeHtml(input.toName)}, (kalm) has a lead for you.</p>
+
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <tr><td style="padding: 8px 0; color: #666; width: 140px;">Project type</td><td style="padding: 8px 0;">${escapeHtml(input.projectType)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Location</td><td style="padding: 8px 0;">${escapeHtml(input.location)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Budget range</td><td style="padding: 8px 0;">${escapeHtml(input.budgetRangeLabel)}</td></tr>
+          </table>
+
+          <p style="color: #666; margin-bottom: 4px;">Details</p>
+          <p style="white-space: pre-wrap;">${escapeHtml(input.details)}</p>
+
+          <p style="margin-top: 24px;">Log in to your dashboard to see full contact details and respond.</p>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend returned an error sending project post alert email:', error);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Failed to send project post alert email:', err);
+    return false;
+  }
+}
+
 // Minimal HTML escaping for values interpolated into the email template
 // above. All of these values come from user input (developer-submitted
 // form fields), so this isn't optional — without it, a project description

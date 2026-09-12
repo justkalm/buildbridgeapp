@@ -27,6 +27,19 @@ type QuoteRequestRow = {
   developer: { name: string; email: string; phone: string };
 };
 
+type ProjectAlertRow = {
+  id: string;
+  alertedAt: string;
+  projectPost: {
+    projectType: string;
+    location: string;
+    budgetRangeLabel: string;
+    details: string;
+    contactPhone: string;
+    developer: { name: string; email: string };
+  };
+};
+
 type ContractorMe = {
   id: string;
   name: string;
@@ -34,6 +47,7 @@ type ContractorMe = {
   tier: 'LISTED' | 'PLUS' | 'PRO';
   emailVerified: boolean;
   quoteRequests: QuoteRequestRow[];
+  projectAlerts: ProjectAlertRow[];
 };
 
 const verificationCopy: Record<ContractorMe['verificationStatus'], { label: string; style: string }> = {
@@ -150,6 +164,41 @@ export default function ContractorDashboardPage() {
             </p>
           </div>
         </div>
+
+        {me.projectAlerts.length > 0 && (
+          <>
+            <h2 className="font-display font-light text-xl mb-1">Project alerts</h2>
+            <p className="text-stone text-xs mb-4">
+              Projects our team has personally matched to your profile.
+            </p>
+            <div className="flex flex-col gap-3 mb-10">
+              {me.projectAlerts.map((a) => (
+                <div key={a.id} className="border border-ink rounded-[6px] p-4">
+                  <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
+                    <div>
+                      <p className="font-medium text-sm">{a.projectPost.developer.name}</p>
+                      <p className="text-stone text-xs mt-0.5">
+                        {a.projectPost.projectType} · {a.projectPost.location} · {a.projectPost.budgetRangeLabel}
+                      </p>
+                    </div>
+                    <span className="text-xs text-stone">
+                      {new Date(a.alertedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-sm mb-3">{a.projectPost.details}</p>
+                  <div className="flex gap-4 text-xs text-stone border-t border-line pt-2.5">
+                    <a href={`mailto:${a.projectPost.developer.email}`} className="hover:text-ink underline underline-offset-2">
+                      {a.projectPost.developer.email}
+                    </a>
+                    <a href={`tel:${a.projectPost.contactPhone}`} className="hover:text-ink underline underline-offset-2">
+                      {a.projectPost.contactPhone}
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <h2 className="font-display font-light text-xl mb-4">Quote requests received</h2>
         {me.quoteRequests.length === 0 ? (

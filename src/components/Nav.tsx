@@ -24,6 +24,11 @@ export default function Nav() {
           <Link href="/browse" className="text-sm text-stone hover:text-ink transition-colors">
             Browse Contractors
           </Link>
+          {status === 'authenticated' && role === 'developer' && (
+            <Link href="/post-project" className="text-sm text-stone hover:text-ink transition-colors">
+              Post a Project
+            </Link>
+          )}
           {status !== 'authenticated' && (
             <Link href="/contractor/signup" className="text-sm text-stone hover:text-ink transition-colors">
               List Your Business

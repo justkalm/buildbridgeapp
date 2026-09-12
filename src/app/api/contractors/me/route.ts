@@ -49,6 +49,26 @@ export async function GET() {
           developer: { select: { name: true, email: true, phone: true } },
         },
       },
+      // Alerts admin has manually sent this contractor about posted
+      // projects — see ProjectPostAlert schema comment. Only ever
+      // non-empty for PRO contractors, since that's enforced at alert-send
+      // time, not here; this just returns whatever alerts already exist.
+      projectAlerts: {
+        orderBy: { alertedAt: 'desc' },
+        take: 50,
+        include: {
+          projectPost: {
+            select: {
+              projectType: true,
+              location: true,
+              budgetRangeLabel: true,
+              details: true,
+              contactPhone: true,
+              developer: { select: { name: true, email: true } },
+            },
+          },
+        },
+      },
     },
   });
 

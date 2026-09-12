@@ -130,6 +130,7 @@ model Contractor {
 
   projects      Project[]
   quoteRequests QuoteRequest[]
+  projectAlerts ProjectPostAlert[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -210,6 +211,7 @@ model Developer {
   passwordResetTokenExpiresAt DateTime?
 
   quoteRequests QuoteRequest[]
+  projectPosts  ProjectPost[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -222,7 +224,9 @@ model Developer {
 // the notification email. `status` exists so a future "your requests" view
 // on the developer dashboard has something real to show — for now, every
 // request lands as PENDING and you update it by hand if you hear back from
-// a contractor (there's no contractor-side app yet for them to update it
+// a contractor. The contractor-side dashboard (src/app/contractor/*) does
+// let a contractor see and act on requests aimed at them directly — this
+// comment used to say no contractor app existed yet; that's no longer true.
 // themselves).
 
 enum QuoteRequestStatus {
@@ -255,4 +259,75 @@ model QuoteRequest {
   @@index([contractorId])
   @@index([developerId])
   @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// ProjectPost / ProjectPostAlert
+// ---------------------------------------------------------------------------
+// A second, more general intake path alongside QuoteRequest. Where a
+// QuoteRequest targets one specific contractor a developer already found
+// via browse, a ProjectPost is a developer describing a project with NO
+// contractor picked yet — closer to "tell us what you need" than "contact
+// this company". It is never shown publicly and never auto-matched to
+// contractors; it lands with admin (same "you get an email" pattern as
+// QuoteRequest) and stays admin-only until a human decides who should hear
+// about it.
+//
+// ProjectPostAlert is the deliberate, manual link between one ProjectPost
+// and the specific contractor(s) admin chooses to notify. This is the PRO
+// perk: alerting is restricted to tier === PRO contractors at the API
+// layer (not enforced by the schema itself — Prisma has no way to express
+// "this foreign key must point at a row where tier = PRO" — so
+// src/app/api/admin/project-posts/[id]/alert/route.ts is where that rule
+// actually lives; don't assume the schema alone protects this).
+model ProjectPost {
+  id String @id @default(cuid())
+
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  projectType      String
+  location         String
+  budgetRangeLabel String
+  details          String
+  contactPhone     String // same reasoning as QuoteRequest.contactPhone — self-contained record
+
+  status ProjectPostStatus @default(NEW)
+
+  emailSentAt DateTime? // the "admin was notified" email, not a contractor alert
+
+  alerts ProjectPostAlert[]
+
+  createdAt DateTime @default(now())
+
+  @@index([developerId])
+  @@index([status])
+}
+
+enum ProjectPostStatus {
+  NEW // just submitted, admin hasn't actioned it
+  MATCHED // admin has alerted at least one contractor
+  CLOSED // admin considers this done (contractor engaged, or project no longer active) — set by hand, nothing automatic closes this yet
+}
+
+model ProjectPostAlert {
+  id String @id @default(cuid())
+
+  projectPostId String
+  projectPost   ProjectPost @relation(fields: [projectPostId], references: [id], onDelete: Cascade)
+
+  contractorId String
+  contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+
+  // When the alert was actually sent (email + dashboard both become
+  // visible at the same moment — there's no separate "seen" state yet,
+  // this timestamp IS what makes it show in the contractor's dashboard).
+  alertedAt DateTime @default(now())
+
+  // A contractor can be alerted about the same project more than once in
+  // theory (admin re-sends), so this is NOT unique on
+  // [projectPostId, contractorId] — duplicates are a deliberate non-issue,
+  // not a bug, if that ever happens.
+  @@index([projectPostId])
+  @@index([contractorId])
 }
