@@ -71,7 +71,12 @@ export async function GET() {
     // for why this isn't a bare `include`), not `include` on a bare findMany —
     // that used to return the ENTIRE Contractor row, passwordHash and reset/
     // verify tokens included, to the admin's browser on every page load.
-    select: ADMIN_SAFE_CONTRACTOR_SELECT,
+    // _count still needs its own explicit select alongside the shared
+    // constant — the admin list page reads _count.projects and
+    // _count.quoteRequests directly (both for display and for the delete
+    // confirmation copy), and this got dropped once already when the bare
+    // `include` was first replaced, which crashed the whole page render.
+    select: { ...ADMIN_SAFE_CONTRACTOR_SELECT, _count: { select: { projects: true, quoteRequests: true } } },
   });
 
   return NextResponse.json(contractors);
