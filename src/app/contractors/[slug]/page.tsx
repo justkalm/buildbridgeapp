@@ -165,16 +165,6 @@ export default function ContractorProfilePage() {
                       ✓ Verified
                     </span>
                   )}
-                  {contractor.tier === 'PRO' && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] text-paper bg-ink rounded-full px-2.5 py-1 font-medium">
-                      Pro
-                    </span>
-                  )}
-                  {contractor.tier === 'PLUS' && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] text-ink bg-paper-dim border border-line rounded-full px-2.5 py-1 font-medium">
-                      Plus
-                    </span>
-                  )}
                 </div>
                 <div className="flex gap-4 flex-wrap text-[13.5px] text-stone mb-3">
                   <span>📍 {contractor.area}, {contractor.city}</span>

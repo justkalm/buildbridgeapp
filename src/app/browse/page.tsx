@@ -82,13 +82,29 @@ function BrowsePageInner() {
     // when no filter was applied, and mutating that with .sort() would
     // silently reorder the original fetched list too.
     result = [...result];
-    if (sortBy === 'experience') {
-      result.sort((a, b) => (b.yearsInBusiness ?? 0) - (a.yearsInBusiness ?? 0));
-    } else if (sortBy === 'projects') {
-      result.sort((a, b) => b._count.projects - a._count.projects);
-    } else if (sortBy === 'location') {
-      result.sort((a, b) => `${a.city}${a.area}`.localeCompare(`${b.city}${b.area}`));
-    }
+
+    // Tier always wins first — paying contractors (PRO, then PLUS) show
+    // above free (LISTED) ones regardless of which sort option is picked.
+    // This used to be undone entirely: the backend fetch already ordered
+    // by tier, but this client-side sort ran on top of it and only looked
+    // at experience/projects/location, silently discarding that order. The
+    // dropdown now only controls ranking WITHIN a tier, not whether tier
+    // matters at all — "highest payer shows first" should hold no matter
+    // which sort view someone's looking at.
+    const TIER_RANK: Record<Contractor['tier'], number> = { PRO: 0, PLUS: 1, LISTED: 2 };
+
+    result.sort((a, b) => {
+      const tierDiff = TIER_RANK[a.tier] - TIER_RANK[b.tier];
+      if (tierDiff !== 0) return tierDiff;
+
+      if (sortBy === 'experience') {
+        return (b.yearsInBusiness ?? 0) - (a.yearsInBusiness ?? 0);
+      }
+      if (sortBy === 'projects') {
+        return b._count.projects - a._count.projects;
+      }
+      return `${a.city}${a.area}`.localeCompare(`${b.city}${b.area}`);
+    });
 
     return result;
   }, [contractors, selectedTrade, selectedCity, minExperience, minProjects, sortBy]);
@@ -238,16 +254,6 @@ function BrowsePageInner() {
                           {c.verificationStatus === 'VERIFIED' && (
                             <span className="inline-flex items-center gap-1.5 text-[11px] text-sage bg-sage-soft border border-sage/25 rounded-full px-2.5 py-1">
                               ✓ Verified
-                            </span>
-                          )}
-                          {c.tier === 'PRO' && (
-                            <span className="inline-flex items-center gap-1.5 text-[11px] text-paper bg-ink rounded-full px-2.5 py-1 font-medium">
-                              Pro
-                            </span>
-                          )}
-                          {c.tier === 'PLUS' && (
-                            <span className="inline-flex items-center gap-1.5 text-[11px] text-ink bg-paper-dim border border-line rounded-full px-2.5 py-1 font-medium">
-                              Plus
                             </span>
                           )}
                         </div>
