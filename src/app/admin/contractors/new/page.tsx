@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import ImageUpload from '@/components/ImageUpload';
+import AdminTabs from '@/components/AdminTabs';
 
 type ProjectDraft = {
   title: string;
@@ -158,6 +159,14 @@ export default function NewContractorPage() {
   return (
     <main className="min-h-screen bg-paper-dim py-10 px-6">
       <div className="max-w-2xl mx-auto">
+        {/*
+          active="contractors" — this page is reached from the Contractors
+          tab (via the "New Contractor" card on /admin, or a link from the
+          Contractors list itself), so highlighting that tab here keeps
+          the "where am I" model consistent even though this specific URL
+          isn't one of the three top-level tab destinations.
+        */}
+        <AdminTabs active="contractors" />
         <div className="flex items-center justify-between mb-1">
           <h1 className="font-display font-light text-2xl">Add a Contractor</h1>
           <Link href="/browse" className="text-sm text-stone hover:text-ink">
