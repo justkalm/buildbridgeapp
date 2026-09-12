@@ -20,8 +20,7 @@ const securityHeaders = [
     // Stops the browser from guessing content types based on file
     // contents rather than trusting the declared Content-Type header —
     // relevant given the upload routes accept files by client-reported
-    // MIME type (see the upload route comments for the related, separate
-    // issue of that type not being independently verified).
+    // MIME type.
     key: 'X-Content-Type-Options',
     value: 'nosniff',
   },
@@ -61,10 +60,18 @@ const securityHeaders = [
     // unsanitized user-content rendering, so the realistic exposure is
     // low — trading a fully broken site for a moderately-relaxed script
     // policy is the right call here.
+    //
+    // 'unsafe-eval' is added ONLY in development: React's dev-mode
+    // debugging tools (reconstructing component stacks, Fast Refresh) use
+    // eval() internally, and without 'unsafe-eval' `npm run dev` throws
+    // "eval() is not supported in this environment" and breaks local
+    // development entirely. React's own docs confirm it never uses eval()
+    // in production, so this only needs to (and only does) apply when
+    // iterating locally — the deployed site never gets 'unsafe-eval'.
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https:",
