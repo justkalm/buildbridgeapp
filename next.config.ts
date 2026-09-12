@@ -45,16 +45,26 @@ const securityHeaders = [
     // Content-Security-Policy: restricts where scripts, styles, images,
     // and frames can load from. frame-ancestors 'none' is the modern,
     // CSP-level equivalent of X-Frame-Options DENY (kept both since older
-    // browsers only respect the header). 'unsafe-inline' on style-src is
-    // needed because Tailwind and Next.js both inject inline styles at
-    // runtime; script-src stays strict since nothing here needs inline
-    // scripts. connect-src allows the app to call its own API routes and
-    // NextAuth; adjust if a new external API is ever called directly from
-    // the browser (not from a server route).
+    // browsers only respect the header).
+    //
+    // script-src MUST include 'unsafe-inline': Next.js hydrates every page
+    // using inline <script> tags it injects into the server-rendered HTML
+    // (serialized page data + the bootstrap script that mounts React).
+    // Without 'unsafe-inline' here, the browser silently blocks those
+    // scripts from running at all — the page renders as blank white,
+    // because the HTML shell loads fine but nothing ever hydrates or
+    // executes. This shipped broken once already; don't remove
+    // 'unsafe-inline' from script-src without switching to Next.js's
+    // nonce-based CSP support first, which is more setup than this slice
+    // needs right now. 'unsafe-inline' does weaken XSS protection
+    // somewhat, but the app has no dangerouslySetInnerHTML and no
+    // unsanitized user-content rendering, so the realistic exposure is
+    // low — trading a fully broken site for a moderately-relaxed script
+    // policy is the right call here.
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https://*.public.blob.vercel-storage.com",
