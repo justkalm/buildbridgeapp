@@ -9,10 +9,10 @@
 //
 // `active` tells this component which tab to visually highlight — pass the
 // current page's own key so it doesn't render its own link as clickable-
-// looking-different-from-current. Omit it (or leave undefined) on pages
-// that aren't any one of the three tabs themselves — /admin (the home
-// screen) uses this, since it sits above all three rather than being one
-// of them; no tab renders as "current" in that case, which is accurate.
+// looking-different-from-current. This component is only rendered on the
+// three actual sub-pages (Contractors/Developers/Project Posts) — /admin
+// itself (the home screen) doesn't render it at all, since showing tabs
+// (or a link back to itself) on the page they point back TO is circular.
 
 import Link from 'next/link';
 
@@ -24,7 +24,7 @@ const TABS = [
 
 export type AdminTabKey = (typeof TABS)[number]['key'];
 
-export default function AdminTabs({ active }: { active?: AdminTabKey }) {
+export default function AdminTabs({ active }: { active: AdminTabKey }) {
   return (
     <div className="flex items-center justify-between mb-6 -mt-2 border-b border-line">
       <nav className="flex gap-1">

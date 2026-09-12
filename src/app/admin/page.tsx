@@ -8,7 +8,6 @@
 import Link from 'next/link';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import AdminLoginForm from './login-form';
-import AdminTabs from '@/components/AdminTabs';
 
 export default async function AdminPage() {
   const authenticated = await isAdminAuthenticated();
@@ -21,13 +20,12 @@ export default async function AdminPage() {
     <main className="min-h-screen bg-paper py-10 px-6">
       <div className="max-w-2xl mx-auto">
         {/*
-          AdminTabs has no "active" tab here on purpose — /admin itself
-          isn't one of Contractors/Developers/Project Posts, it's the home
-          screen above all three. Omitting active means none of the three
-          tabs render as "current", which is the honest state: you're not
-          currently inside any of them.
+          Deliberately NO AdminTabs here. This page IS the thing the tab
+          bar's "← Admin home" link points back to — showing the tabs (or
+          a link back to this same page) here is circular and adds nothing
+          the four cards below don't already cover. AdminTabs belongs only
+          on the three actual sub-pages it switches between.
         */}
-        <AdminTabs />
         <div className="flex items-center justify-between mb-8">
           <h1 className="font-display font-bold text-2xl tracking-tight">Admin</h1>
           <Link href="/browse" className="text-sm text-stone hover:text-ink">
