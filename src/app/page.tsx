@@ -95,6 +95,49 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="py-24 border-t border-line bg-paper-dim">
+        <div className="max-w-[880px] mx-auto px-8">
+          <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-center text-ink mb-4">
+            Built for contractors too.
+          </h2>
+          <p className="text-[15.5px] leading-relaxed text-stone text-center max-w-[520px] mx-auto mb-16">
+            A listing on (kalm) isn&apos;t just a directory entry — it&apos;s a dashboard you actually
+            control.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+            {[
+              {
+                title: 'A profile that proves it',
+                body: 'Show completed projects with real photos, timelines, and square footage — not just a claim.',
+              },
+              {
+                title: 'Leads land in one place',
+                body: 'See every quote request as it comes in, with the developer\u2019s contact details, right in your dashboard.',
+              },
+              {
+                title: 'You stay in control',
+                body: 'Update your own profile and project history any time. Editing never takes your listing offline.',
+              },
+            ].map((item) => (
+              <div key={item.title} className="text-center md:text-left">
+                <h4 className="font-display text-lg text-ink mb-2">{item.title}</h4>
+                <p className="text-sm text-stone leading-relaxed">{item.body}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-center mt-16">
+            <Link
+              href="/contractor/signup"
+              className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
+            >
+              List your business
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section className="py-24 border-t border-line">
         <div className="max-w-[640px] mx-auto px-8 text-center">
           <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-ink mb-6">
