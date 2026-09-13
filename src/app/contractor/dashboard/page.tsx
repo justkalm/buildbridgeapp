@@ -24,7 +24,8 @@ type QuoteRequestRow = {
   details: string;
   status: 'PENDING' | 'CONTACTED' | 'DECLINED';
   createdAt: string;
-  developer: { name: string; email: string; phone: string };
+  developer: { name: string; email: string | null; phone: string | null };
+  leadVisibility: 'full' | 'blurred';
 };
 
 type ProjectAlertRow = {
@@ -48,6 +49,7 @@ type ContractorMe = {
   emailVerified: boolean;
   quoteRequests: QuoteRequestRow[];
   projectAlerts: ProjectAlertRow[];
+  leadLimit: { cap: number; usedThisMonth: number } | null;
 };
 
 const verificationCopy: Record<ContractorMe['verificationStatus'], { label: string; style: string }> = {
@@ -200,35 +202,84 @@ export default function ContractorDashboardPage() {
           </>
         )}
 
-        <h2 className="font-display font-light text-xl mb-4">Quote requests received</h2>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h2 className="font-display font-light text-xl">Quote requests received</h2>
+          {me.leadLimit && (
+            <span className="text-xs text-stone">
+              {me.leadLimit.usedThisMonth} of {me.leadLimit.cap} full leads used this month
+            </span>
+          )}
+        </div>
         {me.quoteRequests.length === 0 ? (
           <p className="text-stone text-sm">No quote requests yet.</p>
         ) : (
           <div className="flex flex-col gap-3">
-            {me.quoteRequests.map((r) => (
-              <div key={r.id} className="border border-line rounded-[6px] p-4">
-                <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
-                  <div>
-                    <p className="font-medium text-sm">{r.developer.name}</p>
-                    <p className="text-stone text-xs mt-0.5">
-                      {r.projectType} · {r.location} · {r.budgetRangeLabel}
-                    </p>
+            {me.quoteRequests.map((r) =>
+              r.leadVisibility === 'blurred' ? (
+                <div key={r.id} className="border border-line rounded-[6px] p-4 relative overflow-hidden">
+                  <div className="blur-[3px] select-none pointer-events-none">
+                    <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
+                      <div>
+                        <p className="font-medium text-sm">{r.developer.name}</p>
+                        <p className="text-stone text-xs mt-0.5">
+                          {r.projectType} · {r.location} · {r.budgetRangeLabel}
+                        </p>
+                      </div>
+                      <span className="text-xs text-stone">
+                        {new Date(r.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-sm mb-3">{r.details}</p>
+                    <div className="flex gap-4 text-xs text-stone border-t border-line pt-2.5">
+                      <span>contact@hidden.example</span>
+                      <span>+91 00000 00000</span>
+                    </div>
                   </div>
-                  <span className="text-xs text-stone">
-                    {new Date(r.createdAt).toLocaleDateString()}
-                  </span>
+                  <div className="absolute inset-0 flex items-center justify-center bg-paper/70">
+                    <div className="text-center px-4">
+                      <p className="text-sm font-medium mb-1">You&apos;ve used your free leads this month</p>
+                      <p className="text-xs text-stone mb-3">
+                        Upgrade to see full details for every lead, not just the first {me.leadLimit?.cap}.
+                      </p>
+                      {/* Placeholder destination — there's no real
+                          pricing/upgrade page yet (deferred, per project
+                          notes). Points at the dashboard itself for now so
+                          it's not a dead link; swap for the real upgrade
+                          flow once pricing exists. */}
+                      <Link
+                        href="/contractor/dashboard"
+                        className="inline-flex items-center justify-center text-xs px-4 py-2 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
+                      >
+                        See upgrade options
+                      </Link>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm mb-3">{r.details}</p>
-                <div className="flex gap-4 text-xs text-stone border-t border-line pt-2.5">
-                  <a href={`mailto:${r.developer.email}`} className="hover:text-ink underline underline-offset-2">
-                    {r.developer.email}
-                  </a>
-                  <a href={`tel:${r.developer.phone}`} className="hover:text-ink underline underline-offset-2">
-                    {r.developer.phone}
-                  </a>
+              ) : (
+                <div key={r.id} className="border border-line rounded-[6px] p-4">
+                  <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
+                    <div>
+                      <p className="font-medium text-sm">{r.developer.name}</p>
+                      <p className="text-stone text-xs mt-0.5">
+                        {r.projectType} · {r.location} · {r.budgetRangeLabel}
+                      </p>
+                    </div>
+                    <span className="text-xs text-stone">
+                      {new Date(r.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-sm mb-3">{r.details}</p>
+                  <div className="flex gap-4 text-xs text-stone border-t border-line pt-2.5">
+                    <a href={`mailto:${r.developer.email}`} className="hover:text-ink underline underline-offset-2">
+                      {r.developer.email}
+                    </a>
+                    <a href={`tel:${r.developer.phone}`} className="hover:text-ink underline underline-offset-2">
+                      {r.developer.phone}
+                    </a>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
         )}
       </main>

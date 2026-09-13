@@ -17,6 +17,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { computeLeadVisibility, getMonthStart, LISTED_MONTHLY_LEAD_CAP } from '@/lib/lead-limits';
 
 async function requireContractor() {
   const session = await auth();
@@ -76,15 +77,58 @@ export async function GET() {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
+  // Lead-limit enforcement — LISTED contractors get LISTED_MONTHLY_LEAD_CAP
+  // fully-visible quote requests per calendar month; the rest are blurred.
+  // See src/lib/lead-limits.ts for the full reasoning. This has to happen
+  // server-side, not just hidden in the UI: stripping developer.email/
+  // phone/name out of the actual response is what stops a contractor from
+  // just reading the network tab to see contact info they haven't paid
+  // for. A CSS blur alone would be purely cosmetic.
+  const monthStart = getMonthStart();
+  const thisMonthRequests = contractor.quoteRequests
+    .filter((r) => r.createdAt >= monthStart)
+    // oldest-first for the cap calculation — see lead-limits.ts on why
+    .slice()
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+  const visibilityById = computeLeadVisibility(contractor.tier, thisMonthRequests);
+
+  const quoteRequestsWithVisibility = contractor.quoteRequests.map((r) => {
+    // Requests from a PRIOR month are never blurred — the cap is scoped to
+    // the current month only, so history already visible stays visible.
+    const visibility = visibilityById.get(r.id) ?? 'full';
+
+    if (visibility === 'full') {
+      return { ...r, leadVisibility: 'full' as const };
+    }
+
+    // Blurred: strip the actual contact fields rather than truncating them
+    // client-side — see the block comment above for why.
+    const { developer, ...rest } = r;
+    return {
+      ...rest,
+      developer: { name: developer.name, email: null, phone: null },
+      leadVisibility: 'blurred' as const,
+    };
+  });
+
   // Never return passwordHash or reset/verify tokens to the client.
   const {
     passwordHash: _passwordHash,
     emailVerifyToken: _evt,
     passwordResetToken: _prt,
+    quoteRequests: _rawQuoteRequests,
     ...safe
   } = contractor;
 
-  return NextResponse.json(safe);
+  return NextResponse.json({
+    ...safe,
+    quoteRequests: quoteRequestsWithVisibility,
+    leadLimit:
+      contractor.tier === 'LISTED'
+        ? { cap: LISTED_MONTHLY_LEAD_CAP, usedThisMonth: thisMonthRequests.length }
+        : null,
+  });
 }
 
 // Profile fields that trigger a re-verification reset when changed.
