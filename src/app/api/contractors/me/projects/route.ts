@@ -14,6 +14,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 async function requireContractor() {
   const session = await auth();
@@ -46,13 +48,31 @@ const projectSchema = z.object({
   elevationFloors: z.number().int().positive().nullable().optional(),
   committedDurationMonths: z.number().int().positive().nullable().optional(),
   actualDurationMonths: z.number().int().positive().nullable().optional(),
-  imageUrls: z.array(z.string().url()).max(20).default([]),
+  imageUrls: z
+    .array(z.string().url())
+    .max(20)
+    .refine((urls) => urls.every(isOwnBlobImageUrl), {
+      message: 'Image URLs must come from this app\'s own upload endpoint',
+    })
+    .default([]),
 });
 
 export async function POST(req: Request) {
   const contractorId = await requireContractor();
   if (!contractorId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  // Rate limited per contractor — this route is already behind login, so
+  // the realistic abuse case is a logged-in account scripting unlimited
+  // project creation (each with up to 20 image URLs). 20/hour is generous
+  // for genuine use — nobody legitimately adds more than a handful of
+  // projects in one sitting.
+  if (!checkRateLimit(`project-create:${contractorId}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    );
   }
 
   let body: unknown;

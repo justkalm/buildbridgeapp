@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { verifyImageFileType } from '@/lib/verify-image';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -25,6 +26,19 @@ const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 export async function POST(req: NextRequest) {
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  // Keyed by IP, not a per-user id — the shared admin session has no
+  // individual user identity to key on (see admin-auth.ts). Lower urgency
+  // than the contractor-facing upload route since only whoever has the
+  // admin password+2FA can reach this at all, but consistent protection
+  // is simple to add and costs nothing.
+  const ip = getClientIp(req);
+  if (!checkRateLimit(`admin-upload:${ip}`, { maxAttempts: 30, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: 'Too many uploads. Please try again later.' },
+      { status: 429 }
+    );
   }
 
   const formData = await req.formData();

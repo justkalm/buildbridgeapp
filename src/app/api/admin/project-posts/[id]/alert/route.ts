@@ -8,19 +8,30 @@
 // request rather than silently skipping it, so admin gets clear feedback
 // instead of a partial, confusing result.
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { sendProjectPostAlertEmail } from '@/lib/email';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const alertSchema = z.object({
   contractorIds: z.array(z.string().min(1)).min(1).max(20),
 });
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  // Each alert sends real emails via Resend — rate limiting this also
+  // protects against burning email-sending quota, not just general abuse.
+  const ip = getClientIp(req);
+  if (!checkRateLimit(`admin-project-alert:${ip}`, { maxAttempts: 30, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    );
   }
 
   const { id } = await params;

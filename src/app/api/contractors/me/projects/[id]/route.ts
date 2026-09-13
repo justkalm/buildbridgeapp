@@ -12,6 +12,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 async function requireContractor() {
   const session = await auth();
@@ -30,13 +32,29 @@ const projectUpdateSchema = z.object({
   elevationFloors: z.number().int().positive().nullable().optional(),
   committedDurationMonths: z.number().int().positive().nullable().optional(),
   actualDurationMonths: z.number().int().positive().nullable().optional(),
-  imageUrls: z.array(z.string().url()).max(20).optional(),
+  imageUrls: z
+    .array(z.string().url())
+    .max(20)
+    .refine((urls) => urls.every(isOwnBlobImageUrl), {
+      message: 'Image URLs must come from this app\'s own upload endpoint',
+    })
+    .optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const contractorId = await requireContractor();
   if (!contractorId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  // Same reasoning and limit as project creation — see the POST route in
+  // ../route.ts. Separate bucket (different key prefix) so create and
+  // edit don't share one combined limit.
+  if (!checkRateLimit(`project-edit:${contractorId}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    );
   }
 
   const { id } = await params;
@@ -75,6 +93,14 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const contractorId = await requireContractor();
   if (!contractorId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  // Same limit as create/edit — see the POST route in ../route.ts.
+  if (!checkRateLimit(`project-delete:${contractorId}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    );
   }
 
   const { id } = await params;

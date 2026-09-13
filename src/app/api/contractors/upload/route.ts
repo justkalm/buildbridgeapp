@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import { auth } from '@/lib/auth';
 import { verifyImageFileType } from '@/lib/verify-image';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -20,6 +21,18 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user || (session.user as { role?: string }).role !== 'contractor') {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  // Rate limited per contractor — uploads cost real storage/bandwidth on
+  // Vercel Blob, and this route was previously uncapped: a logged-in
+  // contractor could script unlimited uploads. 30/hour is generous for
+  // genuine use (a handful of project photos at a time) while capping a
+  // scripted burst.
+  if (!checkRateLimit(`contractor-upload:${session.user.id}`, { maxAttempts: 30, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json(
+      { error: 'Too many uploads. Please try again later.' },
+      { status: 429 }
+    );
   }
 
   const formData = await req.formData();

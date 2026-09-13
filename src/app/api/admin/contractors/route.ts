@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { ADMIN_SAFE_CONTRACTOR_SELECT } from '@/lib/admin-contractor-select';
+import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
 
 const projectSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -23,7 +24,13 @@ const projectSchema = z.object({
   elevationFloors: z.number().int().positive().optional(),
   committedDurationMonths: z.number().int().positive().optional(),
   actualDurationMonths: z.number().int().positive().optional(),
-  imageUrls: z.array(z.string().url()).max(10).default([]),
+  imageUrls: z
+    .array(z.string().url())
+    .max(10)
+    .refine((urls) => urls.every(isOwnBlobImageUrl), {
+      message: 'Image URLs must come from this app\'s own upload endpoint',
+    })
+    .default([]),
 });
 
 const contractorSchema = z.object({
