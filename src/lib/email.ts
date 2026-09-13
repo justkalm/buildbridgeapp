@@ -46,7 +46,7 @@ export async function sendQuoteRequestEmail(input: QuoteRequestEmailInput): Prom
       // "BuildBridge <quotes@yourdomain.com>" — see the deployment notes.
       from: '(Kalm) <onboarding@resend.dev>',
       to: notifyAddress,
-      subject: `New quote request for ${input.contractorName}`,
+      subject: `New quote request for ${sanitizeSubject(input.contractorName)}`,
       html: `
         <div style="font-family: sans-serif; max-width: 560px;">
           <h2 style="margin-bottom: 4px;">New Quote Request</h2>
@@ -107,7 +107,7 @@ export async function sendProjectPostAdminEmail(input: ProjectPostEmailInput): P
     const { error } = await getResendClient().emails.send({
       from: '(Kalm) <onboarding@resend.dev>',
       to: notifyAddress,
-      subject: `New project posted: ${input.projectType} in ${input.location}`,
+      subject: `New project posted: ${sanitizeSubject(input.projectType)} in ${sanitizeSubject(input.location)}`,
       html: `
         <div style="font-family: sans-serif; max-width: 560px;">
           <h2 style="margin-bottom: 4px;">New Project Posted</h2>
@@ -161,7 +161,7 @@ export async function sendProjectPostAlertEmail(input: ProjectPostAlertEmailInpu
     const { error } = await getResendClient().emails.send({
       from: '(Kalm) <onboarding@resend.dev>',
       to: input.toEmail,
-      subject: `New lead: ${input.projectType} in ${input.location}`,
+      subject: `New lead: ${sanitizeSubject(input.projectType)} in ${sanitizeSubject(input.location)}`,
       html: `
         <div style="font-family: sans-serif; max-width: 560px;">
           <h2 style="margin-bottom: 4px;">A new project matches your profile</h2>
@@ -204,6 +204,20 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// For values interpolated into an email SUBJECT line, not the HTML body.
+// escapeHtml is the wrong tool here: the risk in a subject isn't markup
+// injection, it's HEADER injection — a subject value containing a
+// newline (\n or \r\n) could, depending on how deep the mail-sending
+// library's own escaping goes, be used to inject additional email
+// headers (like an extra Bcc:) rather than just extending the visible
+// subject text. Stripping newlines/control characters closes that
+// specific vector regardless of what Resend's SDK does internally —
+// treat this as defense in depth, not a statement that Resend is
+// unsafe without it.
+function sanitizeSubject(str: string): string {
+  return str.replace(/[\r\n]+/g, ' ').trim();
 }
 
 // Both functions below send TO the developer's own email address, unlike
@@ -336,7 +350,7 @@ export async function sendContactFormEmail(input: {
       from: '(kalm) <onboarding@resend.dev>',
       to: notifyAddress,
       replyTo: input.email,
-      subject: `New contact form message from ${escapeHtml(input.name)}`,
+      subject: `New contact form message from ${sanitizeSubject(input.name)}`,
       html: `
         <div style="font-family: sans-serif; max-width: 560px;">
           <h2>New contact form message</h2>
