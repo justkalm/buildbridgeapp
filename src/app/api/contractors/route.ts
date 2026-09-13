@@ -6,12 +6,16 @@
 // hand-added contractors right now, not thousands. Add pagination when the
 // count actually warrants it, not before.
 //
-// Only returns VERIFIED contractors by default. This is a deliberate
-// product decision, not an oversight: a developer browsing the platform
-// should see contractors whose licenses have actually been checked. Pass
-// ?includeUnverified=true to see everything (useful for you, testing, or
-// the future admin view) — this is not meant to be a public-facing param
-// long-term; once the admin page exists, gate this behind admin auth too.
+// Only ever returns VERIFIED contractors — no query param can change this.
+// A developer browsing the platform should see contractors whose licenses
+// have actually been checked, full stop. This used to have an
+// ?includeUnverified=true escape hatch with no auth check on it at all —
+// anyone, not just admin, could see every PENDING/REJECTED contractor by
+// adding that param to the URL. Removed rather than gated behind admin
+// auth: nothing in the app actually used it (the admin contractors page
+// has its own separate, properly-gated /api/admin/contractors endpoint
+// that already returns everything), so there was no reason to keep the
+// bypass around at all.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -20,11 +24,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const area = searchParams.get('area');
   const trade = searchParams.get('trade');
-  const includeUnverified = searchParams.get('includeUnverified') === 'true';
 
   const contractors = await prisma.contractor.findMany({
     where: {
-      ...(includeUnverified ? {} : { verificationStatus: 'VERIFIED' }),
+      verificationStatus: 'VERIFIED',
       ...(area ? { area: { equals: area, mode: 'insensitive' } } : {}),
       ...(trade ? { tradeTypes: { has: trade } } : {}),
     },
