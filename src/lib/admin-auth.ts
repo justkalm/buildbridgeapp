@@ -28,7 +28,7 @@ import { cookies } from 'next/headers';
 import crypto from 'crypto';
 
 const ADMIN_COOKIE_NAME = 'bb_admin_session';
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 4; // 4 hours — admin only, not developer/contractor sessions (those use NextAuth in auth.ts and are unaffected by this). Deliberately short: this is the account that can verify contractors, alert PRO leads, and see every developer's contact info — worth re-entering password + 2FA more often here than on a regular account.
 
 function sign(payload: string): string {
   const secret = process.env.ADMIN_PASSWORD ?? '';
