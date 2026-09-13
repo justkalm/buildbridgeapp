@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import TradeTypePicker from '@/components/TradeTypePicker';
 
 type ContractorMe = {
   id: string;
@@ -144,19 +145,10 @@ export default function ContractorProfilePage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1.5">Trade types (comma-separated)</label>
-            <input
-              value={me.tradeTypes.join(', ')}
-              onChange={(e) =>
-                setMe({
-                  ...me,
-                  tradeTypes: e.target.value
-                    .split(',')
-                    .map((t) => t.trim())
-                    .filter(Boolean),
-                })
-              }
-              className={inputCls}
+            <label className="block text-sm font-medium mb-1.5">Trade types</label>
+            <TradeTypePicker
+              selected={me.tradeTypes}
+              onChange={(next) => setMe({ ...me, tradeTypes: next })}
             />
           </div>
           <div className="grid grid-cols-3 gap-4">

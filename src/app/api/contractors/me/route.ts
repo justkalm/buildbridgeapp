@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { computeLeadVisibility, getMonthStart, LISTED_MONTHLY_LEAD_CAP } from '@/lib/lead-limits';
+import { isValidTradeType } from '@/lib/trade-types';
 
 async function requireContractor() {
   const session = await auth();
@@ -136,7 +137,13 @@ const profileSchema = z.object({
   bio: z.string().trim().max(2000).optional(),
   city: z.string().trim().min(1).max(100).optional(),
   area: z.string().trim().min(1).max(100).optional(),
-  tradeTypes: z.array(z.string().trim().min(1)).max(10).optional(),
+  tradeTypes: z
+    .array(z.string().trim().min(1))
+    .max(10)
+    .refine((types) => types.every(isValidTradeType), {
+      message: 'One or more trade types are not in the allowed list',
+    })
+    .optional(),
   yearsInBusiness: z.number().int().min(0).max(100).nullable().optional(),
   teamSizeMin: z.number().int().min(0).max(10000).nullable().optional(),
   teamSizeMax: z.number().int().min(0).max(10000).nullable().optional(),

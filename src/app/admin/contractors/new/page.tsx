@@ -6,6 +6,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import ImageUpload from '@/components/ImageUpload';
 import AdminTabs from '@/components/AdminTabs';
+import TradeTypePicker from '@/components/TradeTypePicker';
 
 type ProjectDraft = {
   title: string;
@@ -35,7 +36,7 @@ export default function NewContractorPage() {
   const [name, setName] = useState('');
   const [city, setCity] = useState('Mumbai');
   const [area, setArea] = useState('');
-  const [tradeTypesInput, setTradeTypesInput] = useState('');
+  const [tradeTypes, setTradeTypes] = useState<string[]>([]);
   const [licenseNumber, setLicenseNumber] = useState('');
   const [verificationStatus, setVerificationStatus] = useState<'PENDING' | 'VERIFIED'>('PENDING');
   const [tier, setTier] = useState<'LISTED' | 'PLUS' | 'PRO'>('LISTED');
@@ -80,13 +81,22 @@ export default function NewContractorPage() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+
+    // TradeTypePicker has no native HTML `required` the way the old text
+    // input did — it's a button-based multi-select, not a form control
+    // the browser validates on its own. Check explicitly instead.
+    if (tradeTypes.length === 0) {
+      setError('Select at least one trade type');
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = {
       name,
       city,
       area,
-      tradeTypes: tradeTypesInput.split(',').map((t) => t.trim()).filter(Boolean),
+      tradeTypes,
       licenseNumber,
       verificationStatus,
       tier,
@@ -136,7 +146,7 @@ export default function NewContractorPage() {
       setSuccess(`Added ${data.name}. You can add another below.`);
       setName('');
       setArea('');
-      setTradeTypesInput('');
+      setTradeTypes([]);
       setLicenseNumber('');
       setVerificationStatus('PENDING');
       setYearsInBusiness('');
@@ -204,14 +214,8 @@ export default function NewContractorPage() {
             </Field>
           </div>
 
-          <Field label="Trade types (comma-separated)">
-            <input
-              required
-              value={tradeTypesInput}
-              onChange={(e) => setTradeTypesInput(e.target.value)}
-              placeholder="RCC & Structural, Waterproofing"
-              className={inputCls}
-            />
+          <Field label="Trade types">
+            <TradeTypePicker selected={tradeTypes} onChange={setTradeTypes} />
           </Field>
 
           <div className="grid grid-cols-2 gap-4">

@@ -14,6 +14,7 @@ import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { ADMIN_SAFE_CONTRACTOR_SELECT } from '@/lib/admin-contractor-select';
 import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
+import { isValidTradeType } from '@/lib/trade-types';
 
 const projectSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -37,7 +38,12 @@ const contractorSchema = z.object({
   name: z.string().trim().min(1).max(200),
   city: z.string().trim().min(1).max(100),
   area: z.string().trim().min(1).max(100),
-  tradeTypes: z.array(z.string().trim().min(1)).min(1, 'At least one trade type is required'),
+  tradeTypes: z
+    .array(z.string().trim().min(1))
+    .min(1, 'At least one trade type is required')
+    .refine((types) => types.every(isValidTradeType), {
+      message: 'One or more trade types are not in the allowed list',
+    }),
   licenseNumber: z.string().trim().min(1).max(100),
   verificationStatus: z.enum(['PENDING', 'VERIFIED', 'REJECTED']).default('PENDING'),
   // Manual override only — not tied to billing. Trial period means no
