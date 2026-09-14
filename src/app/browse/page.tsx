@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import { TRADE_TYPE_CATEGORIES } from '@/lib/trade-types';
 
 type Contractor = {
   id: string;
@@ -55,6 +56,24 @@ function BrowsePageInner() {
     const allTrades = contractors.flatMap((c) => c.tradeTypes);
     return Array.from(new Set(allTrades)).sort();
   }, [contractors]);
+
+  // Groups availableTrades by the same 8 categories used in
+  // src/lib/trade-types.ts, so the filter dropdown organizes trades the
+  // same way the contractor-side picker does. Previously this page just
+  // listed every distinct trade string as a flat row of pill buttons —
+  // fine when trades were a handful of loose free-text values, but once
+  // the 90-item closed taxonomy landed, even one contractor selecting
+  // several trades across categories produced a long, unsorted-feeling
+  // wrapping row of buttons. Category groups fix that; only categories
+  // with at least one trade actually in use are shown, so this never
+  // shows empty groups even though the full taxonomy has 8 categories.
+  const tradeOptgroups = useMemo(() => {
+    const availableSet = new Set(availableTrades);
+    return TRADE_TYPE_CATEGORIES.map((c) => ({
+      label: c.category,
+      options: c.trades.filter((t) => availableSet.has(t)).map((t) => ({ value: t, label: t })),
+    })).filter((group) => group.options.length > 0);
+  }, [availableTrades]);
 
   const availableCities = useMemo(() => {
     if (!contractors) return [];
@@ -109,7 +128,7 @@ function BrowsePageInner() {
     return result;
   }, [contractors, selectedTrade, selectedCity, minExperience, minProjects, sortBy]);
 
-  const hasActiveFilters = selectedCity !== 'all' || minExperience > 0 || minProjects > 0;
+  const hasActiveFilters = selectedTrade !== 'all' || selectedCity !== 'all' || minExperience > 0 || minProjects > 0;
 
   return (
     <>
@@ -136,36 +155,18 @@ function BrowsePageInner() {
 
         {contractors !== null && filteredContractors !== null && (
           <>
-            {availableTrades.length > 1 && (
-              <div className="flex flex-wrap gap-2 mb-5">
-                <button
-                  onClick={() => setSelectedTrade('all')}
-                  className={`text-[13px] px-3.5 py-2 rounded-full border transition-colors ${
-                    selectedTrade === 'all'
-                      ? 'bg-ink text-paper border-ink'
-                      : 'bg-paper text-stone border-line hover:border-ink'
-                  }`}
-                >
-                  All trades
-                </button>
-                {availableTrades.map((trade) => (
-                  <button
-                    key={trade}
-                    onClick={() => setSelectedTrade(trade)}
-                    className={`text-[13px] px-3.5 py-2 rounded-full border transition-colors ${
-                      selectedTrade === trade
-                        ? 'bg-ink text-paper border-ink'
-                        : 'bg-paper text-stone border-line hover:border-ink'
-                    }`}
-                  >
-                    {trade}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Filter + sort bar */}
             <div className="flex flex-wrap items-center gap-3 mb-6 pb-6 border-b border-line">
+              {availableTrades.length > 1 && (
+                <FilterSelect
+                  label="Trade"
+                  value={selectedTrade}
+                  onChange={setSelectedTrade}
+                  options={[{ value: 'all', label: 'All trades' }]}
+                  optgroups={tradeOptgroups}
+                />
+              )}
               <FilterSelect
                 label="Location"
                 value={selectedCity}
@@ -194,6 +195,7 @@ function BrowsePageInner() {
               {hasActiveFilters && (
                 <button
                   onClick={() => {
+                    setSelectedTrade('all');
                     setSelectedCity('all');
                     setMinExperience(0);
                     setMinProjects(0);
@@ -302,11 +304,22 @@ function FilterSelect({
   value,
   onChange,
   options,
+  optgroups,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  // Flat option list — used by every existing filter (location, min
+  // experience, min projects, sort). Left as the default/simple path so
+  // none of those callers need to change.
+  options?: { value: string; label: string }[];
+  // Grouped option list, rendered as <optgroup> sections — added for the
+  // trade filter specifically, since the 90-item closed trade taxonomy
+  // (see src/lib/trade-types.ts) made a flat alphabetical list of
+  // whatever trades happen to be in use unreadable once even one
+  // contractor with many trades was added. Exactly one of `options` or
+  // `optgroups` should be passed, not both.
+  optgroups?: { label: string; options: { value: string; label: string }[] }[];
 }) {
   return (
     <label className="flex items-center gap-2 text-[13px] text-stone">
@@ -316,10 +329,19 @@ function FilterSelect({
         onChange={(e) => onChange(e.target.value)}
         className="text-[13px] px-3 py-2 rounded-md border border-line bg-paper text-ink focus:outline-none focus:ring-2 focus:ring-ink cursor-pointer"
       >
-        {options.map((opt) => (
+        {options?.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
           </option>
+        ))}
+        {optgroups?.map((group) => (
+          <optgroup key={group.label} label={group.label}>
+            {group.options.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
     </label>

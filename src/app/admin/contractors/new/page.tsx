@@ -353,13 +353,6 @@ export default function NewContractorPage() {
                       type="number"
                       value={p.completedYear}
                       onChange={(e) => updateProject(i, 'completedYear', e.target.value)}
-                      placeholder="Contract value (₹ lakh)"
-                      className={inputCls}
-                    />
-                    <input
-                      type="number"
-                      value={p.completedYear}
-                      onChange={(e) => updateProject(i, 'completedYear', e.target.value)}
                       placeholder="Year completed"
                       className={inputCls}
                     />
