@@ -11,7 +11,19 @@
 
 import { useState } from 'react';
 
-export default function ProjectGallery({ imageUrls }: { imageUrls: string[] }) {
+export default function ProjectGallery({
+  imageUrls,
+  projectTitle,
+}: {
+  imageUrls: string[];
+  // Used for alt text — these are real project photos shown to a
+  // developer browsing, not a self-referential upload preview (unlike the
+  // admin/contractor "here's what you just uploaded" thumbnails elsewhere
+  // in the app, where alt="" is the correct choice since there's nothing
+  // distinguishing to announce). A developer deciding whether to hire this
+  // contractor benefits from knowing which project each photo is from.
+  projectTitle: string;
+}) {
   const [index, setIndex] = useState(0);
 
   if (imageUrls.length === 0) {
@@ -29,7 +41,11 @@ export default function ProjectGallery({ imageUrls }: { imageUrls: string[] }) {
   return (
     <div className="relative h-[100px] w-full group">
       {/* eslint-disable-next-line @next/next/no-img-element -- external Blob URL */}
-      <img src={imageUrls[index]} alt="" className="h-[100px] w-full object-cover" />
+      <img
+        src={imageUrls[index]}
+        alt={hasMultiple ? `${projectTitle} — photo ${index + 1} of ${imageUrls.length}` : projectTitle}
+        className="h-[100px] w-full object-cover"
+      />
 
       {hasMultiple && (
         <>

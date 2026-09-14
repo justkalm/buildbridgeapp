@@ -87,7 +87,7 @@ export default function Home() {
               { title: 'Negotiate & decide', body: 'You talk terms directly. No obligation either way.' },
             ].map((step) => (
               <div key={step.title} className="text-center md:text-left">
-                <h4 className="font-display text-lg text-ink mb-2">{step.title}</h4>
+                <h3 className="font-display text-lg text-ink mb-2">{step.title}</h3>
                 <p className="text-sm text-stone leading-relaxed">{step.body}</p>
               </div>
             ))}
@@ -121,7 +121,7 @@ export default function Home() {
               },
             ].map((item) => (
               <div key={item.title} className="text-center md:text-left">
-                <h4 className="font-display text-lg text-ink mb-2">{item.title}</h4>
+                <h3 className="font-display text-lg text-ink mb-2">{item.title}</h3>
                 <p className="text-sm text-stone leading-relaxed">{item.body}</p>
               </div>
             ))}

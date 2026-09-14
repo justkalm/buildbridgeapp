@@ -152,7 +152,7 @@ export default function ContractorProfilePage() {
               <div className="w-[84px] h-[84px] rounded-xl bg-paper-dim border border-line text-ink font-display text-3xl flex items-center justify-center shrink-0 overflow-hidden">
                 {contractor.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- external Blob URL
-                  <img src={contractor.logoUrl} alt="" className="w-full h-full object-cover" />
+                  <img src={contractor.logoUrl} alt={`${contractor.name} logo`} className="w-full h-full object-cover" />
                 ) : (
                   contractor.name.slice(0, 2).toUpperCase()
                 )}
@@ -204,7 +204,7 @@ export default function ContractorProfilePage() {
                   className="border border-line rounded-md overflow-hidden bg-paper cursor-pointer hover:border-ink transition-colors"
                   onClick={() => setOpenProject(p)}
                 >
-                  <ProjectGallery imageUrls={p.imageUrls} />
+                  <ProjectGallery imageUrls={p.imageUrls} projectTitle={p.title} />
                   <div className="p-4">
                     <h3 className="font-display text-[15px] mb-1">{p.title}</h3>
                     {(p.developerName || p.projectType || p.elevationFloors) && (

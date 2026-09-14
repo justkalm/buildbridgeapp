@@ -243,7 +243,7 @@ function BrowsePageInner() {
                       <div className="w-14 h-14 rounded-lg bg-ink text-paper font-display text-lg flex items-center justify-center shrink-0 overflow-hidden">
                         {c.logoUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element -- external Blob URL
-                          <img src={c.logoUrl} alt="" className="w-full h-full object-cover" />
+                          <img src={c.logoUrl} alt={`${c.name} logo`} className="w-full h-full object-cover" />
                         ) : (
                           c.name.slice(0, 2).toUpperCase()
                         )}
