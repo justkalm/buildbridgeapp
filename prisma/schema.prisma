@@ -131,6 +131,7 @@ model Contractor {
   projects      Project[]
   quoteRequests QuoteRequest[]
   projectAlerts ProjectPostAlert[]
+  shortlistedBy ShortlistedContractor[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -212,6 +213,7 @@ model Developer {
 
   quoteRequests QuoteRequest[]
   projectPosts  ProjectPost[]
+  shortlist     ShortlistedContractor[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -329,5 +331,37 @@ model ProjectPostAlert {
   // [projectPostId, contractorId] — duplicates are a deliberate non-issue,
   // not a bug, if that ever happens.
   @@index([projectPostId])
+  @@index([contractorId])
+}
+
+// ---------------------------------------------------------------------------
+// ShortlistedContractor
+// ---------------------------------------------------------------------------
+// A developer's saved/shortlisted contractor, with an optional private
+// note. Unlike QuoteRequest (which fires a real notification to the
+// contractor), shortlisting is entirely private to the developer — the
+// contractor is never notified and never knows they've been shortlisted.
+// This is deliberately unique on [developerId, contractorId]: shortlisting
+// the same contractor twice should update the existing row (and its note),
+// not create a duplicate — the UI ("save"/"unsave" toggle) treats this as
+// a single on/off state per developer-contractor pair, not a log of every
+// time someone clicked save.
+model ShortlistedContractor {
+  id String @id @default(cuid())
+
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  contractorId String
+  contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+
+  // Private to the developer — never shown to the contractor or anyone
+  // else. Nullable: saving a contractor doesn't require writing a note.
+  note String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([developerId, contractorId])
+  @@index([developerId])
   @@index([contractorId])
 }

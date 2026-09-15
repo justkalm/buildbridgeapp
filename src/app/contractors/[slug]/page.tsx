@@ -10,6 +10,7 @@ import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import ProjectGallery from '@/components/ProjectGallery';
 import ProjectLightbox from '@/components/ProjectLightbox';
+import ShortlistButton from '@/components/ShortlistButton';
 
 type Project = {
   id: string;
@@ -183,6 +184,10 @@ export default function ContractorProfilePage() {
                 )}
               </div>
             </div>
+            <ShortlistButton
+              contractorId={contractor.id}
+              className="text-sm px-4 py-2.5 rounded-full border border-line text-ink hover:border-ink transition-colors shrink-0"
+            />
           </div>
         </div>
       </header>

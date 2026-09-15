@@ -8,6 +8,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { TRADE_TYPE_CATEGORIES } from '@/lib/trade-types';
+import ShortlistButton from '@/components/ShortlistButton';
 
 type Contractor = {
   id: string;
@@ -251,13 +252,16 @@ function BrowsePageInner() {
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2.5 flex-wrap mb-1">
-                          <span className="font-display text-lg">{c.name}</span>
-                          {c.verificationStatus === 'VERIFIED' && (
-                            <span className="inline-flex items-center gap-1.5 text-[11px] text-sage bg-sage-soft border border-sage/25 rounded-full px-2.5 py-1">
-                              ✓ Verified
-                            </span>
-                          )}
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <span className="font-display text-lg">{c.name}</span>
+                            {c.verificationStatus === 'VERIFIED' && (
+                              <span className="inline-flex items-center gap-1.5 text-[11px] text-sage bg-sage-soft border border-sage/25 rounded-full px-2.5 py-1">
+                                ✓ Verified
+                              </span>
+                            )}
+                          </div>
+                          <ShortlistButton contractorId={c.id} />
                         </div>
                         <p className="text-sm text-stone mb-3">
                           📍 {c.area}, {c.city} · License {c.licenseNumber}
