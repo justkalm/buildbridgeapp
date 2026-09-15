@@ -1,12 +1,14 @@
 // src/app/api/admin/project-posts/[id]/alert/route.ts
 //
 // Sends a ProjectPost alert to one or more contractors. THIS IS WHERE
-// "alerts are PRO-only" actually gets enforced — see the ProjectPost
-// schema comment for why that rule lives here and not in the schema
-// itself. Every contractorId in the request is checked against tier
-// before anything is written; a non-PRO id in the list fails the whole
-// request rather than silently skipping it, so admin gets clear feedback
-// instead of a partial, confusing result.
+// "alerts require Plus or Pro" actually gets enforced (updated from an
+// earlier PRO-only rule — see PricingTiers.ts / the pricing page for the
+// current tier breakdown) — see the ProjectPost schema comment for why
+// that rule lives here and not in the schema itself. Every contractorId
+// in the request is checked against tier before anything is written; a
+// LISTED id in the list fails the whole request rather than silently
+// skipping it, so admin gets clear feedback instead of a partial,
+// confusing result.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -67,13 +69,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'One or more contractors not found' }, { status: 404 });
   }
 
-  // The actual PRO-only enforcement. A non-PRO id anywhere in the request
-  // fails the whole thing — no partial alerts, no silent skips.
-  const nonPro = contractors.filter((c) => c.tier !== 'PRO');
-  if (nonPro.length > 0) {
+  // The actual PLUS-or-PRO enforcement (updated from PRO-only — pricing
+  // changed to make project alerts a PLUS+ perk, not PRO-exclusive; PRO
+  // additionally gets priority placement and promotional emails, but
+  // project alerts themselves are now shared between the two paid tiers).
+  // A LISTED id anywhere in the request fails the whole thing — no
+  // partial alerts, no silent skips.
+  const notEligible = contractors.filter((c) => c.tier === 'LISTED');
+  if (notEligible.length > 0) {
     return NextResponse.json(
       {
-        error: `Project alerts are PRO-only. Not PRO: ${nonPro.map((c) => c.name).join(', ')}`,
+        error: `Project alerts require Plus or Pro. Not eligible: ${notEligible.map((c) => c.name).join(', ')}`,
       },
       { status: 400 }
     );

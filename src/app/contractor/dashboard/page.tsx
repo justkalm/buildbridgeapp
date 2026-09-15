@@ -241,13 +241,8 @@ export default function ContractorDashboardPage() {
                       <p className="text-xs text-stone mb-3">
                         Upgrade to see full details for every lead, not just the first {me.leadLimit?.cap}.
                       </p>
-                      {/* Placeholder destination — there's no real
-                          pricing/upgrade page yet (deferred, per project
-                          notes). Points at the dashboard itself for now so
-                          it's not a dead link; swap for the real upgrade
-                          flow once pricing exists. */}
                       <Link
-                        href="/contractor/dashboard"
+                        href="/pricing"
                         className="inline-flex items-center justify-center text-xs px-4 py-2 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
                       >
                         See upgrade options

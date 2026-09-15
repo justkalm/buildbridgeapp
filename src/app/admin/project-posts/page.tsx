@@ -2,11 +2,11 @@
 //
 // Lists ProjectPosts submitted via the developer-facing /post-project
 // form. For each one, admin can pick contractor(s) to alert — the picker
-// is filtered to tier === PRO client-side for a clean UX (no point showing
-// LISTED/PLUS contractors as options at all), but the REAL enforcement is
-// server-side in the alert route — see that route's header comment. Don't
-// rely on this filter alone; a client-side-only restriction is not a
-// security boundary.
+// is filtered to tier !== 'LISTED' client-side for a clean UX (no point
+// showing free-tier contractors as options at all, since they're never
+// eligible), but the REAL enforcement is server-side in the alert route —
+// see that route's header comment. Don't rely on this filter alone; a
+// client-side-only restriction is not a security boundary.
 
 'use client';
 
@@ -31,7 +31,7 @@ type ProjectPostRow = {
   alerts: Alert[];
 };
 
-type ProContractor = { id: string; name: string; tier: 'LISTED' | 'PLUS' | 'PRO' };
+type EligibleContractor = { id: string; name: string; tier: 'LISTED' | 'PLUS' | 'PRO' };
 
 const statusStyle: Record<ProjectPostRow['status'], string> = {
   NEW: 'bg-sage-soft text-sage',
@@ -41,7 +41,7 @@ const statusStyle: Record<ProjectPostRow['status'], string> = {
 
 export default function AdminProjectPostsPage() {
   const [posts, setPosts] = useState<ProjectPostRow[] | null>(null);
-  const [proContractors, setProContractors] = useState<ProContractor[] | null>(null);
+  const [eligibleContractors, setEligibleContractors] = useState<EligibleContractor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openPickerFor, setOpenPickerFor] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -58,7 +58,7 @@ export default function AdminProjectPostsPage() {
     // why this filter is UX-only, not the real enforcement.
     fetch('/api/admin/contractors')
       .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((all: ProContractor[]) => setProContractors(all.filter((c) => c.tier === 'PRO')))
+      .then((all: EligibleContractor[]) => setEligibleContractors(all.filter((c) => c.tier !== 'LISTED')))
       .catch(() => {});
   }, []);
 
@@ -157,14 +157,14 @@ export default function AdminProjectPostsPage() {
 
                 {openPickerFor === p.id ? (
                   <div className="border-t border-line pt-3 mt-1">
-                    <p className="text-xs text-stone mb-2">Select PRO contractor(s) to alert:</p>
-                    {!proContractors ? (
+                    <p className="text-xs text-stone mb-2">Select Plus/Pro contractor(s) to alert:</p>
+                    {!eligibleContractors ? (
                       <p className="text-xs text-stone">Loading contractors…</p>
-                    ) : proContractors.length === 0 ? (
-                      <p className="text-xs text-stone">No PRO contractors yet.</p>
+                    ) : eligibleContractors.length === 0 ? (
+                      <p className="text-xs text-stone">No Plus/Pro contractors yet.</p>
                     ) : (
                       <div className="flex flex-wrap gap-2 mb-3">
-                        {proContractors.map((c) => (
+                        {eligibleContractors.map((c) => (
                           <button
                             key={c.id}
                             type="button"
@@ -201,7 +201,7 @@ export default function AdminProjectPostsPage() {
                     onClick={() => openPicker(p.id)}
                     className="text-xs font-medium text-sage"
                   >
-                    + Alert PRO contractor(s)
+                    + Alert Plus/Pro contractor(s)
                   </button>
                 )}
               </div>
