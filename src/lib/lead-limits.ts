@@ -20,8 +20,23 @@
 
 const LISTED_MONTHLY_LEAD_CAP = 5;
 
+// IST is UTC+5:30, fixed — India doesn't observe daylight saving, so this
+// offset never changes and a simple constant is correct (no timezone
+// library needed for this one calculation).
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
 export function getMonthStart(now: Date = new Date()): Date {
-  return new Date(now.getFullYear(), now.getMonth(), 1);
+  // Previously used new Date(now.getFullYear(), now.getMonth(), 1), which
+  // reads year/month from the SERVER's local timezone — UTC on Vercel.
+  // That meant a request made around midnight IST (UTC+5:30) could be
+  // dated to the wrong month by UTC's clock, for a ~5.5 hour window
+  // around each month boundary — a lead sent at 1am IST on the 1st is
+  // still Sept 30 in UTC, so it would count toward September's cap
+  // instead of October's. Shifting `now` into IST before reading its
+  // year/month fixes this: the boundary now actually falls at midnight
+  // IST, matching where users actually are.
+  const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+  return new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), 1) - IST_OFFSET_MS);
 }
 
 export type LeadVisibility = 'full' | 'blurred';

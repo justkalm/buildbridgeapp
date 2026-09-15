@@ -28,8 +28,8 @@ type ContractorRow = {
 };
 
 const statusStyle: Record<ContractorRow['verificationStatus'], string> = {
-  VERIFIED: 'bg-verified-soft text-verified',
-  PENDING: 'bg-sage-soft text-sage',
+  VERIFIED: 'bg-sage-soft text-sage',
+  PENDING: 'bg-paper-dim text-stone',
   REJECTED: 'bg-red-50 text-red-600',
 };
 

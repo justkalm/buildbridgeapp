@@ -32,7 +32,7 @@ const statusStyle: Record<QuoteRequestRow['status'], string> = {
 };
 
 export default function DashboardPage() {
-  const { status } = useSession();
+  const { status, data: session } = useSession();
   const router = useRouter();
   const [requests, setRequests] = useState<QuoteRequestRow[] | null>(null);
 
@@ -40,7 +40,21 @@ export default function DashboardPage() {
     if (status === 'unauthenticated') {
       router.push('/login');
     }
-  }, [status, router]);
+    // Previously missing entirely — every other role-specific page
+    // (post-project, contractor/*) redirects a wrong-role session to
+    // their own home instead of rendering. Without this, a logged-in
+    // contractor who navigated here directly (bookmark, typed URL) saw a
+    // confusing dashboard that never populated with real data — the
+    // underlying API (/api/quote-requests/mine) was always correctly
+    // role-gated server-side, so nothing leaked, but the UX was a dead
+    // end with no data and no explanation.
+    if (
+      status === 'authenticated' &&
+      (session?.user as { role?: string })?.role !== 'developer'
+    ) {
+      router.push('/contractor/dashboard');
+    }
+  }, [status, session, router]);
 
   useEffect(() => {
     if (status !== 'authenticated') return;
@@ -49,7 +63,10 @@ export default function DashboardPage() {
       .then(setRequests);
   }, [status]);
 
-  if (status !== 'authenticated') {
+  if (
+    status !== 'authenticated' ||
+    (session?.user as { role?: string })?.role !== 'developer'
+  ) {
     return null;
   }
 

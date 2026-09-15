@@ -34,8 +34,8 @@ type ProjectPostRow = {
 type EligibleContractor = { id: string; name: string; tier: 'LISTED' | 'PLUS' | 'PRO' };
 
 const statusStyle: Record<ProjectPostRow['status'], string> = {
-  NEW: 'bg-sage-soft text-sage',
-  MATCHED: 'bg-verified-soft text-verified',
+  NEW: 'bg-paper-dim text-stone',
+  MATCHED: 'bg-sage-soft text-sage',
   CLOSED: 'bg-paper-dim text-stone',
 };
 
