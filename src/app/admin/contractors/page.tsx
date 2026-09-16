@@ -248,8 +248,8 @@ export default function AdminContractorsPage() {
         )}
 
         {contractors && contractors.length > 0 && (
-          <div className="bg-white border border-line rounded-md overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="bg-white border border-line rounded-md overflow-x-auto">
+            <table className="w-full text-sm min-w-[900px]">
               <thead>
                 <tr className="text-left font-mono text-[11px] tracking-wider uppercase text-stone">
                   <th className="px-4 py-3 border-b border-line">Name</th>
