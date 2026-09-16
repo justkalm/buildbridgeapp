@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminTabs from '@/components/AdminTabs';
 
@@ -27,6 +27,16 @@ type ContractorRow = {
   _count: { projects: number; quoteRequests: number };
 };
 
+type ProjectRow = {
+  id: string;
+  title: string;
+  developerName: string | null;
+  completedYear: number | null;
+  reviewRating: number | null;
+  reviewText: string | null;
+  reviewedAt: string | null;
+};
+
 const statusStyle: Record<ContractorRow['verificationStatus'], string> = {
   VERIFIED: 'bg-sage-soft text-sage',
   PENDING: 'bg-paper-dim text-stone',
@@ -37,6 +47,69 @@ export default function AdminContractorsPage() {
   const [contractors, setContractors] = useState<ContractorRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [expandedContractorId, setExpandedContractorId] = useState<string | null>(null);
+  const [projectsByContractor, setProjectsByContractor] = useState<Record<string, ProjectRow[]>>({});
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [ratingDraft, setRatingDraft] = useState(5);
+  const [textDraft, setTextDraft] = useState('');
+  const [savingReview, setSavingReview] = useState(false);
+
+  async function toggleExpand(contractorId: string) {
+    if (expandedContractorId === contractorId) {
+      setExpandedContractorId(null);
+      return;
+    }
+    setExpandedContractorId(contractorId);
+    if (!projectsByContractor[contractorId]) {
+      const res = await fetch(`/api/admin/contractors/${contractorId}/projects`);
+      if (res.ok) {
+        const projects = await res.json();
+        setProjectsByContractor((prev) => ({ ...prev, [contractorId]: projects }));
+      }
+    }
+  }
+
+  function startReview(project: ProjectRow) {
+    setEditingProjectId(project.id);
+    setRatingDraft(project.reviewRating ?? 5);
+    setTextDraft(project.reviewText ?? '');
+  }
+
+  async function saveReview(contractorId: string, projectId: string) {
+    setSavingReview(true);
+    const res = await fetch(`/api/admin/projects/${projectId}/review`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating: ratingDraft, text: textDraft.trim() || null }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setProjectsByContractor((prev) => ({
+        ...prev,
+        [contractorId]: prev[contractorId].map((p) => (p.id === projectId ? { ...p, ...updated } : p)),
+      }));
+      setEditingProjectId(null);
+    } else {
+      alert('Failed to save review. Please try again.');
+    }
+    setSavingReview(false);
+  }
+
+  async function clearReview(contractorId: string, projectId: string) {
+    if (!confirm('Remove this review?')) return;
+    const res = await fetch(`/api/admin/projects/${projectId}/review`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating: null }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setProjectsByContractor((prev) => ({
+        ...prev,
+        [contractorId]: prev[contractorId].map((p) => (p.id === projectId ? { ...p, ...updated } : p)),
+      }));
+    }
+  }
 
   function loadContractors() {
     fetch('/api/admin/contractors')
@@ -191,7 +264,8 @@ export default function AdminContractorsPage() {
               </thead>
               <tbody>
                 {contractors.map((c) => (
-                  <tr key={c.id} className="border-b border-line last:border-b-0">
+                  <React.Fragment key={c.id}>
+                  <tr className="border-b border-line last:border-b-0">
                     <td className="px-4 py-4">
                       <div className="font-medium">{c.name}</div>
                       <div className="text-xs text-stone font-mono">{c.licenseNumber}</div>
@@ -222,7 +296,14 @@ export default function AdminContractorsPage() {
                         <option value="PRO">PRO</option>
                       </select>
                     </td>
-                    <td className="px-4 py-4 text-stone">{c._count.projects}</td>
+                    <td className="px-4 py-4 text-stone">
+                      <button
+                        onClick={() => toggleExpand(c.id)}
+                        className="underline underline-offset-2 hover:text-ink transition-colors"
+                      >
+                        {c._count.projects}
+                      </button>
+                    </td>
                     <td className="px-4 py-4 text-stone">{c._count.quoteRequests}</td>
                     <td className="px-4 py-4 text-right">
                       <button
@@ -234,6 +315,100 @@ export default function AdminContractorsPage() {
                       </button>
                     </td>
                   </tr>
+                  {expandedContractorId === c.id && (
+                    <tr className="border-b border-line last:border-b-0 bg-paper-dim/40">
+                      <td colSpan={8} className="px-4 py-4">
+                        {!projectsByContractor[c.id] ? (
+                          <p className="text-xs text-stone">Loading projects…</p>
+                        ) : projectsByContractor[c.id].length === 0 ? (
+                          <p className="text-xs text-stone">No projects yet.</p>
+                        ) : (
+                          <div className="flex flex-col gap-3">
+                            {projectsByContractor[c.id].map((p) => (
+                              <div key={p.id} className="bg-white border border-line rounded-md p-3">
+                                <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
+                                  <div>
+                                    <p className="text-sm font-medium">{p.title}</p>
+                                    <p className="text-xs text-stone">
+                                      {[p.developerName, p.completedYear].filter(Boolean).join(' · ') || '—'}
+                                    </p>
+                                  </div>
+                                  {p.reviewRating ? (
+                                    <div className="flex gap-2 items-center">
+                                      <span className="text-sage text-sm">{'★'.repeat(p.reviewRating)}</span>
+                                      <button
+                                        onClick={() => startReview(p)}
+                                        className="text-xs text-stone hover:text-ink underline underline-offset-2"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        onClick={() => clearReview(c.id, p.id)}
+                                        className="text-xs text-stone hover:text-red-600 underline underline-offset-2"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => startReview(p)}
+                                      className="text-xs font-medium text-sage underline underline-offset-2"
+                                    >
+                                      + Add review
+                                    </button>
+                                  )}
+                                </div>
+
+                                {editingProjectId === p.id ? (
+                                  <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-line">
+                                    <div className="flex items-center gap-2">
+                                      <label className="text-xs text-stone">Rating:</label>
+                                      <select
+                                        value={ratingDraft}
+                                        onChange={(e) => setRatingDraft(Number(e.target.value))}
+                                        className="text-xs px-2 py-1 rounded border border-line"
+                                      >
+                                        {[5, 4, 3, 2, 1].map((n) => (
+                                          <option key={n} value={n}>{n} star{n === 1 ? '' : 's'}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <textarea
+                                      value={textDraft}
+                                      onChange={(e) => setTextDraft(e.target.value)}
+                                      rows={2}
+                                      placeholder="What the developer said, in their own words"
+                                      className="text-sm px-3 py-2 border border-line rounded-[4px] focus:outline-none focus:ring-2 focus:ring-ink"
+                                    />
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => saveReview(c.id, p.id)}
+                                        disabled={savingReview}
+                                        className="text-xs font-medium px-3 py-1.5 rounded-full bg-ink text-paper disabled:opacity-60"
+                                      >
+                                        {savingReview ? 'Saving…' : 'Save review'}
+                                      </button>
+                                      <button
+                                        onClick={() => setEditingProjectId(null)}
+                                        className="text-xs font-medium px-3 py-1.5 rounded-full border border-line"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  p.reviewText && (
+                                    <p className="text-xs text-stone italic mt-1">&quot;{p.reviewText}&quot;</p>
+                                  )
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
