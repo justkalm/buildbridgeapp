@@ -177,6 +177,21 @@ model Project {
   // gradient block) or several.
   imageUrls String[] @default([])
 
+  // Review — admin-entered ONLY, never a self-service submission flow.
+  // Per the actual process: the contractor's founder personally collects
+  // this from the developer named above after the project wraps, then
+  // types it in here via the admin form. There is deliberately no public
+  // "submit a review" endpoint — that would let anyone claim to be a past
+  // client, which defeats the whole point of this being a real, sourced
+  // review. One review per project (not per contractor) is the natural
+  // fit: reviewRating/reviewText are nullable fields on the project they
+  // belong to, not a separate model with its own relation, since there's
+  // no scenario where a project has more than one review or a review
+  // exists without a project.
+  reviewRating Int?    // 1-5, validated in the admin API route (Prisma itself doesn't constrain this)
+  reviewText   String? // the developer's own words, typed in by admin
+  reviewedAt   DateTime? // when the review was collected/entered — null if reviewRating is null
+
   createdAt DateTime @default(now())
 
   @@index([contractorId])

@@ -23,6 +23,8 @@ type Project = {
   committedDurationMonths: number | null;
   actualDurationMonths: number | null;
   imageUrls: string[];
+  reviewRating: number | null;
+  reviewText: string | null;
 };
 
 type ContractorDetail = {
@@ -220,6 +222,17 @@ export default function ContractorProfilePage() {
                           p.elevationFloors && `G+${p.elevationFloors}`,
                         ].filter(Boolean).join(' · ')}
                       </p>
+                    )}
+                    {p.reviewRating && (
+                      <div className="border-t border-line pt-3 mt-1">
+                        <p className="text-sage text-sm mb-1" aria-label={`${p.reviewRating} out of 5 stars`}>
+                          {'★'.repeat(p.reviewRating)}
+                          <span className="text-line">{'★'.repeat(5 - p.reviewRating)}</span>
+                        </p>
+                        {p.reviewText && (
+                          <p className="text-xs text-stone italic">&quot;{p.reviewText}&quot;</p>
+                        )}
+                      </div>
                     )}
                     <div className="flex justify-between items-center pt-3 border-t border-line">
                       {p.squareFeet && (

@@ -62,6 +62,8 @@ export async function GET(
           committedDurationMonths: true,
           actualDurationMonths: true,
           imageUrls: true,
+          reviewRating: true,
+          reviewText: true,
         },
         orderBy: { completedYear: 'desc' },
       },
