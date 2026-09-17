@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import MessageThread from '@/components/MessageThread';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 
@@ -272,6 +273,7 @@ export default function ContractorDashboardPage() {
                       {r.developer.phone}
                     </a>
                   </div>
+                  <MessageThread quoteRequestId={r.id} viewerRole="CONTRACTOR" />
                 </div>
               )
             )}

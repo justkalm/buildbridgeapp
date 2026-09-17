@@ -2,12 +2,13 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import MessageThread from '@/components/MessageThread';
 
 type QuoteRequestRow = {
   id: string;
@@ -54,6 +55,7 @@ export default function DashboardPage() {
   const { status, data: session } = useSession();
   const router = useRouter();
   const [requests, setRequests] = useState<QuoteRequestRow[] | null>(null);
+  const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
   const [shortlist, setShortlist] = useState<ShortlistedRow[] | null>(null);
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
@@ -260,11 +262,13 @@ export default function DashboardPage() {
                   <th className="px-4 py-3 border-b border-line">Project</th>
                   <th className="px-4 py-3 border-b border-line">Sent</th>
                   <th className="px-4 py-3 border-b border-line">Status</th>
+                  <th className="px-4 py-3 border-b border-line"></th>
                 </tr>
               </thead>
               <tbody>
                 {requests.map((r) => (
-                  <tr key={r.id} className="border-b border-line last:border-b-0">
+                  <React.Fragment key={r.id}>
+                  <tr className="border-b border-line last:border-b-0">
                     <td className="px-4 py-4">
                       <Link href={`/contractors/${r.contractor.slug}`} className="font-medium hover:text-stone transition-colors">
                         {r.contractor.name}
@@ -286,7 +290,23 @@ export default function DashboardPage() {
                         </p>
                       )}
                     </td>
+                    <td className="px-4 py-4 text-right">
+                      <button
+                        onClick={() => setExpandedMessageId(expandedMessageId === r.id ? null : r.id)}
+                        className="text-xs text-stone underline underline-offset-2 hover:text-ink transition-colors"
+                      >
+                        Message
+                      </button>
+                    </td>
                   </tr>
+                  {expandedMessageId === r.id && (
+                    <tr className="border-b border-line last:border-b-0 bg-paper-dim/40">
+                      <td colSpan={5} className="px-4 py-4">
+                        <MessageThread quoteRequestId={r.id} viewerRole="DEVELOPER" startOpen />
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

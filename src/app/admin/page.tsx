@@ -66,7 +66,17 @@ export default async function AdminPage() {
           >
             <h2 className="font-display font-semibold text-lg mb-1">Project Posts</h2>
             <p className="text-stone text-sm">
-              Review projects submitted via &quot;Post a Project&quot; and alert PRO contractors.
+              Review projects submitted via &quot;Post a Project&quot; and alert Plus/Pro contractors.
+            </p>
+          </Link>
+
+          <Link
+            href="/admin/messages"
+            className="block bg-white border border-line rounded-md p-6 hover:border-ink transition-colors"
+          >
+            <h2 className="font-display font-semibold text-lg mb-1">Messages</h2>
+            <p className="text-stone text-sm">
+              See how many leads turn into real conversations, and open a thread if needed.
             </p>
           </Link>
         </div>

@@ -271,6 +271,8 @@ model QuoteRequest {
 
   emailSentAt DateTime? // null if the notification email failed — lets you spot silently-dropped requests
 
+  messages Message[]
+
   createdAt DateTime @default(now())
 
   @@index([contractorId])
@@ -379,4 +381,42 @@ model ShortlistedContractor {
   @@unique([developerId, contractorId])
   @@index([developerId])
   @@index([contractorId])
+}
+
+// ---------------------------------------------------------------------------
+// Message
+// ---------------------------------------------------------------------------
+// Optional in-app thread on a QuoteRequest. This does NOT replace the
+// existing "developer sees contractor's email/phone, contractor sees
+// developer's email/phone" reveal — that stays exactly as-is. This is an
+// ADDITIONAL channel: a contractor or developer can reply in-app instead
+// of switching to email, which is what makes real engagement visible to
+// admin (message counts, whether a thread ever started) in a way raw
+// QuoteRequest counts never could. One QuoteRequest can have many
+// Messages; there's no separate "Thread" model since the QuoteRequest
+// itself already uniquely identifies the developer-contractor pair a
+// conversation belongs to.
+//
+// senderRole distinguishes who sent it without needing two nullable
+// foreign keys (developerId-or-null, contractorId-or-null) — the sender's
+// actual identity is recoverable from the QuoteRequest's own
+// developerId/contractorId plus this role, so storing it directly here
+// would be redundant.
+model Message {
+  id String @id @default(cuid())
+
+  quoteRequestId String
+  quoteRequest   QuoteRequest @relation(fields: [quoteRequestId], references: [id], onDelete: Cascade)
+
+  senderRole MessageSenderRole
+  body       String
+
+  createdAt DateTime @default(now())
+
+  @@index([quoteRequestId])
+}
+
+enum MessageSenderRole {
+  DEVELOPER
+  CONTRACTOR
 }

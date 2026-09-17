@@ -20,6 +20,7 @@ const TABS = [
   { key: 'contractors', label: 'Contractors', href: '/admin/contractors' },
   { key: 'developers', label: 'Developers', href: '/admin/developers' },
   { key: 'project-posts', label: 'Project Posts', href: '/admin/project-posts' },
+  { key: 'messages', label: 'Messages', href: '/admin/messages' },
 ] as const;
 
 export type AdminTabKey = (typeof TABS)[number]['key'];
