@@ -52,9 +52,15 @@ export async function GET() {
         },
       },
       // Alerts admin has manually sent this contractor about posted
-      // projects — see ProjectPostAlert schema comment. Only ever
-      // non-empty for PRO contractors, since that's enforced at alert-send
-      // time, not here; this just returns whatever alerts already exist.
+      // projects — see ProjectPostAlert schema comment. This is correct
+      // TODAY only because a LISTED contractor can never have any rows
+      // here — enforced entirely at alert-send time, in a different file
+      // (admin/project-posts/[id]/alert/route.ts). That split is exactly
+      // the kind of thing that breaks later: if the write-side rule ever
+      // changes or has a bug, this read route would start leaking full
+      // contact details to LISTED contractors with no defense of its own.
+      // The filter below is that defense — belt and suspenders, not
+      // trusting the other file's enforcement alone.
       projectAlerts: {
         orderBy: { alertedAt: 'desc' },
         take: 50,
@@ -103,11 +109,22 @@ export async function GET() {
       return { ...r, leadVisibility: 'full' as const };
     }
 
-    // Blurred: strip the actual contact fields rather than truncating them
-    // client-side — see the block comment above for why.
-    const { developer, ...rest } = r;
+    // Blurred: strip contactPhone entirely and truncate details, not just
+    // the developer object. Previously `...rest` kept every other field
+    // on the QuoteRequest — including contactPhone (the developer's own
+    // phone number, captured at request time even before any contractor
+    // relationship exists) and the full, untruncated details text, which
+    // frequently contains a site address or a second number. A LISTED
+    // contractor at their cap could open devtools, read this response
+    // directly, and get full contact information for a "blurred" lead —
+    // the blur was cosmetic on the frontend while the real data still
+    // shipped in the JSON. Stripping it here, not just hiding it in the
+    // UI, is what actually enforces the cap.
+    const { developer, contactPhone: _contactPhone, details, ...rest } = r;
     return {
       ...rest,
+      details: details.length > 80 ? `${details.slice(0, 80)}…` : details,
+      contactPhone: null,
       developer: { name: developer.name, email: null, phone: null },
       leadVisibility: 'blurred' as const,
     };
@@ -119,12 +136,23 @@ export async function GET() {
     emailVerifyToken: _evt,
     passwordResetToken: _prt,
     quoteRequests: _rawQuoteRequests,
+    projectAlerts: rawProjectAlerts,
     ...safe
   } = contractor;
+
+  // Defensive strip, independent of the write-time PLUS/PRO enforcement —
+  // see the comment on the projectAlerts select above for why this
+  // exists as its own check rather than trusting that the other file
+  // never lets a LISTED contractor accumulate alert rows.
+  const projectAlerts =
+    contractor.tier === 'LISTED'
+      ? []
+      : rawProjectAlerts;
 
   return NextResponse.json({
     ...safe,
     quoteRequests: quoteRequestsWithVisibility,
+    projectAlerts,
     leadLimit:
       contractor.tier === 'LISTED'
         ? { cap: LISTED_MONTHLY_LEAD_CAP, usedThisMonth: thisMonthRequests.length }

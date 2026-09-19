@@ -240,6 +240,31 @@ async function seed() {
 
 const isClean = process.argv.includes('--clean');
 
+// Guardrail: refuse to SEED fake data unless the environment explicitly
+// says it's safe to. Cleaning (--clean) is deliberately still allowed
+// unconditionally — if demo rows ever did leak into a live database, you
+// need this script to be able to remove them there.
+//
+// This does NOT try to auto-detect "is this production" from the
+// DATABASE_URL hostname — Neon's pooled-connection URL format looks the
+// same for dev and prod branches in a typical setup, so a hostname
+// heuristic would be unreliable in exactly the way that matters (either
+// blocking legitimate dev use, or failing to block real production).
+// Instead this requires an explicit opt-in: set ALLOW_DEMO_SEED=true in
+// whichever .env you actually intend to run this against. Nothing sets
+// that automatically — you have to mean it.
+const seedingAllowed = process.env.ALLOW_DEMO_SEED === 'true';
+
+if (!isClean && !seedingAllowed) {
+  console.error(
+    '\nRefusing to seed fake demo contractors: ALLOW_DEMO_SEED is not set to "true".\n' +
+      'This is an explicit opt-in, not an environment auto-detection — set\n' +
+      'ALLOW_DEMO_SEED=true in the .env you actually intend to seed fake data into\n' +
+      '(a dev/staging database only), then run this again. Never set it in production.\n'
+  );
+  process.exit(1);
+}
+
 (isClean ? clean() : seed())
   .catch((e) => {
     console.error(e);
