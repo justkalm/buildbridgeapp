@@ -3,15 +3,7 @@
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
-
-const TRADE_CATEGORIES = [
-  'RCC & Structural',
-  'Electrical',
-  'Waterproofing',
-  'Interior Fit-out',
-  'Plumbing',
-  'Facade & Cladding',
-];
+import { HOMEPAGE_TRADE_CATEGORIES } from '@/lib/trade-types';
 
 export default function Home() {
   return (
@@ -60,13 +52,13 @@ export default function Home() {
           </h2>
 
           <div className="flex flex-wrap justify-center gap-3">
-            {TRADE_CATEGORIES.map((trade) => (
+            {HOMEPAGE_TRADE_CATEGORIES.map((category) => (
               <Link
-                key={trade}
-                href={`/browse?trade=${encodeURIComponent(trade)}`}
+                key={category.label}
+                href={`/browse?category=${encodeURIComponent(category.label)}`}
                 className="text-sm px-5 py-2.5 rounded-full border border-line bg-paper text-ink hover:border-ink transition-colors"
               >
-                {trade}
+                {category.label}
               </Link>
             ))}
           </div>

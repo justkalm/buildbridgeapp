@@ -158,3 +158,29 @@ const ALL_TRADE_TYPES_SET = new Set(ALL_TRADE_TYPES);
 export function isValidTradeType(value: string): boolean {
   return ALL_TRADE_TYPES_SET.has(value);
 }
+
+// Simplified category set for the homepage's "Every trade, one directory"
+// section — 6 broad, recognizable categories rather than the full 8-group/
+// 90-item taxonomy, since a landing page needs quick, scannable entries,
+// not the complete detailed list. Each maps to the actual taxonomy trades
+// it covers.
+//
+// Previously the homepage hardcoded its own ad-hoc category labels
+// ('RCC & Structural', 'Facade & Cladding', etc.) that didn't match ANY
+// real trade string — 'RCC & Structural' isn't in the 90-item list at
+// all, and 'Facade' (no cedilla) doesn't match the taxonomy's 'Façade
+// contractor'. /browse's filter did (and still does, for the single-trade
+// case) an exact string match, so every one of the six homepage category
+// links landed on "no contractors match these filters" regardless of what
+// was actually listed. This is what a real category → multiple real
+// trades mapping looks like, and /browse now accepts a `category=` param
+// that matches ANY trade in the mapped list (see the browse page's use of
+// this), instead of only supporting a single exact trade string.
+export const HOMEPAGE_TRADE_CATEGORIES: { label: string; trades: string[] }[] = [
+  { label: 'RCC & Structural', trades: ['Foundation contractor', 'RCC contractor', 'Structural steel contractor', 'Reinforcement/rebar contractor'] },
+  { label: 'Electrical', trades: ['Electrical contractor', 'External electrical contractor'] },
+  { label: 'Waterproofing', trades: ['Waterproofing contractor', 'Waterproofing specialist'] },
+  { label: 'Interior Fit-out', trades: ['Flooring contractor', 'Tile contractor', 'Painting contractor', 'Carpentry contractor', 'False-ceiling contractor'] },
+  { label: 'Plumbing', trades: ['Plumbing contractor', 'External plumbing contractor', 'Sanitary contractor'] },
+  { label: 'Facade & Cladding', trades: ['Façade contractor', 'ACP/cladding contractor', 'Structural-glazing contractor'] },
+];

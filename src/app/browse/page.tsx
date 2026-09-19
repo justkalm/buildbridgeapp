@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
-import { TRADE_TYPE_CATEGORIES } from '@/lib/trade-types';
+import { TRADE_TYPE_CATEGORIES, HOMEPAGE_TRADE_CATEGORIES } from '@/lib/trade-types';
 import ShortlistButton from '@/components/ShortlistButton';
 
 type Contractor = {
@@ -37,6 +37,20 @@ function BrowsePageInner() {
   const [contractors, setContractors] = useState<Contractor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedTrade, setSelectedTrade] = useState<string>(searchParams.get('trade') ?? 'all');
+  // Separate from selectedTrade: a homepage category link (e.g. "RCC &
+  // Structural") maps to SEVERAL real trade strings (see
+  // HOMEPAGE_TRADE_CATEGORIES in trade-types.ts), not one exact value the
+  // single-select trade dropdown can represent. Reading it as its own
+  // param and matching with .some() against the mapped list, rather than
+  // trying to force it through the same exact-match selectedTrade state,
+  // is what actually makes the homepage's category links work — they used
+  // to link to ?trade=<ad-hoc label that matched nothing in the real
+  // taxonomy>, so every homepage category returned zero results
+  // regardless of what was actually listed.
+  const categoryParam = searchParams.get('category');
+  const categoryTrades = categoryParam
+    ? HOMEPAGE_TRADE_CATEGORIES.find((c) => c.label === categoryParam)?.trades ?? null
+    : null;
   const [selectedCity, setSelectedCity] = useState<string>('all');
   const [minExperience, setMinExperience] = useState(0);
   const [minProjects, setMinProjects] = useState(0);
@@ -88,6 +102,9 @@ function BrowsePageInner() {
     if (selectedTrade !== 'all') {
       result = result.filter((c) => c.tradeTypes.includes(selectedTrade));
     }
+    if (categoryTrades) {
+      result = result.filter((c) => c.tradeTypes.some((t) => categoryTrades.includes(t)));
+    }
     if (selectedCity !== 'all') {
       result = result.filter((c) => c.city === selectedCity);
     }
@@ -127,7 +144,7 @@ function BrowsePageInner() {
     });
 
     return result;
-  }, [contractors, selectedTrade, selectedCity, minExperience, minProjects, sortBy]);
+  }, [contractors, selectedTrade, categoryParam, selectedCity, minExperience, minProjects, sortBy]);
 
   const hasActiveFilters = selectedTrade !== 'all' || selectedCity !== 'all' || minExperience > 0 || minProjects > 0;
 
