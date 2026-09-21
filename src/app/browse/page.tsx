@@ -3,7 +3,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
@@ -34,6 +34,7 @@ const MIN_PROJECTS_OPTIONS = [0, 1, 3, 5];
 
 function BrowsePageInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [contractors, setContractors] = useState<Contractor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedTrade, setSelectedTrade] = useState<string>(searchParams.get('trade') ?? 'all');
@@ -146,7 +147,8 @@ function BrowsePageInner() {
     return result;
   }, [contractors, selectedTrade, categoryParam, selectedCity, minExperience, minProjects, sortBy]);
 
-  const hasActiveFilters = selectedTrade !== 'all' || selectedCity !== 'all' || minExperience > 0 || minProjects > 0;
+  const hasActiveFilters =
+    selectedTrade !== 'all' || !!categoryParam || selectedCity !== 'all' || minExperience > 0 || minProjects > 0;
 
   return (
     <>
@@ -217,6 +219,17 @@ function BrowsePageInner() {
                     setSelectedCity('all');
                     setMinExperience(0);
                     setMinProjects(0);
+                    // categoryParam (and the initial selectedTrade value)
+                    // come from the URL, not component state — clearing
+                    // just the state above left a homepage category link's
+                    // ?category=... still applied after clicking "Clear
+                    // filters", since the filter logic reads it straight
+                    // from searchParams on every render regardless of
+                    // component state. Actually navigating to the bare
+                    // /browse URL is what clears it for real.
+                    if (searchParams.toString()) {
+                      router.replace('/browse');
+                    }
                   }}
                   className="text-[13px] text-stone hover:text-ink underline underline-offset-2"
                 >
