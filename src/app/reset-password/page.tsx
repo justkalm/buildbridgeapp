@@ -7,6 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import { PASSWORD_MIN_LENGTH, PASSWORD_HINT } from '@/lib/password-rules';
 
 function ResetPasswordInner() {
   const searchParams = useSearchParams();
@@ -77,12 +78,12 @@ function ResetPasswordInner() {
                 <input
                   type="password"
                   required
-                  minLength={8}
+                  minLength={PASSWORD_MIN_LENGTH}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
                 />
-                <p className="text-xs text-stone mt-1">At least 8 characters.</p>
+                <p className="text-xs text-stone mt-1">{PASSWORD_HINT}</p>
               </div>
               {error && <p className="text-sm text-red-600">{error}</p>}
               <button

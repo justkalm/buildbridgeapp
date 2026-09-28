@@ -25,7 +25,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       id: true,
       title: true,
       developerName: true,
-      completedYear: true,
       reviewRating: true,
       reviewText: true,
       reviewedAt: true,

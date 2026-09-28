@@ -43,7 +43,7 @@ export default function ProjectGallery({
       {/* eslint-disable-next-line @next/next/no-img-element -- external Blob URL */}
       <img
         src={imageUrls[index]}
-        alt={hasMultiple ? `${projectTitle} — photo ${index + 1} of ${imageUrls.length}` : projectTitle}
+        alt={hasMultiple ? `${projectTitle}, photo ${index + 1} of ${imageUrls.length}` : projectTitle}
         className="h-[100px] w-full object-cover"
       />
 

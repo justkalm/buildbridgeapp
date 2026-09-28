@@ -8,18 +8,22 @@
 // showing every control to everyone and handling the failure after the
 // fact.
 //
-// Deliberately does NOT fetch the developer's whole shortlist just to
-// determine one button's state — that would mean every browse card
-// firing its own redundant check, or the parent page having to fetch and
-// thread shortlist state down to N cards. Instead this takes
-// `initiallySaved` as a prop (the parent, which already has the
-// developer's shortlist loaded where relevant, passes it in) and manages
-// optimistic toggling locally from there. On pages that don't have that
-// context (a fresh page load on /browse with no shortlist fetch), pass
-// `initiallySaved={false}` — the button will still work correctly, it
-// just won't show as already-saved until the developer's real shortlist
-// state is known some other way (e.g. after they save something in this
-// session).
+// Deliberately does NOT fetch the developer's whole shortlist itself —
+// that would mean every browse card firing its own redundant check.
+// Instead this takes `initiallySaved` as a prop and the PARENT page (e.g.
+// /browse, /contractors/[slug]) is responsible for fetching the
+// developer's shortlisted contractor IDs once (GET
+// /api/developers/shortlist?ids=1) and passing the right value down per
+// contractor. That fetch commonly resolves AFTER this component has
+// already mounted with `initiallySaved={false}` (the contractor list
+// loads first, the shortlist check is a second round trip) — so this
+// can't just seed local state from the prop once and ignore it after.
+// Instead we resync `saved` whenever `initiallySaved` changes, using the
+// "adjust state during render when a prop changes" pattern (comparing
+// against a mirrored `prevInitiallySaved` state) rather than a
+// useEffect — the repo's `react-hooks/set-state-in-effect` lint rule is
+// an error, and this pattern avoids the extra render/flicker an effect
+// would cause anyway.
 
 'use client';
 
@@ -37,7 +41,19 @@ export default function ShortlistButton({
 }) {
   const { status, data: session } = useSession();
   const [saved, setSaved] = useState(initiallySaved);
+  const [prevInitiallySaved, setPrevInitiallySaved] = useState(initiallySaved);
   const [pending, setPending] = useState(false);
+
+  // Render-time state adjustment (not an effect): when the parent's
+  // knowledge of the saved state changes — e.g. the shortlist ids fetch
+  // resolves after this button already mounted — sync local `saved` to
+  // match. This only fires on the render where the prop actually
+  // changed, so a user's own optimistic toggle afterward isn't clobbered
+  // by a stale prop value on unrelated re-renders.
+  if (initiallySaved !== prevInitiallySaved) {
+    setPrevInitiallySaved(initiallySaved);
+    setSaved(initiallySaved);
+  }
 
   const isDeveloper = status === 'authenticated' && (session?.user as { role?: string })?.role === 'developer';
 

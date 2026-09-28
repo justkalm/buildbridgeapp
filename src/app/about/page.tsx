@@ -13,17 +13,17 @@ import Footer from '@/components/Footer';
 const FOUNDERS = [
   {
     name: 'Moiz Patrawala',
-    role: 'Co-founder — Tech & Finance',
-    bio: "Moiz co-founded Northstar Web, a Mumbai studio building sites for small businesses, and has spent time on the finance and operations side of his family's manufacturing business. That mix — building software on one side, running a real operating business on the other — is where (kalm) came from. He leads product and engineering, and keeps an eye on the numbers underneath it.",
+    role: 'Co-founder, Tech & Finance',
+    bio: "Moiz co-founded Northstar Web, a Mumbai studio building sites for small businesses, and has spent time on the finance and operations side of his family's manufacturing business. That mix, building software on one side and running a real operating business on the other, is where (kalm) came from. He leads product and engineering, and keeps an eye on the numbers underneath it.",
   },
   {
     name: 'Hassan Birya',
-    role: 'Co-founder — Legal & Finance',
-    bio: "Hassan handles the legal and financial groundwork (kalm) is built on — the contracts, the compliance, the parts of a marketplace that have to be right before anything else can work.",
+    role: 'Co-founder, Legal & Finance',
+    bio: "Hassan handles the legal and financial groundwork (kalm) is built on: the contracts, the compliance, the parts of a marketplace that have to be right before anything else can work.",
   },
   {
     name: 'Anas Maklai',
-    role: 'Co-founder — Marketing & Growth',
+    role: 'Co-founder, Marketing & Growth',
     bio: "Anas co-founded Northstar Web alongside Moiz before the two of them started (kalm) together. He's focused on getting the platform in front of the developers and contractors who need it, and making sure growth doesn't come at the cost of what the Verified badge is supposed to mean.",
   },
 ];
@@ -48,7 +48,7 @@ export default function AboutPage() {
           </h1>
           <p className="text-[17px] leading-relaxed text-stone max-w-[480px] mx-auto">
             (kalm) exists to make finding a contractor as straightforward as it should&apos;ve
-            always been — verified profiles, real project history, no middleman on the deal.
+            always been: verified profiles, real project history, no middleman on the deal.
           </p>
         </div>
       </header>

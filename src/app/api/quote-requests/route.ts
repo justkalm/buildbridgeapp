@@ -13,6 +13,19 @@
 // own kind of wrong. This tradeoff is worth revisiting once there's a
 // dashboard for you to see emailSentAt failures — for now, check it
 // directly in the database if requests seem to be going unanswered.
+//
+// EMAIL VERIFICATION GATE. Logging in does NOT require a verified email
+// (see the Developer model comment in prisma/schema.prisma — that's still
+// true), but sending a quote request does. A request puts the developer's
+// email and phone in front of a real contractor and costs us an email
+// send; letting an unverified (possibly fake or mistyped) address do that
+// means contractors reply into the void, or someone signs up with a
+// stranger's email and spams contractors under that name. Unverified
+// developers get a 403 with code 'EMAIL_NOT_VERIFIED' and a human message
+// pointing them at the resend link — the quote form on the contractor
+// profile page shows the API's message as-is. The check runs after auth
+// and BEFORE the rate limiter, so a blocked attempt doesn't also eat one
+// of the developer's 20/hour.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -20,6 +33,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendQuoteRequestEmail } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { requireVerifiedDeveloperEmail } from '@/lib/require-verified-email';
 
 const quoteRequestSchema = z.object({
   contractorId: z.string().min(1),
@@ -44,6 +58,13 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id || (session.user as { role?: string }).role !== 'developer') {
     return NextResponse.json({ error: 'You must be signed in to request a quote' }, { status: 401 });
   }
+
+  // Before rate limiting — see file header ("EMAIL VERIFICATION GATE").
+  const notVerified = await requireVerifiedDeveloperEmail(
+    session.user.id,
+    'Please verify your email before requesting quotes. Check your inbox for the verification link, or resend it from your dashboard.'
+  );
+  if (notVerified) return notVerified;
 
   // Rate limited per developer (not per IP) — this route is already behind
   // login, so the realistic abuse case is a logged-in account blasting

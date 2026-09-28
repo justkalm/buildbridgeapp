@@ -13,17 +13,39 @@
 // dashboard except by typing the URL directly. This adds a hamburger
 // toggle that reveals the same links, plus sign-in/out, in a dropdown
 // panel — desktop layout and behavior are unchanged.
+//
+// Notification badge: for a signed-in developer or contractor, the
+// Dashboard link shows how many things need their attention: unread
+// in-app messages plus site visits the other side has acted on (polled
+// every minute via useUnreadMessages). On mobile a dot on the hamburger hints
+// that there's something inside the menu worth opening.
 
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
+import { useUnreadMessages } from '@/lib/use-unread-messages';
+
+function UnreadBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-ink text-paper text-[10.5px] font-semibold align-middle"
+      aria-label={`${count} new notification${count === 1 ? '' : 's'}`}
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
 
 export default function Nav() {
   const { data: session, status } = useSession();
   const role = (session?.user as { role?: string })?.role;
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { total: unreadTotal } = useUnreadMessages(
+    status === 'authenticated' && (role === 'developer' || role === 'contractor')
+  );
 
   function closeMobile() {
     setMobileOpen(false);
@@ -56,6 +78,7 @@ export default function Nav() {
               className="text-sm text-stone hover:text-ink transition-colors"
             >
               Dashboard
+              <UnreadBadge count={unreadTotal} />
             </Link>
           )}
         </div>
@@ -90,10 +113,15 @@ export default function Nav() {
             `hidden md:flex` pattern used everywhere else in this file. */}
         <button
           onClick={() => setMobileOpen((v) => !v)}
-          className="md:hidden flex flex-col justify-center gap-1.5 w-8 h-8 -mr-1"
+          className="md:hidden relative flex flex-col justify-center gap-1.5 w-8 h-8 -mr-1"
           aria-expanded={mobileOpen}
-          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+          aria-label={
+            mobileOpen ? 'Close menu' : unreadTotal > 0 ? `Open menu (${unreadTotal} new notifications)` : 'Open menu'
+          }
         >
+          {!mobileOpen && unreadTotal > 0 && (
+            <span className="absolute top-0.5 -right-0.5 w-2 h-2 rounded-full bg-ink" aria-hidden="true" />
+          )}
           <span
             className={`block h-[1.5px] bg-ink transition-transform ${mobileOpen ? 'translate-y-[6.5px] rotate-45' : ''}`}
           />
@@ -126,6 +154,7 @@ export default function Nav() {
               onClick={closeMobile}
             >
               Dashboard
+              <UnreadBadge count={unreadTotal} />
             </Link>
           )}
 

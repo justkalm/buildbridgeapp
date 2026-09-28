@@ -78,7 +78,7 @@ export default function AdminDevelopersPage() {
                   <tr key={d.id} className="border-b border-line last:border-b-0">
                     <td className="px-4 py-4 font-medium">{d.name}</td>
                     <td className="px-4 py-4 text-stone">{d.email}</td>
-                    <td className="px-4 py-4 text-stone">{d.phone ?? '—'}</td>
+                    <td className="px-4 py-4 text-stone">{d.phone ?? 'N/A'}</td>
                     <td className="px-4 py-4 text-stone">
                       {new Date(d.createdAt).toLocaleDateString('en-IN', {
                         year: 'numeric',

@@ -1,16 +1,22 @@
 // src/app/api/contractors/reset-password/route.ts
 //
 // Mirrors src/app/api/developers/reset-password/route.ts exactly, against
-// the Contractor table instead.
+// the Contractor table instead — including the shared password policy
+// and marking the email verified on a successful reset. This route also
+// completes the contractor CLAIM flow (see contractors/signup), where the
+// "reset" link is really a set-your-first-password link; verifying the
+// email there is just as justified, since it was delivered to the address
+// admin had on file.
 
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { newPasswordSchema, passwordMatchesEmail, EMAIL_PASSWORD_MESSAGE } from '@/lib/password-policy';
 
 const schema = z.object({
   token: z.string().min(1),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
+  password: newPasswordSchema,
 });
 
 export async function POST(req: NextRequest) {
@@ -46,6 +52,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // The email isn't in the request body here, so the "not your own
+  // email" half of the policy is checked against the row instead. Done
+  // after the token check so an invalid token never gets a hint about
+  // whose account it was.
+  if (passwordMatchesEmail(password, contractor.email)) {
+    return NextResponse.json({ error: EMAIL_PASSWORD_MESSAGE }, { status: 400 });
+  }
+
   const passwordHash = await bcrypt.hash(password, 12);
 
   await prisma.contractor.update({
@@ -54,6 +68,16 @@ export async function POST(req: NextRequest) {
       passwordHash,
       passwordResetToken: null,
       passwordResetTokenExpiresAt: null,
+      // Using a reset link proves inbox ownership just as well as the
+      // verify-email link does — the token was only ever sent to this
+      // address. So mark the email verified and retire any outstanding
+      // verify token (it's now redundant, and leaving it live just leaves
+      // one more valid secret sitting in an old email). This also gets
+      // someone who lost the original verification email unstuck from the
+      // actions that require a verified email, without a separate resend.
+      emailVerified: true,
+      emailVerifyToken: null,
+      emailVerifyTokenExpiresAt: null,
     },
   });
 

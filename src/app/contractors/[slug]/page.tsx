@@ -9,15 +9,17 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import ProjectGallery from '@/components/ProjectGallery';
+import SiteVisitRequest from '@/components/SiteVisitRequest';
 import ProjectLightbox from '@/components/ProjectLightbox';
 import ShortlistButton from '@/components/ShortlistButton';
+import { isPlaceholderLicense } from '@/lib/license';
+import { formatLocation } from '@/lib/location';
 
 type Project = {
   id: string;
   title: string;
   developerName: string | null;
   projectType: string | null;
-  completedYear: number | null;
   squareFeet: number | null;
   elevationFloors: number | null;
   committedDurationMonths: number | null;
@@ -47,15 +49,19 @@ type ContractorDetail = {
   licenseNumber: string;
   bio: string | null;
   projects: Project[];
+  // False for an admin-entered listing nobody has claimed yet: there's no
+  // one to answer a site visit request, so the panel isn't offered.
+  acceptsSiteVisits: boolean;
 };
 
 export default function ContractorProfilePage() {
   const params = useParams<{ slug: string }>();
-  const { status } = useSession();
+  const { status, data: session } = useSession();
 
   const [contractor, setContractor] = useState<ContractorDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [openProject, setOpenProject] = useState<Project | null>(null);
+  const [shortlistedIds, setShortlistedIds] = useState<Set<string> | null>(null);
 
   const [projectType, setProjectType] = useState('');
   const [location, setLocation] = useState('');
@@ -64,6 +70,15 @@ export default function ContractorProfilePage() {
   const [contactPhone, setContactPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<'success' | 'error' | null>(null);
+  // Holds the API's own error message (and, for a known error code, that
+  // code) so the form can show the real reason a quote request failed
+  // instead of a generic message — see #2. Null on success or before any
+  // submit.
+  const [submitError, setSubmitError] = useState<{ message: string; code?: string } | null>(null);
+
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const isDeveloper = status === 'authenticated' && role === 'developer';
+  const isContractorViewer = status === 'authenticated' && role === 'contractor';
 
   useEffect(() => {
     if (!params.slug) return;
@@ -85,11 +100,28 @@ export default function ContractorProfilePage() {
       .catch(() => setNotFound(true));
   }, [params.slug]);
 
+  // Real saved state for the shortlist button — mirrors the fetch added
+  // to /browse (see ShortlistButton's header comment for why this can't
+  // just be a prop the button fetches itself). Only fired for logged-in
+  // developers.
+  useEffect(() => {
+    if (!isDeveloper) return;
+    fetch('/api/developers/shortlist?ids=1')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { contractorIds: string[] } | null) => {
+        if (data) setShortlistedIds(new Set(data.contractorIds));
+      })
+      .catch(() => {
+        // Non-fatal — button falls back to showing "+ Save".
+      });
+  }, [isDeveloper]);
+
   async function handleQuoteSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!contractor) return;
     setSubmitting(true);
     setSubmitResult(null);
+    setSubmitError(null);
 
     try {
       const res = await fetch('/api/quote-requests', {
@@ -112,9 +144,25 @@ export default function ContractorProfilePage() {
         setContactPhone('');
       } else {
         setSubmitResult('error');
+        // Show the API's own explanation (e.g. "You've already sent a
+        // request to this contractor", or the email-verification message
+        // below) rather than a blanket "Something went wrong" — only
+        // fall back to a generic message when the response isn't the
+        // JSON `{ error }` shape we expect.
+        let parsed: { error?: string; code?: string } | null = null;
+        try {
+          parsed = await res.json();
+        } catch {
+          parsed = null;
+        }
+        setSubmitError({
+          message: parsed?.error ?? 'Something went wrong. Please try again.',
+          code: parsed?.code,
+        });
       }
     } catch {
       setSubmitResult('error');
+      setSubmitError({ message: 'Could not reach the server. Please check your connection and try again.' });
     } finally {
       setSubmitting(false);
     }
@@ -170,7 +218,7 @@ export default function ContractorProfilePage() {
                   )}
                 </div>
                 <div className="flex gap-4 flex-wrap text-[13.5px] text-stone mb-3">
-                  <span>📍 {contractor.area}, {contractor.city}</span>
+                  <span>📍 {formatLocation(contractor.area, contractor.city)}</span>
                   <span>🏗️ {contractor.tradeTypes.join(', ')}</span>
                   {contractor.yearsInBusiness && <span>📅 {contractor.yearsInBusiness}+ years in business</span>}
                 </div>
@@ -188,6 +236,7 @@ export default function ContractorProfilePage() {
             </div>
             <ShortlistButton
               contractorId={contractor.id}
+              initiallySaved={shortlistedIds?.has(contractor.id) ?? false}
               className="text-sm px-4 py-2.5 rounded-full border border-line text-ink hover:border-ink transition-colors shrink-0"
             />
           </div>
@@ -199,6 +248,14 @@ export default function ContractorProfilePage() {
           {contractor.bio && <p className="text-[15px] text-stone leading-relaxed mb-8">{contractor.bio}</p>}
 
           <h2 className="font-display text-xl mb-5">Completed Projects</h2>
+          {contractor.acceptsSiteVisits && contractor.projects.length > 0 && !isContractorViewer && status !== 'loading' && (
+            <SiteVisitRequest
+              contractorId={contractor.id}
+              contractorName={contractor.name}
+              projects={contractor.projects.map((p) => ({ id: p.id, title: p.title }))}
+              isDeveloper={isDeveloper}
+            />
+          )}
           {contractor.projects.length === 0 ? (
             <p className="text-sm text-stone border border-line rounded-md p-6 bg-paper">
               No projects listed yet for this contractor.
@@ -240,7 +297,6 @@ export default function ContractorProfilePage() {
                           {p.squareFeet.toLocaleString('en-IN')} sq ft
                         </span>
                       )}
-                      {p.completedYear && <span className="text-xs text-stone">{p.completedYear}</span>}
                     </div>
                     {(p.committedDurationMonths || p.actualDurationMonths) && (
                       <p className="text-xs text-stone mt-2">
@@ -262,7 +318,18 @@ export default function ContractorProfilePage() {
             <dl className="text-[13.5px]">
               <div className="flex justify-between py-2.5 border-b border-line">
                 <dt className="text-stone">License Number</dt>
-                <dd className="text-xs font-medium">{contractor.licenseNumber}</dd>
+                {/* Self-signed-up contractors get a placeholder
+                    'PENDING-<hex>' licenseNumber until admin records the
+                    real one (see the admin contractors route). Showing
+                    that raw placeholder to developers reads as a real
+                    license number, so it's hidden here — never rendered,
+                    not even truncated. Admin-side blocking of the
+                    placeholder is handled separately. */}
+                {isPlaceholderLicense(contractor.licenseNumber) ? (
+                  <dd className="text-xs text-stone italic">License details pending</dd>
+                ) : (
+                  <dd className="text-xs font-medium">{contractor.licenseNumber}</dd>
+                )}
               </div>
               {(contractor.teamSizeMin || contractor.teamSizeMax) && (
                 <div className="flex justify-between py-2.5 border-b border-line">
@@ -296,6 +363,17 @@ export default function ContractorProfilePage() {
                   Sign up to continue
                 </Link>
               </div>
+            ) : isContractorViewer ? (
+              // Quote requests are a developer-to-contractor flow — a
+              // contractor account (their own, or browsing a peer's
+              // profile) can't be the one sending one, and the POST
+              // /api/quote-requests route only accepts a developer
+              // session anyway. Showing the form and letting it fail on
+              // submit would be a confusing dead end, so it's swapped for
+              // an explanatory note instead. See #1.
+              <p className="text-sm text-stone">
+                You&apos;re signed in as a contractor. Quote requests are sent by developer accounts.
+              </p>
             ) : submitResult === 'success' ? (
               <div className="text-sm">
                 <p className="text-sage font-medium mb-1">Request sent.</p>
@@ -364,8 +442,20 @@ export default function ContractorProfilePage() {
                   />
                 </div>
 
-                {submitResult === 'error' && (
-                  <p className="text-sm text-red-600">Something went wrong. Please try again.</p>
+                {submitResult === 'error' && submitError && (
+                  <div className="text-sm text-red-600">
+                    <p>{submitError.message}</p>
+                    {/* POST /api/quote-requests returns 403 with code
+                        EMAIL_NOT_VERIFIED for a developer whose email isn't
+                        verified yet — point them at the dashboard, where
+                        they can resend the verification email, rather than
+                        leaving them stuck here. */}
+                    {submitError.code === 'EMAIL_NOT_VERIFIED' && (
+                      <Link href="/dashboard" className="underline underline-offset-2 font-medium">
+                        Go to your dashboard to resend verification
+                      </Link>
+                    )}
+                  </div>
                 )}
 
                 <button

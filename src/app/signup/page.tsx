@@ -8,6 +8,7 @@ import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import { PASSWORD_MIN_LENGTH, PASSWORD_HINT } from '@/lib/password-rules';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -44,7 +45,9 @@ export default function SignupPage() {
         redirect: false,
       });
 
-      if (signInResult?.ok) {
+      // `ok` alone isn't enough in NextAuth v5 beta — a failed credentials
+      // sign-in still resolves ok:true with `error` set (see login page).
+      if (signInResult?.ok && !signInResult.error) {
         router.push('/browse');
       } else {
         router.push('/login');
@@ -101,12 +104,12 @@ export default function SignupPage() {
               <input
                 type="password"
                 required
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
               />
-              <p className="text-xs text-stone mt-1">At least 8 characters.</p>
+              <p className="text-xs text-stone mt-1">{PASSWORD_HINT}</p>
             </div>
 
             {error && <p className="text-sm text-red-600">{error}</p>}

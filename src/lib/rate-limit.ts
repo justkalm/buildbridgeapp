@@ -1,7 +1,10 @@
 // src/lib/rate-limit.ts
 //
-// A simple in-memory rate limiter, keyed by IP, for endpoints that don't
-// warrant pulling in Redis/Upstash — currently just admin login.
+// A simple in-memory rate limiter for endpoints that don't warrant pulling
+// in Redis/Upstash. Keys are caller-chosen strings (an IP, a user id, a
+// normalized email), prefixed per endpoint so buckets don't collide. Used
+// by admin login, user login (src/lib/auth.ts — keyed by BOTH email and
+// IP), signup, forgot-password, and the logged-in write endpoints.
 //
 // KNOWN LIMITATION, stated plainly: this only works within a single
 // running server process. On Vercel, each serverless function instance
@@ -58,6 +61,25 @@ export function checkRateLimit(
 
   existing.count += 1;
   return true;
+}
+
+/**
+ * Gives back one attempt previously consumed by a SUCCESSFUL
+ * checkRateLimit() call on the same key. Used by the login flow to make
+ * the limit effectively count only failed attempts while still reserving
+ * the attempt synchronously up front — see authorize() in src/lib/auth.ts
+ * for why that ordering matters (parallel requests can't all slip past a
+ * "check now, record the failure later" limiter while bcrypt is running).
+ *
+ * Only call this after checkRateLimit() returned true for this key;
+ * a rejected call never incremented anything, so refunding it would hand
+ * out a free attempt. No-op if the bucket already expired or was cleaned
+ * up in between.
+ */
+export function refundRateLimit(key: string): void {
+  const existing = buckets.get(key);
+  if (!existing || existing.resetAt < Date.now()) return;
+  if (existing.count > 0) existing.count -= 1;
 }
 
 // Best-effort client IP extraction. Vercel sets x-forwarded-for; falls

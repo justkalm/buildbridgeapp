@@ -50,13 +50,15 @@ export async function GET(
       reviewCount: true,
       licenseNumber: true,
       bio: true,
+      // Only used to derive acceptsSiteVisits below, then stripped. The
+      // hash itself must never reach the response.
+      passwordHash: true,
       projects: {
         select: {
           id: true,
           title: true,
           developerName: true,
           projectType: true,
-          completedYear: true,
           squareFeet: true,
           elevationFloors: true,
           committedDurationMonths: true,
@@ -65,7 +67,10 @@ export async function GET(
           reviewRating: true,
           reviewText: true,
         },
-        orderBy: { completedYear: 'desc' },
+        // Newest-added first. Used to sort by completedYear, which the
+        // project forms no longer ask for (the owner prefers the committed
+        // and actual durations); the column still exists in the database.
+        orderBy: { createdAt: 'desc' },
       },
     },
   });
@@ -74,5 +79,9 @@ export async function GET(
     return NextResponse.json({ error: 'Contractor not found' }, { status: 404 });
   }
 
-  return NextResponse.json(contractor);
+  // acceptsSiteVisits: whether this contractor has claimed their account
+  // and can therefore answer a site visit request (see
+  // src/app/api/site-visits/route.ts). A boolean, never the hash.
+  const { passwordHash, ...publicFields } = contractor;
+  return NextResponse.json({ ...publicFields, acceptsSiteVisits: passwordHash !== null });
 }

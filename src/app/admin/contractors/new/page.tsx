@@ -7,6 +7,8 @@ import Link from 'next/link';
 import ImageUpload from '@/components/ImageUpload';
 import AdminTabs from '@/components/AdminTabs';
 import TradeTypePicker from '@/components/TradeTypePicker';
+import { isPlaceholderLicense } from '@/lib/license';
+import { normalizeLocation } from '@/lib/location';
 
 type ProjectDraft = {
   title: string;
@@ -16,7 +18,6 @@ type ProjectDraft = {
   committedDurationMonths: string;
   actualDurationMonths: string;
   projectType: string;
-  completedYear: string;
   imageUrls: string[];
 };
 
@@ -28,7 +29,6 @@ const emptyProject = (): ProjectDraft => ({
   committedDurationMonths: '',
   actualDurationMonths: '',
   projectType: '',
-  completedYear: '',
   imageUrls: [],
 });
 
@@ -119,7 +119,6 @@ export default function NewContractorPage() {
           committedDurationMonths: p.committedDurationMonths ? Number(p.committedDurationMonths) : undefined,
           actualDurationMonths: p.actualDurationMonths ? Number(p.actualDurationMonths) : undefined,
           projectType: p.projectType || undefined,
-          completedYear: p.completedYear ? Number(p.completedYear) : undefined,
           imageUrls: p.imageUrls,
         })),
     };
@@ -207,10 +206,23 @@ export default function NewContractorPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="City">
-              <input required value={city} onChange={(e) => setCity(e.target.value)} className={inputCls} />
+              <input
+                required
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                onBlur={(e) => setCity(normalizeLocation(e.target.value))}
+                className={inputCls}
+              />
             </Field>
             <Field label="Area / neighborhood">
-              <input required value={area} onChange={(e) => setArea(e.target.value)} placeholder="e.g. Thane" className={inputCls} />
+              <input
+                required
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                onBlur={(e) => setArea(normalizeLocation(e.target.value))}
+                placeholder="e.g. Thane"
+                className={inputCls}
+              />
             </Field>
           </div>
 
@@ -228,13 +240,28 @@ export default function NewContractorPage() {
                 onChange={(e) => setVerificationStatus(e.target.value as 'PENDING' | 'VERIFIED')}
                 className={inputCls}
               >
-                <option value="PENDING">Pending — not yet checked</option>
-                <option value="VERIFIED">Verified — license confirmed</option>
+                <option value="PENDING">Pending: not yet checked</option>
+                <option
+                  value="VERIFIED"
+                  disabled={isPlaceholderLicense(licenseNumber)}
+                  title={
+                    isPlaceholderLicense(licenseNumber)
+                      ? 'Enter the contractor\'s real license number before marking Verified.'
+                      : undefined
+                  }
+                >
+                  Verified: license confirmed
+                </option>
               </select>
+              {isPlaceholderLicense(licenseNumber) && (
+                <p className="text-xs text-red-600 mt-1">
+                  This looks like a placeholder license number. Enter the real one to enable Verified.
+                </p>
+              )}
             </Field>
           </div>
 
-          <Field label="Tier (free during trial — this is a manual override, not billing)">
+          <Field label="Tier (free during trial: this is a manual override, not billing)">
             <select
               value={tier}
               onChange={(e) => setTier(e.target.value as 'LISTED' | 'PLUS' | 'PRO')}
@@ -272,7 +299,7 @@ export default function NewContractorPage() {
             <Field label="Phone (used for quote notifications)">
               <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91XXXXXXXXXX" className={inputCls} />
             </Field>
-            <Field label="Email (required — this becomes their dashboard login)">
+            <Field label="Email (required: this becomes their dashboard login)">
               <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
             </Field>
           </div>
@@ -290,7 +317,7 @@ export default function NewContractorPage() {
             </div>
             {projects.length === 0 && (
               <p className="text-xs text-stone">
-                No projects added. It&apos;s fine to leave this empty and add projects later — an empty
+                No projects added. It&apos;s fine to leave this empty and add projects later. An empty
                 list is more honest than one made up.
               </p>
             )}
@@ -347,13 +374,6 @@ export default function NewContractorPage() {
                       value={p.actualDurationMonths}
                       onChange={(e) => updateProject(i, 'actualDurationMonths', e.target.value)}
                       placeholder="Actual duration (months)"
-                      className={inputCls}
-                    />
-                    <input
-                      type="number"
-                      value={p.completedYear}
-                      onChange={(e) => updateProject(i, 'completedYear', e.target.value)}
-                      placeholder="Year completed"
                       className={inputCls}
                     />
                   </div>

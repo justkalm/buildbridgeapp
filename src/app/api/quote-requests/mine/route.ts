@@ -26,6 +26,7 @@ export async function GET() {
       projectType: true,
       location: true,
       status: true,
+      statusUpdatedAt: true,
       createdAt: true,
       emailSentAt: true,
       contractor: { select: { id: true, name: true, slug: true } },

@@ -22,7 +22,6 @@ type ProjectLightboxProps = {
     title: string;
     developerName: string | null;
     projectType: string | null;
-    completedYear: number | null;
     squareFeet: number | null;
     elevationFloors: number | null;
     committedDurationMonths: number | null;
@@ -158,9 +157,6 @@ export default function ProjectLightbox({ project, onClose }: ProjectLightboxPro
             )}
             {project.elevationFloors && (
               <DetailRow label="Elevation" value={`G+${project.elevationFloors}`} />
-            )}
-            {project.completedYear && (
-              <DetailRow label="Completed" value={String(project.completedYear)} />
             )}
             {durationText && <DetailRow label="Timeline" value={durationText} />}
           </div>

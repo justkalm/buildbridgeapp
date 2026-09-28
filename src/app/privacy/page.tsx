@@ -18,7 +18,7 @@ export default function PrivacyPage() {
       <Nav />
       <main className="flex-1 max-w-[720px] mx-auto px-8 py-14 w-full">
         <div className="mb-8 px-4 py-3 rounded-[6px] bg-paper-dim border border-line text-sm text-stone">
-          <strong className="text-ink">Placeholder — under legal review.</strong> This page is a
+          <strong className="text-ink">Placeholder: under legal review.</strong> This page is a
           draft outline, not a final privacy policy. It will be replaced once reviewed.
         </div>
 
@@ -38,7 +38,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="font-display text-xl mb-2">2. How we use it</h2>
             <p className="text-stone">
-              To operate the marketplace — matching developers with contractors, sending
+              To operate the marketplace: matching developers with contractors, sending
               notifications about quote requests and project alerts, and verifying contractor
               licenses.
             </p>

@@ -16,7 +16,7 @@ export default function TermsPage() {
       <Nav />
       <main className="flex-1 max-w-[720px] mx-auto px-8 py-14 w-full">
         <div className="mb-8 px-4 py-3 rounded-[6px] bg-paper-dim border border-line text-sm text-stone">
-          <strong className="text-ink">Placeholder — under legal review.</strong> This page is a
+          <strong className="text-ink">Placeholder: under legal review.</strong> This page is a
           draft outline, not final terms. It will be replaced once reviewed.
         </div>
 
@@ -28,7 +28,7 @@ export default function TermsPage() {
             <h2 className="font-display text-xl mb-2">1. What (kalm) is</h2>
             <p className="text-stone">
               (kalm) is a platform that connects property developers with licensed contractors.
-              We facilitate introductions and quote requests — we are not a party to any
+              We facilitate introductions and quote requests, and we are not a party to any
               agreement, contract, or transaction between a developer and a contractor.
             </p>
           </section>
@@ -38,7 +38,7 @@ export default function TermsPage() {
             <p className="text-stone">
               You&apos;re responsible for the accuracy of information you provide, and for keeping
               your account credentials secure. Contractor listings marked &quot;Verified&quot; have had
-              their license number checked against the relevant state authority — this does not
+              their license number checked against the relevant state authority. This does not
               constitute a guarantee of workmanship, timeliness, or business conduct.
             </p>
           </section>

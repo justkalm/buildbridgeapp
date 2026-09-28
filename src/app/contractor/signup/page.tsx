@@ -3,9 +3,21 @@
 // Mirrors src/app/signup/page.tsx exactly (same visual pattern, same form
 // shape), pointed at /api/contractors/signup instead of
 // /api/developers/signup. Also covers the CLAIM case — if this email
-// matches a contractor admin already entered, the API sets a password on
-// that existing record rather than creating a duplicate; this page doesn't
-// need to know which case happened, the redirect is the same either way.
+// matches a contractor admin already entered, the API does NOT set a
+// password or sign anyone in; it emails a claim link to the address on
+// file and returns `claimRequested`, and this page shows a "check your
+// email" screen instead of redirecting (see the API route header for the
+// account-takeover reasoning). Password min length / hint text come from
+// src/lib/password-rules.ts, shared with the server-side policy.
+//
+// City and area are required here so a new listing has a real location
+// from day one (developers filter /browse by it, and admin won't verify a
+// contractor without one). Both are tidied with normalizeLocation on blur
+// so the person sees the saved spelling before submitting; the API applies
+// the same rule regardless. The fields are always shown, because the form
+// can't tell a fresh signup from a claim before submitting. On a claim the
+// API ignores them and keeps the location admin already entered (see the
+// route's header comment), which is why the hint under the fields says so.
 
 'use client';
 
@@ -15,12 +27,16 @@ import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import { PASSWORD_MIN_LENGTH, PASSWORD_HINT } from '@/lib/password-rules';
+import { normalizeLocation } from '@/lib/location';
 
 export default function ContractorSignupPage() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
+  const [area, setArea] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +51,16 @@ export default function ContractorSignupPage() {
       const res = await fetch('/api/contractors/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, password }),
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          password,
+          // Normalized here too in case submit happens without a blur
+          // (e.g. pressing Enter in the field); the API does it again.
+          city: normalizeLocation(city),
+          area: normalizeLocation(area),
+        }),
       });
 
       const data = await res.json();
@@ -62,7 +87,9 @@ export default function ContractorSignupPage() {
         redirect: false,
       });
 
-      if (signInResult?.ok) {
+      // `ok` alone isn't enough in NextAuth v5 beta — a failed credentials
+      // sign-in still resolves ok:true with `error` set (see login page).
+      if (signInResult?.ok && !signInResult.error) {
         router.push('/contractor/dashboard');
       } else {
         router.push('/login');
@@ -137,17 +164,59 @@ export default function ContractorSignupPage() {
                 className="w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
               />
             </div>
+            <fieldset>
+              <legend className="block text-sm font-medium mb-1.5">Where you&apos;re based</legend>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="signup-city" className="block text-xs text-stone mb-1">
+                    City
+                  </label>
+                  <input
+                    id="signup-city"
+                    type="text"
+                    required
+                    maxLength={100}
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    onBlur={(e) => setCity(normalizeLocation(e.target.value))}
+                    placeholder="e.g. Mumbai"
+                    className="w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="signup-area" className="block text-xs text-stone mb-1">
+                    Area
+                  </label>
+                  <input
+                    id="signup-area"
+                    type="text"
+                    required
+                    maxLength={100}
+                    value={area}
+                    onChange={(e) => setArea(e.target.value)}
+                    onBlur={(e) => setArea(normalizeLocation(e.target.value))}
+                    placeholder="e.g. Andheri West"
+                    className="w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-stone mt-1">
+                Developers search for contractors by location, and we need it to verify your
+                listing. If you&apos;re already listed, we&apos;ll keep the location on your
+                existing profile; you can change it from your dashboard later.
+              </p>
+            </fieldset>
             <div>
               <label className="block text-sm font-medium mb-1.5">Password</label>
               <input
                 type="password"
                 required
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
               />
-              <p className="text-xs text-stone mt-1">At least 8 characters.</p>
+              <p className="text-xs text-stone mt-1">{PASSWORD_HINT}</p>
             </div>
 
             {error && <p className="text-sm text-red-600">{error}</p>}

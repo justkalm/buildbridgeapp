@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { ADMIN_SAFE_CONTRACTOR_SELECT } from '@/lib/admin-contractor-select';
+import { isPlaceholderLicense } from '@/lib/license';
 
 export async function DELETE(
   req: NextRequest,
@@ -42,11 +43,28 @@ export async function DELETE(
   return NextResponse.json({ ok: true, deletedName: existing.name });
 }
 
-// PATCH updates a contractor's verification status and/or tier. Gated the
-// same way as DELETE above. Both fields are optional in the request body —
-// existing callers that only send verificationStatus keep working
-// unchanged; tier is a manual admin override only, not tied to billing
-// (see the zod comment in the create route for why).
+// PATCH updates a contractor's verification status, tier and/or license
+// number. Gated the same way as DELETE above. All fields are optional in
+// the request body — existing callers that only send verificationStatus
+// keep working unchanged; tier is a manual admin override only, not tied
+// to billing (see the zod comment in the create route for why).
+//
+// licenseNumber is editable here because self-signed-up contractors start
+// with a PENDING-* placeholder (src/lib/license.ts) and can't be marked
+// Verified until a real one is on file. Without this, admin would have no
+// way to ever verify them. Changing the license of an already-Verified
+// contractor drops them back to PENDING (unless this same request sets
+// VERIFIED), because the badge was earned against the old number.
+//
+// VERIFIED is also blocked while the contractor's city or area is blank.
+// Self-signed-up contractors used to start with an empty location (signup
+// now requires one, but older rows may still be blank), and a Verified
+// badge on a listing that can't be found by location, or checked against
+// where they actually work, isn't worth much. This route doesn't edit
+// location; the contractor adds it from their own profile.
+//
+// verifiedAt is kept in step with the status: stamped when a contractor
+// becomes VERIFIED, cleared when they stop being VERIFIED.
 const VALID_STATUSES = ['PENDING', 'VERIFIED', 'REJECTED'] as const;
 type VerificationStatus = (typeof VALID_STATUSES)[number];
 const VALID_TIERS = ['LISTED', 'PLUS', 'PRO'] as const;
@@ -65,8 +83,9 @@ export async function PATCH(
 
   const hasStatus = 'verificationStatus' in body;
   const hasTier = 'tier' in body;
+  const hasLicense = 'licenseNumber' in body;
 
-  if (!hasStatus && !hasTier) {
+  if (!hasStatus && !hasTier && !hasLicense) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
   }
 
@@ -78,16 +97,97 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid tier' }, { status: 400 });
   }
 
-  const existing = await prisma.contractor.findUnique({ where: { id }, select: { id: true } });
+  let newLicense: string | undefined;
+  if (hasLicense) {
+    newLicense = typeof body.licenseNumber === 'string' ? body.licenseNumber.trim() : '';
+    if (!newLicense || newLicense.length > 100) {
+      return NextResponse.json({ error: 'License number must be between 1 and 100 characters' }, { status: 400 });
+    }
+    if (isPlaceholderLicense(newLicense)) {
+      return NextResponse.json({ error: 'Enter the real license number, not a placeholder' }, { status: 400 });
+    }
+  }
+
+  const existing = await prisma.contractor.findUnique({
+    where: { id },
+    select: { id: true, licenseNumber: true, verificationStatus: true, city: true, area: true },
+  });
   if (!existing) {
     return NextResponse.json({ error: 'Contractor not found' }, { status: 404 });
+  }
+
+  const licenseChanging = newLicense !== undefined && newLicense !== existing.licenseNumber;
+  if (licenseChanging) {
+    const clash = await prisma.contractor.findUnique({
+      where: { licenseNumber: newLicense },
+      select: { id: true },
+    });
+    if (clash) {
+      return NextResponse.json(
+        { error: `Another contractor already has license number ${newLicense}` },
+        { status: 409 }
+      );
+    }
+  }
+
+  // The license the VERIFIED check below should look at: the new one if
+  // this request is setting it, otherwise the one on file.
+  const effectiveLicense = newLicense ?? existing.licenseNumber;
+
+  let nextStatus: VerificationStatus | undefined = hasStatus
+    ? (body.verificationStatus as VerificationStatus)
+    : undefined;
+  if (licenseChanging && !hasStatus && existing.verificationStatus === 'VERIFIED') {
+    nextStatus = 'PENDING';
+  }
+
+  // A PENDING-* license number means no real license has been looked up
+  // yet (see src/lib/license.ts) — block flipping such a contractor to
+  // Verified even though this route can't fix the license itself.
+  if (
+    hasStatus &&
+    body.verificationStatus === 'VERIFIED' &&
+    isPlaceholderLicense(effectiveLicense)
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          'This contractor has a placeholder license number (no real license on file) and cannot be marked Verified. Add the real license number first.',
+      },
+      { status: 400 }
+    );
+  }
+
+  // No location on file: see the comment above PATCH.
+  if (
+    hasStatus &&
+    body.verificationStatus === 'VERIFIED' &&
+    (!existing.city.trim() || !existing.area.trim())
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          'This contractor has no location on file and cannot be marked Verified. They need to add their city and area in their profile first.',
+      },
+      { status: 400 }
+    );
   }
 
   const updated = await prisma.contractor.update({
     where: { id },
     data: {
-      ...(hasStatus ? { verificationStatus: body.verificationStatus as VerificationStatus } : {}),
+      ...(nextStatus
+        ? {
+            verificationStatus: nextStatus,
+            ...(nextStatus === 'VERIFIED'
+              ? existing.verificationStatus === 'VERIFIED' && !licenseChanging
+                ? {}
+                : { verifiedAt: new Date() }
+              : { verifiedAt: null }),
+          }
+        : {}),
       ...(hasTier ? { tier: body.tier as ContractorTier } : {}),
+      ...(licenseChanging ? { licenseNumber: newLicense } : {}),
     },
     select: ADMIN_SAFE_CONTRACTOR_SELECT,
   });

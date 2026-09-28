@@ -132,6 +132,7 @@ model Contractor {
   quoteRequests QuoteRequest[]
   projectAlerts ProjectPostAlert[]
   shortlistedBy ShortlistedContractor[]
+  siteVisits    SiteVisit[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -212,10 +213,13 @@ model Developer {
 
   phone String? // required at signup going forward; stays nullable so accounts created before this change don't break
 
-  // Email verification — set on signup, cleared once the link is clicked.
-  // Login is NOT blocked on this being true (see verify-email route
-  // comment for why); it's tracked so a fake/mistyped email is visible in
-  // admin, not to gate access.
+  // Email verification — set on signup, cleared once the link is clicked
+  // (or a password reset is completed, which proves the same thing).
+  // Login is NOT blocked on this being true, so a developer can always get
+  // in to browse, shortlist and resend the link. But sending a quote
+  // request or posting a project IS: see src/lib/require-verified-email.ts.
+  // Those are the actions that email contractors or admin on the
+  // developer's behalf, so they need a real, reachable address.
   emailVerified              Boolean   @default(false)
   emailVerifyToken           String?   @unique
   emailVerifyTokenExpiresAt  DateTime?
@@ -229,6 +233,7 @@ model Developer {
   quoteRequests QuoteRequest[]
   projectPosts  ProjectPost[]
   shortlist     ShortlistedContractor[]
+  siteVisits    SiteVisit[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -238,17 +243,26 @@ model Developer {
 // QuoteRequest
 // ---------------------------------------------------------------------------
 // The core mechanic of this whole slice. Creating one of these is what fires
-// the notification email. `status` exists so a future "your requests" view
-// on the developer dashboard has something real to show — for now, every
-// request lands as PENDING and you update it by hand if you hear back from
-// a contractor. The contractor-side dashboard (src/app/contractor/*) does
-// let a contractor see and act on requests aimed at them directly — this
-// comment used to say no contractor app existed yet; that's no longer true.
-// themselves).
+// the notification email. Every request lands as PENDING; from there the
+// CONTRACTOR moves it along from their dashboard via
+// PATCH /api/quote-requests/[id]/status, and each change emails the
+// developer. The allowed transitions live in src/lib/quote-status.ts, not
+// here — Prisma can't express "only forward moves", so don't assume the
+// schema alone protects this.
+//
+//   PENDING   → CONTACTED ("Accept — I'll be in touch") | QUOTED | DECLINED
+//   CONTACTED → QUOTED | DECLINED
+//   QUOTED    → (final)
+//   DECLINED  → (final)
+//
+// CONTACTED is the "accepted" state. It kept its original name rather than
+// being renamed to ACCEPTED so existing rows and the baseline migration
+// don't need rewriting — the UI labels it "Accepted".
 
 enum QuoteRequestStatus {
   PENDING
   CONTACTED
+  QUOTED
   DECLINED
 }
 
@@ -268,10 +282,26 @@ model QuoteRequest {
   contactPhone   String // developer's number, captured at request time even if it's already on their account — keeps the record self-contained
 
   status QuoteRequestStatus @default(PENDING)
+  statusUpdatedAt DateTime? // when the contractor last changed `status` — null while still PENDING
 
   emailSentAt DateTime? // null if the notification email failed — lets you spot silently-dropped requests
 
   messages Message[]
+
+  // Unread tracking for the in-app thread, one pair of fields per side
+  // (there are only ever two parties, so this is simpler than a separate
+  // "read receipts" table). A message is unread for a side if it was sent
+  // by the OTHER side after that side's lastReadAt (or ever, if null).
+  // lastReadAt is bumped whenever that party loads the thread.
+  //
+  // notifiedAt throttles "you have a new message" emails: we only email a
+  // side if we haven't already emailed them since they last read the
+  // thread. So a burst of ten messages produces one email, not ten, and
+  // the next email only goes out once they've come back and read it.
+  developerLastReadAt  DateTime?
+  contractorLastReadAt DateTime?
+  developerNotifiedAt  DateTime?
+  contractorNotifiedAt DateTime?
 
   createdAt DateTime @default(now())
 
@@ -419,4 +449,75 @@ model Message {
 enum MessageSenderRole {
   DEVELOPER
   CONTRACTOR
+}
+
+// ---------------------------------------------------------------------------
+// SiteVisit
+// ---------------------------------------------------------------------------
+// A developer asking to see a contractor's completed projects in person,
+// the most direct way for them to judge the quality of the work before
+// hiring. Started from the contractor's public profile, independent of any
+// QuoteRequest: checking someone's work usually comes BEFORE asking them
+// for a price.
+//
+// Flow: the developer picks up to 5 of the contractor's listed projects
+// (3 minimum, or all of them if the contractor lists fewer than 3), offers
+// 3 date/time options, and the contractor is emailed. The contractor
+// confirms one of the offered times and adds a meeting point/address
+// (Project rows don't store addresses), or declines. Either side can
+// cancel. Confirmation emails both sides a calendar invite.
+//
+// projectIds is a plain array rather than a join table: it's a small,
+// fixed-at-request-time list, and the API checks every id belongs to this
+// contractor when the visit is created. If a contractor later deletes one
+// of those projects, readers simply drop the missing id.
+enum SiteVisitStatus {
+  REQUESTED // waiting on the contractor
+  CONFIRMED // contractor picked a time; confirmedSlot is set
+  DECLINED  // contractor said no
+  CANCELLED // either side called it off after requesting/confirming
+}
+
+model SiteVisit {
+  id String @id @default(cuid())
+
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  contractorId String
+  contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+
+  projectIds    String[]
+  proposedSlots DateTime[] // exactly 3, validated in the API
+  confirmedSlot DateTime?  // one of proposedSlots, set on CONFIRMED
+
+  status SiteVisitStatus @default(REQUESTED)
+
+  developerNote String? // anything the developer wants the contractor to know
+  contactPhone  String  // developer's number for the day, captured at request time
+  meetingPoint  String? // set by the contractor on confirm: where to meet / site address
+  responseNote  String? // contractor's reason on decline, or extra detail on confirm
+  cancelledBy   MessageSenderRole? // which side cancelled, if CANCELLED
+
+  requestEmailSentAt DateTime? // null if the "new visit request" email to the contractor failed
+
+  // In-app notifications. Whoever acted last (lastActionBy, at
+  // lastActionAt) has obviously seen the change; the OTHER side hasn't
+  // until they next open their dashboard, which bumps their seenAt. A
+  // visit counts as "new" for a side when the other side acted after that
+  // side's seenAt. Feeds the Nav badge (via /api/messages/unread) and the
+  // "New" label on dashboard cards. Emails still go out as well; this is
+  // for people who don't check email, and for while Resend can only email
+  // the account owner.
+  lastActionAt     DateTime           @default(now())
+  lastActionBy     MessageSenderRole?
+  developerSeenAt  DateTime?
+  contractorSeenAt DateTime?
+
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime? // when the contractor confirmed/declined
+
+  @@index([developerId])
+  @@index([contractorId])
+  @@index([status])
 }

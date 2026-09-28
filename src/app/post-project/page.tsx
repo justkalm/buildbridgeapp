@@ -6,6 +6,19 @@
 // schema comment). Same visual language as the quote-request form on the
 // contractor profile page, since it's the same kind of form for the
 // developer filling it out, just without a contractor already chosen.
+//
+// Errors: the API's own `error` message is shown verbatim for every
+// failure status (400 validation, 403 unverified email, 429 rate limit),
+// since each is already written for a human. For 403 with
+// code 'EMAIL_NOT_VERIFIED' we also show a link to the dashboard, which
+// is where the "resend verification email" button lives.
+//
+// Location stays one free-text "Area, City" field (developers are never
+// asked for their own location anywhere else, including signup). It's
+// tidied with normalizeLocation (src/lib/location.ts) on blur so posts read
+// consistently for admin ("andheri west, mumbai" becomes "Andheri West,
+// Mumbai"); the API applies the same rule, so this is just so the
+// developer sees the saved spelling.
 
 'use client';
 
@@ -15,6 +28,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import { normalizeLocation } from '@/lib/location';
 
 const inputCls = 'w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink';
 
@@ -30,6 +44,7 @@ export default function PostProjectPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
@@ -54,6 +69,7 @@ export default function PostProjectPage() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setNeedsVerification(false);
 
     try {
       const res = await fetch('/api/project-posts', {
@@ -65,8 +81,9 @@ export default function PostProjectPage() {
       if (res.ok) {
         setSubmitted(true);
       } else {
-        const data = await res.json();
-        setError(data.error ?? 'Something went wrong');
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? 'Something went wrong. Please try again.');
+        setNeedsVerification(data.code === 'EMAIL_NOT_VERIFIED');
       }
     } catch {
       setError('Something went wrong. Please try again.');
@@ -87,7 +104,7 @@ export default function PostProjectPage() {
       <main className="flex-1 max-w-[560px] mx-auto px-8 py-12 w-full">
         <h1 className="font-display font-light text-[28px] mb-2">Post a project</h1>
         <p className="text-stone text-sm mb-8">
-          Tell us what you need — we&apos;ll review it and connect you with the right contractor
+          Tell us what you need. We&apos;ll review it and connect you with the right contractor
           directly, rather than you having to browse and pick one yourself.
         </p>
 
@@ -120,6 +137,7 @@ export default function PostProjectPage() {
                 required
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
+                onBlur={(e) => setLocation(normalizeLocation(e.target.value))}
                 placeholder="Area, City"
                 className={inputCls}
               />
@@ -160,7 +178,19 @@ export default function PostProjectPage() {
               />
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && (
+              <p className="text-sm text-red-600">
+                {error}
+                {needsVerification && (
+                  <>
+                    {' '}
+                    <Link href="/dashboard" className="underline underline-offset-2">
+                      Go to your dashboard
+                    </Link>
+                  </>
+                )}
+              </p>
+            )}
 
             <button
               type="submit"

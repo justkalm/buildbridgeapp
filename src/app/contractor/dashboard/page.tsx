@@ -6,6 +6,13 @@
 // data fetch (GET /api/contractors/me) also checks the session server-side
 // — this page-level guard is about UX (don't flash the page before
 // redirecting), not the real security boundary.
+//
+// Quote request actions: each fully-visible lead shows Accept / Mark quote
+// sent / Decline buttons for whichever moves are allowed from its current
+// status (rules in src/lib/quote-status.ts; the server enforces the same
+// rules in PATCH /api/quote-requests/[id]/status). Each change emails the
+// developer. Decline asks for confirmation first, since it can't be
+// undone and the developer is told straight away.
 
 'use client';
 
@@ -14,8 +21,16 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import MessageThread from '@/components/MessageThread';
+import SiteVisitList from '@/components/SiteVisitList';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import {
+  ALLOWED_TRANSITIONS,
+  contractorActionLabel,
+  contractorStatusLabel,
+  type QuoteStatus,
+} from '@/lib/quote-status';
+import { useUnreadMessages } from '@/lib/use-unread-messages';
 
 type QuoteRequestRow = {
   id: string;
@@ -23,7 +38,7 @@ type QuoteRequestRow = {
   location: string;
   budgetRangeLabel: string;
   details: string;
-  status: 'PENDING' | 'CONTACTED' | 'DECLINED';
+  status: QuoteStatus;
   createdAt: string;
   developer: { name: string; email: string | null; phone: string | null };
   leadVisibility: 'full' | 'blurred';
@@ -59,6 +74,13 @@ const verificationCopy: Record<ContractorMe['verificationStatus'], { label: stri
   REJECTED: { label: 'Verification rejected', style: 'bg-red-50 text-red-700' },
 };
 
+const contractorStatusStyle: Record<QuoteStatus, string> = {
+  PENDING: 'bg-ink text-paper',
+  CONTACTED: 'bg-sage-soft text-sage',
+  QUOTED: 'bg-sage-soft text-sage',
+  DECLINED: 'bg-paper-dim text-stone',
+};
+
 const tierLabel: Record<ContractorMe['tier'], string> = {
   LISTED: 'Listed (free)',
   PLUS: 'Plus',
@@ -69,6 +91,42 @@ export default function ContractorDashboardPage() {
   const { status: sessionStatus, data: session } = useSession();
   const router = useRouter();
   const [me, setMe] = useState<ContractorMe | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<{ id: string; message: string } | null>(null);
+  const isContractor =
+    sessionStatus === 'authenticated' && (session?.user as { role?: string })?.role === 'contractor';
+  const unread = useUnreadMessages(isContractor, 30_000);
+
+  async function changeStatus(r: QuoteRequestRow, next: Exclude<QuoteStatus, 'PENDING'>) {
+    if (
+      next === 'DECLINED' &&
+      !window.confirm(`Decline ${r.developer.name}'s request? They'll be emailed, and this can't be undone.`)
+    ) {
+      return;
+    }
+    setUpdatingId(r.id);
+    setStatusError(null);
+    try {
+      const res = await fetch(`/api/quote-requests/${r.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: next }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setMe((prev) =>
+          prev
+            ? { ...prev, quoteRequests: prev.quoteRequests.map((q) => (q.id === r.id ? { ...q, status: next } : q)) }
+            : prev
+        );
+      } else {
+        setStatusError({ id: r.id, message: data?.error ?? "Couldn't update this request. Please try again." });
+      }
+    } catch {
+      setStatusError({ id: r.id, message: "Couldn't update. Please check your connection and try again." });
+    }
+    setUpdatingId(null);
+  }
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
@@ -143,7 +201,7 @@ export default function ContractorDashboardPage() {
 
         {!me.emailVerified && (
           <div className="mb-6 px-4 py-3 rounded-[6px] bg-paper-dim text-stone text-sm">
-            Your email isn&apos;t verified yet — check your inbox for a verification link.
+            Your email isn&apos;t verified yet. Check your inbox for a verification link.
           </div>
         )}
 
@@ -155,7 +213,8 @@ export default function ContractorDashboardPage() {
             </span>
             {me.verificationStatus !== 'PENDING' && (
               <p className="text-xs text-stone mt-2">
-                Editing your profile or projects will reset this to pending review.
+                Changing your location, phone, GST status or trades sends your profile back for
+                review. Editing your bio, team details or projects doesn&apos;t.
               </p>
             )}
           </div>
@@ -167,6 +226,8 @@ export default function ContractorDashboardPage() {
             </p>
           </div>
         </div>
+
+        <SiteVisitList viewerRole="CONTRACTOR" />
 
         {me.projectAlerts.length > 0 && (
           <>
@@ -260,9 +321,16 @@ export default function ContractorDashboardPage() {
                         {r.projectType} · {r.location} · {r.budgetRangeLabel}
                       </p>
                     </div>
-                    <span className="text-xs text-stone">
-                      {new Date(r.createdAt).toLocaleDateString()}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-block text-[11px] font-medium px-2.5 py-0.5 rounded-full ${contractorStatusStyle[r.status]}`}
+                      >
+                        {contractorStatusLabel[r.status]}
+                      </span>
+                      <span className="text-xs text-stone">
+                        {new Date(r.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
                   <p className="text-sm mb-3">{r.details}</p>
                   <div className="flex gap-4 text-xs text-stone border-t border-line pt-2.5">
@@ -273,7 +341,40 @@ export default function ContractorDashboardPage() {
                       {r.developer.phone}
                     </a>
                   </div>
-                  <MessageThread quoteRequestId={r.id} viewerRole="CONTRACTOR" />
+                  {ALLOWED_TRANSITIONS[r.status].length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {ALLOWED_TRANSITIONS[r.status].map((next) => {
+                        const action = next as Exclude<QuoteStatus, 'PENDING'>;
+                        return (
+                          <button
+                            key={action}
+                            onClick={() => changeStatus(r, action)}
+                            disabled={updatingId === r.id}
+                            className={
+                              action === 'DECLINED'
+                                ? 'text-xs px-4 py-1.5 rounded-full border border-line text-stone hover:border-red-300 hover:text-red-700 transition-colors disabled:opacity-60'
+                                : 'text-xs px-4 py-1.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors disabled:opacity-60'
+                            }
+                          >
+                            {contractorActionLabel[action]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {statusError?.id === r.id && (
+                    <p className="text-[11px] text-red-600 mt-1.5">{statusError.message}</p>
+                  )}
+                  {unread.byQuoteRequest[r.id] > 0 && (
+                    <p className="text-[11px] font-medium text-ink mt-3">
+                      {unread.byQuoteRequest[r.id]} new message{unread.byQuoteRequest[r.id] === 1 ? '' : 's'}
+                    </p>
+                  )}
+                  <MessageThread
+                    quoteRequestId={r.id}
+                    viewerRole="CONTRACTOR"
+                    onRead={() => unread.markRead(r.id)}
+                  />
                 </div>
               )
             )}

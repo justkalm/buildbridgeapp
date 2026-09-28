@@ -19,7 +19,7 @@ export default function Home() {
             Build with contractors who&apos;ve proven it before.
           </h1>
           <p className="text-[17px] leading-relaxed text-stone max-w-[480px] mx-auto mb-10">
-            (kalm) connects developers with licensed contractors — every profile backed by
+            (kalm) connects developers with licensed contractors, every profile backed by
             verified project history, not just claims.
           </p>
           <div className="flex gap-4 flex-wrap justify-center">
@@ -93,7 +93,7 @@ export default function Home() {
             Built for contractors too.
           </h2>
           <p className="text-[15.5px] leading-relaxed text-stone text-center max-w-[520px] mx-auto mb-16">
-            A listing on (kalm) isn&apos;t just a directory entry — it&apos;s a dashboard you actually
+            A listing on (kalm) isn&apos;t just a directory entry, it&apos;s a dashboard you actually
             control.
           </p>
 
@@ -101,7 +101,7 @@ export default function Home() {
             {[
               {
                 title: 'A profile that proves it',
-                body: 'Show completed projects with real photos, timelines, and square footage — not just a claim.',
+                body: 'Show completed projects with real photos, timelines, and square footage, not just a claim.',
               },
               {
                 title: 'Leads land in one place',
@@ -135,16 +135,23 @@ export default function Home() {
           <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-ink mb-6">
             A badge that means something.
           </h2>
-          <p className="text-[15.5px] leading-relaxed text-stone mb-4">
-            Every Verified contractor&apos;s license has been independently checked against the
-            issuing state authority — not just submitted and taken at their word.
-          </p>
-          <p className="text-[15.5px] leading-relaxed text-stone mb-10">
-            If we haven&apos;t confirmed a license yet, a contractor stays marked Pending. We&apos;d
-            rather show fewer Verified profiles than let the badge stop meaning what it says.
-          </p>
+          <div className="max-w-[520px] mx-auto">
+            <p className="text-[15.5px] leading-relaxed text-stone mb-4 text-left sm:text-justify">
+              Before a contractor is marked Verified, our team does three things, not just take
+              their word for it:
+            </p>
+            <ul className="text-[15.5px] leading-relaxed text-stone text-left mb-4 list-disc list-outside pl-5 space-y-1.5">
+              <li>Review copies of their license, GST, and registration documents</li>
+              <li>Check their GSTIN against the GST portal</li>
+              <li>Speak with them directly, by phone or in person</li>
+            </ul>
+            <p className="text-[15.5px] leading-relaxed text-stone mb-10 text-left sm:text-justify">
+              If we haven&apos;t completed all three yet, a contractor stays marked Pending. We&apos;d
+              rather show fewer Verified profiles than let the badge stop meaning what it says.
+            </p>
+          </div>
           <span className="inline-flex items-center gap-2 text-sm text-ink border border-line rounded-full px-5 py-2.5">
-            ( verified — license checked independently )
+            ( verified: documents & GSTIN checked, contractor contacted directly )
           </span>
         </div>
       </section>

@@ -7,12 +7,19 @@
 // comment) — so the confirmation step here explicitly shows the
 // quote-request count before deleting, rather than a generic "are you
 // sure?" that hides what's actually about to be lost.
+//
+// The VERIFIED option is disabled (with a title saying why) for any row the
+// PATCH route would refuse anyway: a placeholder license, and/or a blank
+// city or area. Rows with no location show "No location" in red. Admin
+// can't fix location from here; the contractor adds it in their profile.
 
 'use client';
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminTabs from '@/components/AdminTabs';
+import { isPlaceholderLicense } from '@/lib/license';
+import { formatLocation } from '@/lib/location';
 
 type ContractorRow = {
   id: string;
@@ -31,7 +38,6 @@ type ProjectRow = {
   id: string;
   title: string;
   developerName: string | null;
-  completedYear: number | null;
   reviewRating: number | null;
   reviewText: string | null;
   reviewedAt: string | null;
@@ -186,6 +192,38 @@ export default function AdminContractorsPage() {
     }
   }
 
+  // Record or correct a contractor's license number. Mostly for
+  // self-signed-up contractors, who start with a placeholder and can't be
+  // marked Verified until the real number is on file. The server drops an
+  // already-Verified contractor back to PENDING if their license changes,
+  // so the row is replaced with the server's copy rather than patched
+  // optimistically.
+  async function handleLicenseEdit(contractor: ContractorRow) {
+    const current = isPlaceholderLicense(contractor.licenseNumber) ? '' : contractor.licenseNumber;
+    const input = window.prompt(`License number for ${contractor.name}:`, current);
+    if (input === null) return;
+    const licenseNumber = input.trim();
+    if (!licenseNumber || licenseNumber === contractor.licenseNumber) return;
+
+    try {
+      const res = await fetch(`/api/admin/contractors/${contractor.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ licenseNumber }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error ?? 'Failed to update license number');
+        return;
+      }
+      setContractors((prev) =>
+        prev ? prev.map((c) => (c.id === contractor.id ? { ...c, ...data.contractor } : c)) : prev
+      );
+    } catch {
+      alert('Failed to update license number. Please try again.');
+    }
+  }
+
   async function handleTierChange(contractor: ContractorRow, tier: ContractorRow['tier']) {
     const previous = contractor.tier;
     setContractors((prev) =>
@@ -263,15 +301,61 @@ export default function AdminContractorsPage() {
                 </tr>
               </thead>
               <tbody>
-                {contractors.map((c) => (
+                {contractors.map((c) => {
+                  const placeholderLicense = isPlaceholderLicense(c.licenseNumber);
+                  const missingLocation = !c.city.trim() || !c.area.trim();
+                  // Every reason VERIFIED is blocked for this row, joined
+                  // into one tooltip so both show when both apply.
+                  const verifyBlockers = [
+                    placeholderLicense &&
+                      'no real license number on file (self-signup placeholder), so add their real license',
+                    missingLocation &&
+                      'no location on file, so they need to add their city and area in their profile',
+                  ].filter(Boolean);
+                  const verifyBlockedTitle =
+                    verifyBlockers.length > 0
+                      ? `Can't mark Verified yet: ${verifyBlockers.join('; and ')}.`
+                      : undefined;
+                  return (
                   <React.Fragment key={c.id}>
                   <tr className="border-b border-line last:border-b-0">
                     <td className="px-4 py-4">
                       <div className="font-medium">{c.name}</div>
-                      <div className="text-xs text-stone font-mono">{c.licenseNumber}</div>
+                      {placeholderLicense ? (
+                        <div className="text-xs text-red-600 font-medium">
+                          No license on file{' '}
+                          <button
+                            onClick={() => handleLicenseEdit(c)}
+                            className="underline underline-offset-2 hover:text-ink"
+                          >
+                            Add license
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-stone font-mono">
+                          {c.licenseNumber}{' '}
+                          <button
+                            onClick={() => handleLicenseEdit(c)}
+                            className="font-sans underline underline-offset-2 hover:text-ink"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-4 text-stone text-xs">{c.email}</td>
-                    <td className="px-4 py-4 text-stone">{c.area}, {c.city}</td>
+                    <td className="px-4 py-4 text-stone">
+                      {missingLocation ? (
+                        <span
+                          className="text-xs text-red-600 font-medium"
+                          title="City or area is blank. The contractor adds it in their profile."
+                        >
+                          No location
+                        </span>
+                      ) : (
+                        formatLocation(c.area, c.city)
+                      )}
+                    </td>
                     <td className="px-4 py-4">
                       <select
                         value={c.verificationStatus}
@@ -281,7 +365,13 @@ export default function AdminContractorsPage() {
                         className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border-0 cursor-pointer ${statusStyle[c.verificationStatus]}`}
                       >
                         <option value="PENDING">PENDING</option>
-                        <option value="VERIFIED">VERIFIED</option>
+                        <option
+                          value="VERIFIED"
+                          disabled={verifyBlockers.length > 0}
+                          title={verifyBlockedTitle}
+                        >
+                          VERIFIED
+                        </option>
                         <option value="REJECTED">REJECTED</option>
                       </select>
                     </td>
@@ -330,7 +420,7 @@ export default function AdminContractorsPage() {
                                   <div>
                                     <p className="text-sm font-medium">{p.title}</p>
                                     <p className="text-xs text-stone">
-                                      {[p.developerName, p.completedYear].filter(Boolean).join(' · ') || '—'}
+                                      {p.developerName || 'N/A'}
                                     </p>
                                   </div>
                                   {p.reviewRating ? (
@@ -409,7 +499,8 @@ export default function AdminContractorsPage() {
                     </tr>
                   )}
                   </React.Fragment>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

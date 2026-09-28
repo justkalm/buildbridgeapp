@@ -77,8 +77,8 @@ export default function ContractorConsentPage() {
         <h1 className="font-display font-light text-[28px] mb-4">Data sharing</h1>
         <p className="text-stone text-sm mb-6">
           (kalm) partners with material suppliers who may want to reach contractors on the
-          platform. If you opt in, your business details — company name, trade types, and
-          contact information — may be shared with these supplier partners. Your project history
+          platform. If you opt in, your business details (company name, trade types, and
+          contact information) may be shared with these supplier partners. Your project history
           and developer contacts are never shared. You can change this at any time.
         </p>
 

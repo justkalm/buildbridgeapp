@@ -1,13 +1,30 @@
 // src/app/login/page.tsx
+//
+// Error handling notes (NextAuth v5 beta, credentials provider):
+//
+// - signIn(..., { redirect: false }) resolves with `ok: true` even when the
+//   credentials were WRONG — the auth route answers 200 with a JSON body
+//   whose `url` carries `?error=CredentialsSignin&code=...`. So success
+//   has to be judged on `!result.error`, not `result.ok`. (This page used
+//   to check only `ok`, which meant a wrong password could fall through
+//   to the "success" branch and bounce the user to /browse signed-out.)
+//
+// - `result.code` is the only way the server can tell us WHY a sign-in
+//   failed. authorize() in src/lib/auth.ts throws a CredentialsSignin
+//   subclass with code LOGIN_RATE_LIMITED_CODE when the per-email or
+//   per-IP login limit is hit; every other failure (unknown email, wrong
+//   password) comes back as the default code and gets the same generic
+//   message, so the form never reveals whether an email is registered.
 
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { signIn, type SignInResponse } from 'next-auth/react';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import { LOGIN_RATE_LIMITED_CODE } from '@/lib/auth-codes';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,13 +38,20 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
 
-    const result = await signIn('credentials', {
-      email,
-      password,
-      redirect: false,
-    });
+    let result: SignInResponse | undefined;
+    try {
+      result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+    } catch {
+      setError('Something went wrong. Please try again.');
+      setSubmitting(false);
+      return;
+    }
 
-    if (result?.ok) {
+    if (result?.ok && !result.error) {
       // Role isn't known from the signIn result itself — fetch the session
       // to find out whether this was a developer or contractor login, and
       // route to the right home page. A contractor visiting /browse post-
@@ -37,6 +61,11 @@ export default function LoginPage() {
       const session = await sessionRes.json();
       const role = session?.user?.role;
       router.push(role === 'contractor' ? '/contractor/dashboard' : '/browse');
+    } else if (result?.code === LOGIN_RATE_LIMITED_CODE) {
+      setError(
+        'Too many sign-in attempts. Please wait 15 minutes and try again, or use “Forgot password?” below to reset it now.'
+      );
+      setSubmitting(false);
     } else {
       setError('Incorrect email or password');
       setSubmitting(false);

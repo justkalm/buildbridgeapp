@@ -15,16 +15,18 @@ import { prisma } from '@/lib/prisma';
 import { ADMIN_SAFE_CONTRACTOR_SELECT } from '@/lib/admin-contractor-select';
 import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
 import { isValidTradeType } from '@/lib/trade-types';
+import { isPlaceholderLicense } from '@/lib/license';
+import { normalizeLocation } from '@/lib/location';
+import { positiveWhole } from '@/lib/project-validation';
 
 const projectSchema = z.object({
   title: z.string().trim().min(1).max(200),
   developerName: z.string().trim().max(200).optional(),
   projectType: z.string().trim().max(200).optional(),
-  completedYear: z.number().int().min(1990).max(2100).optional(),
-  squareFeet: z.number().int().positive().optional(),
-  elevationFloors: z.number().int().positive().optional(),
-  committedDurationMonths: z.number().int().positive().optional(),
-  actualDurationMonths: z.number().int().positive().optional(),
+  squareFeet: positiveWhole('Sq ft').optional(),
+  elevationFloors: positiveWhole('Floors').optional(),
+  committedDurationMonths: positiveWhole('Committed duration').optional(),
+  actualDurationMonths: positiveWhole('Actual duration').optional(),
   imageUrls: z
     .array(z.string().url())
     .max(10)
@@ -36,8 +38,9 @@ const projectSchema = z.object({
 
 const contractorSchema = z.object({
   name: z.string().trim().min(1).max(200),
-  city: z.string().trim().min(1).max(100),
-  area: z.string().trim().min(1).max(100),
+  // Normalized to consistent capitalisation — see src/lib/location.ts.
+  city: z.string().trim().min(1).max(100).transform(normalizeLocation),
+  area: z.string().trim().min(1).max(100).transform(normalizeLocation),
   tradeTypes: z
     .array(z.string().trim().min(1))
     .min(1, 'At least one trade type is required')
@@ -118,6 +121,20 @@ export async function POST(req: NextRequest) {
   const data = parsed.data;
   const slug = slugify(data.name);
 
+  // A PENDING-* license number is a self-signup placeholder, not a real
+  // license we've reviewed against the license, GST, and registration
+  // documents, see src/lib/license.ts. Never let one be created already
+  // marked Verified.
+  if (data.verificationStatus === 'VERIFIED' && isPlaceholderLicense(data.licenseNumber)) {
+    return NextResponse.json(
+      {
+        error:
+          'This contractor has a placeholder license number (no real license on file) and cannot be marked Verified. Add the real license number first.',
+      },
+      { status: 400 }
+    );
+  }
+
   const existingLicense = await prisma.contractor.findUnique({
     where: { licenseNumber: data.licenseNumber },
   });
@@ -153,7 +170,6 @@ export async function POST(req: NextRequest) {
           title: p.title,
           developerName: p.developerName,
           projectType: p.projectType,
-          completedYear: p.completedYear,
           squareFeet: p.squareFeet,
           elevationFloors: p.elevationFloors,
           committedDurationMonths: p.committedDurationMonths,

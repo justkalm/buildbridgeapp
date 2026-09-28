@@ -1,4 +1,16 @@
 // src/app/dashboard/page.tsx
+//
+// Developer home: shortlist (with private notes + compare table) and every
+// quote request they've sent, with its status and in-app thread.
+//
+// Status wording comes from src/lib/quote-status.ts so it always matches
+// what the contractor's dashboard and the status-change email say.
+//
+// Email-verification banner: when the verification switch is on (see
+// src/lib/require-verified-email.ts), quote requests, project posts and
+// site visits are blocked until the developer's email is verified, so this
+// page (where those forms' "verify your email" errors link to) shows a
+// banner with a resend button. While the switch is off, no banner.
 
 'use client';
 
@@ -9,12 +21,16 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import MessageThread from '@/components/MessageThread';
+import SiteVisitList from '@/components/SiteVisitList';
+import { developerStatusLabel, type QuoteStatus } from '@/lib/quote-status';
+import { useUnreadMessages } from '@/lib/use-unread-messages';
 
 type QuoteRequestRow = {
   id: string;
   projectType: string;
   location: string;
-  status: 'PENDING' | 'CONTACTED' | 'DECLINED';
+  status: QuoteStatus;
+  statusUpdatedAt: string | null;
   createdAt: string;
   emailSentAt: string | null;
   contractor: { id: string; name: string; slug: string };
@@ -39,17 +55,14 @@ type ShortlistedRow = {
   };
 };
 
-const statusLabel: Record<QuoteRequestRow['status'], string> = {
-  PENDING: 'Awaiting response',
-  CONTACTED: 'Contractor reached out',
-  DECLINED: 'No response',
+const statusStyle: Record<QuoteStatus, string> = {
+  PENDING: 'bg-paper-dim text-stone',
+  CONTACTED: 'bg-sage-soft text-sage',
+  QUOTED: 'bg-ink text-paper',
+  DECLINED: 'bg-paper-dim text-stone line-through decoration-stone/40',
 };
 
-const statusStyle: Record<QuoteRequestRow['status'], string> = {
-  PENDING: 'bg-sage-soft text-sage',
-  CONTACTED: 'bg-sage-soft text-sage',
-  DECLINED: 'bg-paper-dim text-stone',
-};
+type Me = { name: string; email: string; emailVerified: boolean; verificationRequired: boolean };
 
 export default function DashboardPage() {
   const { status, data: session } = useSession();
@@ -60,6 +73,10 @@ export default function DashboardPage() {
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+  const [me, setMe] = useState<Me | null>(null);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | string>('idle');
+  const isDeveloper = status === 'authenticated' && (session?.user as { role?: string })?.role === 'developer';
+  const unread = useUnreadMessages(isDeveloper, 30_000);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -89,7 +106,26 @@ export default function DashboardPage() {
     fetch('/api/developers/shortlist')
       .then((res) => (res.ok ? res.json() : []))
       .then(setShortlist);
+    fetch('/api/developers/me')
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setMe);
   }, [status]);
+
+  async function resendVerification() {
+    setResendState('sending');
+    try {
+      const res = await fetch('/api/developers/resend-verification', { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        if (data?.alreadyVerified) setMe((prev) => (prev ? { ...prev, emailVerified: true } : prev));
+        setResendState('sent');
+      } else {
+        setResendState(data?.error ?? "Couldn't send the email. Please try again.");
+      }
+    } catch {
+      setResendState("Couldn't send. Please check your connection and try again.");
+    }
+  }
 
   async function removeFromShortlist(contractorId: string) {
     setShortlist((prev) => (prev ? prev.filter((s) => s.contractor.id !== contractorId) : prev));
@@ -131,8 +167,10 @@ export default function DashboardPage() {
       <main className="flex-1 max-w-[1440px] mx-auto px-8 py-10 w-full">
         <div className="flex justify-between items-start flex-wrap gap-4 mb-9">
           <div>
-            <h1 className="font-display font-light text-[28px] mb-1">Your Quotation Requests</h1>
-            <p className="text-stone text-[14.5px]">Every request you&apos;ve sent, and its status.</p>
+            <h1 className="font-display font-light text-[28px] mb-1">Your dashboard</h1>
+            <p className="text-stone text-[14.5px]">
+              Contractors you&apos;ve saved, your site visits, and every quote request you&apos;ve sent.
+            </p>
           </div>
           <Link
             href="/browse"
@@ -141,6 +179,29 @@ export default function DashboardPage() {
             Browse Contractors
           </Link>
         </div>
+
+        {me && me.verificationRequired && !me.emailVerified && (
+          <div className="mb-8 px-4 py-3 rounded-[6px] bg-paper-dim text-sm flex flex-wrap items-center justify-between gap-3">
+            <p className="text-stone">
+              Please verify your email ({me.email}) to request quotes and post projects. Check your
+              inbox for the link we sent when you signed up.
+            </p>
+            {resendState === 'sent' ? (
+              <span className="text-xs text-sage font-medium">New link sent. Check your inbox.</span>
+            ) : (
+              <button
+                onClick={resendVerification}
+                disabled={resendState === 'sending'}
+                className="text-xs font-medium px-4 py-2 rounded-full bg-ink text-paper disabled:opacity-60"
+              >
+                {resendState === 'sending' ? 'Sending…' : 'Resend verification email'}
+              </button>
+            )}
+            {resendState !== 'idle' && resendState !== 'sending' && resendState !== 'sent' && (
+              <p className="w-full text-xs text-red-600">{resendState}</p>
+            )}
+          </div>
+        )}
 
         {shortlist !== null && shortlist.length > 0 && (
           <>
@@ -171,7 +232,7 @@ export default function DashboardPage() {
                         value={noteDraft}
                         onChange={(e) => setNoteDraft(e.target.value)}
                         rows={2}
-                        placeholder="Private note — only you can see this"
+                        placeholder="Private note (only you can see this)"
                         className="flex-1 text-sm px-3 py-2 border border-line rounded-[4px] bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
                       />
                       <button
@@ -227,11 +288,11 @@ export default function DashboardPage() {
                           <td className="px-4 py-3 text-stone">{s.contractor.tradeTypes.join(', ')}</td>
                           <td className="px-4 py-3 text-stone">{s.contractor.area}, {s.contractor.city}</td>
                           <td className="px-4 py-3 text-stone">
-                            {s.contractor.yearsInBusiness ? `${s.contractor.yearsInBusiness}+ years` : '—'}
+                            {s.contractor.yearsInBusiness ? `${s.contractor.yearsInBusiness}+ years` : 'N/A'}
                           </td>
                           <td className="px-4 py-3 text-stone">{s.contractor._count.projects}</td>
                           <td className="px-4 py-3 text-stone">
-                            {s.contractor.reviewCount > 0 ? `${s.contractor.rating.toFixed(1)} (${s.contractor.reviewCount})` : '—'}
+                            {s.contractor.reviewCount > 0 ? `${s.contractor.rating.toFixed(1)} (${s.contractor.reviewCount})` : 'N/A'}
                           </td>
                         </tr>
                       ))}
@@ -243,6 +304,9 @@ export default function DashboardPage() {
           </>
         )}
 
+        <SiteVisitList viewerRole="DEVELOPER" />
+
+        <h2 className="font-display font-light text-xl mb-4">Your quote requests</h2>
         {requests === null ? (
           <p className="text-sm text-stone">Loading…</p>
         ) : requests.length === 0 ? (
@@ -282,8 +346,13 @@ export default function DashboardPage() {
                     </td>
                     <td className="px-4 py-4">
                       <span className={`inline-block text-[11.5px] font-medium px-2.5 py-1 rounded-full ${statusStyle[r.status]}`}>
-                        {statusLabel[r.status]}
+                        {developerStatusLabel[r.status]}
                       </span>
+                      {r.statusUpdatedAt && (
+                        <p className="text-[11px] text-stone mt-1">
+                          Updated {new Date(r.statusUpdatedAt).toLocaleDateString()}
+                        </p>
+                      )}
                       {!r.emailSentAt && (
                         <p className="text-[11px] text-red-600 mt-1">
                           Notification may not have been delivered
@@ -296,13 +365,24 @@ export default function DashboardPage() {
                         className="text-xs text-stone underline underline-offset-2 hover:text-ink transition-colors"
                       >
                         Message
+                        {unread.byQuoteRequest[r.id] > 0 && (
+                          <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-ink text-paper text-[10.5px] font-semibold no-underline">
+                            {unread.byQuoteRequest[r.id]}
+                            <span className="sr-only"> unread</span>
+                          </span>
+                        )}
                       </button>
                     </td>
                   </tr>
                   {expandedMessageId === r.id && (
                     <tr className="border-b border-line last:border-b-0 bg-paper-dim/40">
                       <td colSpan={5} className="px-4 py-4">
-                        <MessageThread quoteRequestId={r.id} viewerRole="DEVELOPER" startOpen />
+                        <MessageThread
+                          quoteRequestId={r.id}
+                          viewerRole="DEVELOPER"
+                          startOpen
+                          onRead={() => unread.markRead(r.id)}
+                        />
                       </td>
                     </tr>
                   )}

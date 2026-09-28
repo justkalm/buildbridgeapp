@@ -60,7 +60,7 @@ export default function ContactPage() {
             Get in touch.
           </h1>
           <p className="text-[17px] leading-relaxed text-stone">
-            Questions, feedback, or just want to talk — reach us directly.
+            Questions, feedback, or just want to talk, reach us directly.
           </p>
         </div>
       </header>
@@ -114,7 +114,7 @@ export default function ContactPage() {
             {success ? (
               <div>
                 <h2 className="font-display text-xl text-ink mb-2">Message sent</h2>
-                <p className="text-sm text-stone">Thanks for reaching out — we&apos;ll get back to you soon.</p>
+                <p className="text-sm text-stone">Thanks for reaching out. We&apos;ll get back to you soon.</p>
               </div>
             ) : (
               <>

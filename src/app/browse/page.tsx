@@ -4,11 +4,13 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { TRADE_TYPE_CATEGORIES, HOMEPAGE_TRADE_CATEGORIES } from '@/lib/trade-types';
 import ShortlistButton from '@/components/ShortlistButton';
+import { formatLocation, normalizeLocation } from '@/lib/location';
 
 type Contractor = {
   id: string;
@@ -23,7 +25,10 @@ type Contractor = {
   yearsInBusiness: number | null;
   rating: number;
   reviewCount: number;
-  licenseNumber: string;
+  // licenseNumber intentionally NOT included — browse cards no longer
+  // show it (see ShortlistButton-adjacent #15 cleanup), and the list API
+  // (api/contractors/route.ts) stopped selecting it, so there's nothing
+  // to type here. It's still shown on the full profile page.
   _count: { projects: number };
 };
 
@@ -53,9 +58,19 @@ function BrowsePageInner() {
     ? HOMEPAGE_TRADE_CATEGORIES.find((c) => c.label === categoryParam)?.trades ?? null
     : null;
   const [selectedCity, setSelectedCity] = useState<string>('all');
+  // Area (neighbourhood, e.g. "Thane", "Andheri West") narrows within a
+  // city rather than replacing it — see #12. Reset to 'all' whenever the
+  // city changes (handled in the city <select>'s onChange below) since an
+  // area chosen under one city is meaningless once a different city is
+  // selected.
+  const [selectedArea, setSelectedArea] = useState<string>('all');
   const [minExperience, setMinExperience] = useState(0);
   const [minProjects, setMinProjects] = useState(0);
   const [sortBy, setSortBy] = useState<SortOption>('experience');
+
+  const { status: sessionStatus, data: session } = useSession();
+  const isDeveloper = sessionStatus === 'authenticated' && (session?.user as { role?: string })?.role === 'developer';
+  const [shortlistedIds, setShortlistedIds] = useState<Set<string> | null>(null);
 
   useEffect(() => {
     fetch('/api/contractors')
@@ -63,9 +78,36 @@ function BrowsePageInner() {
         if (!res.ok) throw new Error('Failed to load contractors');
         return res.json();
       })
-      .then(setContractors)
+      // Normalize city/area once on arrival so the filters, the cards and
+      // the sort all see one spelling per place, even for rows saved
+      // before capitalisation was enforced on save (see
+      // src/lib/location.ts). "thane" and "Thane" become one option.
+      .then((rows: Contractor[]) =>
+        setContractors(
+          rows.map((c) => ({ ...c, city: normalizeLocation(c.city), area: normalizeLocation(c.area) }))
+        )
+      )
       .catch(() => setError('Could not load contractors right now. Please try again shortly.'));
   }, []);
+
+  // Load which contractors this developer already saved, so cards can
+  // show the real "✓ Saved" state instead of always starting at "+ Save"
+  // and only looking right after a click in this same session (the bug
+  // this fetch fixes — see ShortlistButton's header comment). Only fired
+  // for logged-in developers: a logged-out visitor or a contractor
+  // account can't have a shortlist, so there's nothing to fetch.
+  useEffect(() => {
+    if (!isDeveloper) return;
+    fetch('/api/developers/shortlist?ids=1')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { contractorIds: string[] } | null) => {
+        if (data) setShortlistedIds(new Set(data.contractorIds));
+      })
+      .catch(() => {
+        // Non-fatal — cards just fall back to showing "+ Save" until the
+        // developer saves something in this session.
+      });
+  }, [isDeveloper]);
 
   const availableTrades = useMemo(() => {
     if (!contractors) return [];
@@ -93,8 +135,22 @@ function BrowsePageInner() {
 
   const availableCities = useMemo(() => {
     if (!contractors) return [];
-    return Array.from(new Set(contractors.map((c) => c.city))).sort();
+    // .filter(Boolean): a contractor with no city yet (e.g. self-signup
+    // before filling in their profile) would otherwise add a blank option.
+    return Array.from(new Set(contractors.map((c) => c.city).filter(Boolean))).sort();
   }, [contractors]);
+
+  // Areas are scoped to the selected city — picking "Mumbai" then only
+  // offers Mumbai's areas, not every area across every city, since an
+  // area name like "Andheri West" is only meaningful relative to its
+  // city. With no city selected, all areas across all contractors are
+  // offered (still useful — a developer may know the area they want but
+  // not think of it in terms of city first).
+  const availableAreas = useMemo(() => {
+    if (!contractors) return [];
+    const pool = selectedCity === 'all' ? contractors : contractors.filter((c) => c.city === selectedCity);
+    return Array.from(new Set(pool.map((c) => c.area).filter(Boolean))).sort();
+  }, [contractors, selectedCity]);
 
   const filteredContractors = useMemo(() => {
     if (!contractors) return null;
@@ -108,6 +164,9 @@ function BrowsePageInner() {
     }
     if (selectedCity !== 'all') {
       result = result.filter((c) => c.city === selectedCity);
+    }
+    if (selectedArea !== 'all') {
+      result = result.filter((c) => c.area === selectedArea);
     }
     if (minExperience > 0) {
       result = result.filter((c) => (c.yearsInBusiness ?? 0) >= minExperience);
@@ -145,10 +204,15 @@ function BrowsePageInner() {
     });
 
     return result;
-  }, [contractors, selectedTrade, categoryParam, selectedCity, minExperience, minProjects, sortBy]);
+  }, [contractors, selectedTrade, categoryParam, selectedCity, selectedArea, minExperience, minProjects, sortBy]);
 
   const hasActiveFilters =
-    selectedTrade !== 'all' || !!categoryParam || selectedCity !== 'all' || minExperience > 0 || minProjects > 0;
+    selectedTrade !== 'all' ||
+    !!categoryParam ||
+    selectedCity !== 'all' ||
+    selectedArea !== 'all' ||
+    minExperience > 0 ||
+    minProjects > 0;
 
   return (
     <>
@@ -178,20 +242,34 @@ function BrowsePageInner() {
 
             {/* Filter + sort bar */}
             <div className="flex flex-wrap items-center gap-3 mb-6 pb-6 border-b border-line">
-              {availableTrades.length > 1 && (
-                <FilterSelect
-                  label="Trade"
-                  value={selectedTrade}
-                  onChange={setSelectedTrade}
-                  options={[{ value: 'all', label: 'All trades' }]}
-                  optgroups={tradeOptgroups}
-                />
-              )}
+              {/* Always rendered, even with only one trade (or one
+                  contractor) listed — a filter that vanishes the moment
+                  there's little to filter is more confusing than a
+                  single-option dropdown, and it flickers in/out as
+                  contractors are added/removed. See #11. */}
               <FilterSelect
-                label="Location"
+                label="Trade"
+                value={selectedTrade}
+                onChange={setSelectedTrade}
+                options={[{ value: 'all', label: 'All trades' }]}
+                optgroups={tradeOptgroups}
+              />
+              <FilterSelect
+                label="City"
                 value={selectedCity}
-                onChange={setSelectedCity}
-                options={[{ value: 'all', label: 'All locations' }, ...availableCities.map((c) => ({ value: c, label: c }))]}
+                onChange={(v) => {
+                  setSelectedCity(v);
+                  // Area is scoped to city — switching city invalidates
+                  // whatever area was selected under the old one.
+                  setSelectedArea('all');
+                }}
+                options={[{ value: 'all', label: 'All cities' }, ...availableCities.map((c) => ({ value: c, label: c }))]}
+              />
+              <FilterSelect
+                label="Area"
+                value={selectedArea}
+                onChange={setSelectedArea}
+                options={[{ value: 'all', label: 'All areas' }, ...availableAreas.map((a) => ({ value: a, label: a }))]}
               />
               <FilterSelect
                 label="Min. experience"
@@ -217,6 +295,7 @@ function BrowsePageInner() {
                   onClick={() => {
                     setSelectedTrade('all');
                     setSelectedCity('all');
+                    setSelectedArea('all');
                     setMinExperience(0);
                     setMinProjects(0);
                     // categoryParam (and the initial selectedTrade value)
@@ -291,10 +370,13 @@ function BrowsePageInner() {
                               </span>
                             )}
                           </div>
-                          <ShortlistButton contractorId={c.id} />
+                          <ShortlistButton
+                            contractorId={c.id}
+                            initiallySaved={shortlistedIds?.has(c.id) ?? false}
+                          />
                         </div>
                         <p className="text-sm text-stone mb-3">
-                          📍 {c.area}, {c.city} · License {c.licenseNumber}
+                          📍 {formatLocation(c.area, c.city)}
                           {c.yearsInBusiness ? ` · ${c.yearsInBusiness}+ years` : ''}
                         </p>
                         <div className="flex gap-1.5 flex-wrap mb-3">

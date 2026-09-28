@@ -2,117 +2,58 @@
 //
 // GET lists messages on a QuoteRequest thread; POST sends one. Reachable
 // by EITHER the developer who made the request OR the contractor it was
-// sent to — not by anyone else. The ownership check compares the
-// authenticated session's role+id against the QuoteRequest's own
-// developerId/contractorId; there is no broader "any developer" or "any
-// contractor" access here, this is strictly the two parties to this one
-// conversation.
+// sent to — not by anyone else. Who counts as a party (including the
+// contractor lead-cap check) is decided by getQuoteRequestParty in
+// src/lib/quote-request-access.ts; see that file's header for the
+// reasoning. There is no broader "any developer" or "any contractor"
+// access here, this is strictly the two parties to this one conversation.
 //
 // This is additive to the existing email/phone reveal (see the
 // QuoteRequestRow types on both dashboards) — sending a message here
 // doesn't change or replace that, it's a second, optional channel.
 //
-// LEAD-CAP ENFORCEMENT: a contractor can only reach a thread here if that
-// specific QuoteRequest is currently fully-visible to them per
-// computeLeadVisibility (src/lib/lead-limits.ts) — i.e. the same check the
-// dashboard UI uses to decide whether to blur a lead's contact info and
-// hide the "Message in-app" button. This used to be UI-only: the button
-// was correctly hidden on blurred cards, but nothing stopped a LISTED
-// contractor over their monthly cap from calling this API directly and
-// reading/sending messages on a lead they aren't supposed to have access
-// to yet. The whole point of the cap is to withhold something valuable
-// until upgrade — a UI-only gate doesn't actually withhold it. Developers
-// are never capped, so this check only applies when the authorized party
-// is the CONTRACTOR side.
+// READ TRACKING: a GET by one party marks the thread read for that party
+// (bumps developerLastReadAt / contractorLastReadAt). The client only
+// polls this while the thread is open AND the browser tab is visible, so
+// "loaded the thread" is a fair stand-in for "saw the messages". The
+// unread counts themselves are computed in /api/messages/unread.
+//
+// EMAIL NOTIFICATION: a POST emails the OTHER party, at most once per
+// unread batch — see the notifiedAt comment on QuoteRequest in
+// schema.prisma. The email is sent with after(), i.e. once the response
+// has already gone back to the sender, so a slow or failing email
+// provider never makes the chat feel laggy or makes a send look failed.
 
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
-import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { computeLeadVisibility, getMonthStart } from '@/lib/lead-limits';
+import { getQuoteRequestParty } from '@/lib/quote-request-access';
+import { sendNewMessageEmail } from '@/lib/email';
 
-async function getAuthorizedRole(
-  quoteRequestId: string
-): Promise<{ role: 'DEVELOPER' | 'CONTRACTOR'; userId: string } | null> {
-  const session = await auth();
-  const role = (session?.user as { role?: string })?.role;
-  const userId = session?.user?.id as string | undefined;
-
-  if (!userId || (role !== 'developer' && role !== 'contractor')) {
-    return null;
-  }
-
-  const quoteRequest = await prisma.quoteRequest.findUnique({
-    where: { id: quoteRequestId },
-    select: { developerId: true, contractorId: true, createdAt: true },
-  });
-  if (!quoteRequest) return null;
-
-  if (role === 'developer' && quoteRequest.developerId === userId) {
-    return { role: 'DEVELOPER', userId };
-  }
-
-  if (role === 'contractor' && quoteRequest.contractorId === userId) {
-    // Lead-cap check — see file header comment. Only relevant for
-    // LISTED contractors; PLUS/PRO are unlimited so this is a no-op for
-    // them (computeLeadVisibility returns 'full' for every request when
-    // tier isn't LISTED).
-    const contractor = await prisma.contractor.findUnique({
-      where: { id: userId },
-      select: { tier: true },
-    });
-    if (!contractor) return null;
-
-    if (contractor.tier === 'LISTED') {
-      const monthStart = getMonthStart();
-      const thisMonthRequests = await prisma.quoteRequest.findMany({
-        where: { contractorId: userId, createdAt: { gte: monthStart } },
-        select: { id: true, createdAt: true },
-        orderBy: { createdAt: 'asc' },
-      });
-      const visibility = computeLeadVisibility(contractor.tier, thisMonthRequests);
-      // A request from a PRIOR month (createdAt < monthStart) was never
-      // subject to blurring in the first place — only requests within the
-      // current month's cap window can be blurred, so those short-circuit
-      // to allowed here.
-      //
-      // Fails CLOSED, not open: if this request falls within the current
-      // month but visibility.get() somehow returns undefined instead of
-      // 'full'/'blurred' (shouldn't happen — thisMonthRequests is queried
-      // by this exact contractorId + date range, and we already know this
-      // request belongs to them — but defensive code shouldn't assume
-      // that instead of checking), treat it as blurred rather than
-      // silently granting access. Getting this wrong in the fail-open
-      // direction would quietly reopen the exact bug this whole check
-      // exists to close.
-      const isCurrentMonth = quoteRequest.createdAt >= monthStart;
-      const isBlurred = isCurrentMonth && visibility.get(quoteRequestId) !== 'full';
-      if (isBlurred) return null;
-    }
-
-    return { role: 'CONTRACTOR', userId };
-  }
-
-  // Authenticated, but not a party to THIS thread — same 404-not-403
-  // reasoning used elsewhere in the app (project ownership checks etc.):
-  // don't confirm this quote request exists to someone who isn't part of
-  // it.
-  return null;
+function lastReadField(role: 'DEVELOPER' | 'CONTRACTOR') {
+  return role === 'DEVELOPER' ? 'developerLastReadAt' : 'contractorLastReadAt';
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const authorized = await getAuthorizedRole(id);
-  if (!authorized) {
+  const party = await getQuoteRequestParty(id);
+  if (!party) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const messages = await prisma.message.findMany({
-    where: { quoteRequestId: id },
-    orderBy: { createdAt: 'asc' },
-    select: { id: true, senderRole: true, body: true, createdAt: true },
-  });
+  const [messages] = await Promise.all([
+    prisma.message.findMany({
+      where: { quoteRequestId: id },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, senderRole: true, body: true, createdAt: true },
+    }),
+    prisma.quoteRequest.update({
+      where: { id },
+      data: { [lastReadField(party.role)]: new Date() },
+      select: { id: true },
+    }),
+  ]);
 
   return NextResponse.json(messages);
 }
@@ -123,14 +64,14 @@ const sendSchema = z.object({
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const authorized = await getAuthorizedRole(id);
-  if (!authorized) {
+  const party = await getQuoteRequestParty(id);
+  if (!party) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   // Rate limited per sender — a real-time-feeling chat is exactly the
   // kind of feature that invites rapid-fire scripted spam if uncapped.
-  if (!checkRateLimit(`message-send:${authorized.userId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 })) {
+  if (!checkRateLimit(`message-send:${party.userId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 })) {
     return NextResponse.json(
       { error: 'Too many messages. Please try again later.' },
       { status: 429 }
@@ -152,14 +93,79 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  const message = await prisma.message.create({
-    data: {
-      quoteRequestId: id,
-      senderRole: authorized.role,
-      body: parsed.data.body,
-    },
-    select: { id: true, senderRole: true, body: true, createdAt: true },
-  });
+  const now = new Date();
+  const [message] = await prisma.$transaction([
+    prisma.message.create({
+      data: {
+        quoteRequestId: id,
+        senderRole: party.role,
+        body: parsed.data.body,
+      },
+      select: { id: true, senderRole: true, body: true, createdAt: true },
+    }),
+    // Sending a message means you've seen the thread up to now, so this
+    // also clears the sender's own unread count.
+    prisma.quoteRequest.update({
+      where: { id },
+      data: { [lastReadField(party.role)]: now },
+      select: { id: true },
+    }),
+  ]);
+
+  after(() => notifyRecipient(id, party.role));
 
   return NextResponse.json(message);
+}
+
+// Emails the other party unless they've already been emailed since they
+// last read this thread. Read-then-write rather than a single atomic
+// update, so two messages sent in the same instant could both email. That
+// worst case is one duplicate email, which isn't worth a raw-SQL
+// column-to-column comparison to prevent.
+async function notifyRecipient(quoteRequestId: string, senderRole: 'DEVELOPER' | 'CONTRACTOR') {
+  const qr = await prisma.quoteRequest.findUnique({
+    where: { id: quoteRequestId },
+    select: {
+      projectType: true,
+      developerLastReadAt: true,
+      contractorLastReadAt: true,
+      developerNotifiedAt: true,
+      contractorNotifiedAt: true,
+      developer: { select: { name: true, email: true } },
+      contractor: { select: { name: true, email: true, passwordHash: true } },
+    },
+  });
+  if (!qr) return;
+
+  const toDeveloper = senderRole === 'CONTRACTOR';
+  const lastRead = toDeveloper ? qr.developerLastReadAt : qr.contractorLastReadAt;
+  const lastNotified = toDeveloper ? qr.developerNotifiedAt : qr.contractorNotifiedAt;
+
+  const alreadyNotifiedSinceLastRead = lastNotified !== null && (lastRead === null || lastNotified > lastRead);
+  if (alreadyNotifiedSinceLastRead) return;
+
+  // An admin-entered placeholder contractor with no password can't log in
+  // to read the message anyway (and its email is often a placeholder
+  // address), so there's nobody to notify.
+  if (!toDeveloper && !qr.contractor.passwordHash) return;
+
+  const baseUrl = process.env.NEXTAUTH_URL ?? '';
+  const sent = await sendNewMessageEmail({
+    toEmail: toDeveloper ? qr.developer.email : qr.contractor.email,
+    toName: toDeveloper ? qr.developer.name : qr.contractor.name,
+    fromName: toDeveloper ? qr.contractor.name : qr.developer.name,
+    projectType: qr.projectType,
+    dashboardUrl: `${baseUrl}${toDeveloper ? '/dashboard' : '/contractor/dashboard'}`,
+  });
+
+  // Only record the notification if it actually went out, so a failed
+  // send (e.g. Resend's test domain rejecting the address) doesn't
+  // suppress the next attempt.
+  if (sent) {
+    await prisma.quoteRequest.update({
+      where: { id: quoteRequestId },
+      data: { [toDeveloper ? 'developerNotifiedAt' : 'contractorNotifiedAt']: new Date() },
+      select: { id: true },
+    });
+  }
 }

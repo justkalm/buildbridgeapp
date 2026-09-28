@@ -11,6 +11,9 @@
 // it to enumerate real emails via timing even with the generic error above.
 // 5 signups per hour per IP is generous for real use (nobody creates more
 // than a couple accounts) while still blocking casual scripted abuse.
+//
+// Password rules (min 10 chars, not a common password, not the email)
+// come from src/lib/password-policy.ts so signup and reset can't drift.
 
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
@@ -19,13 +22,16 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { sendVerificationEmail } from '@/lib/email';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { newPasswordSchema, refinePasswordNotEmail } from '@/lib/password-policy';
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(200),
   email: z.string().trim().email('Enter a valid email address').max(320),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
+  // Length, common-password and not-your-email rules all live in
+  // src/lib/password-policy.ts — shared with both reset-password routes.
+  password: newPasswordSchema,
   phone: z.string().trim().min(7, 'Enter a valid phone number').max(20),
-});
+}).superRefine(refinePasswordNotEmail);
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);

@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { positiveWhole } from '@/lib/project-validation';
 import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
 import { checkRateLimit } from '@/lib/rate-limit';
 
@@ -43,11 +44,10 @@ const projectSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(200),
   developerName: z.string().trim().max(200).optional(),
   projectType: z.string().trim().max(200).optional(),
-  completedYear: z.number().int().min(1950).max(2100).nullable().optional(),
-  squareFeet: z.number().int().positive().nullable().optional(),
-  elevationFloors: z.number().int().positive().nullable().optional(),
-  committedDurationMonths: z.number().int().positive().nullable().optional(),
-  actualDurationMonths: z.number().int().positive().nullable().optional(),
+  squareFeet: positiveWhole('Sq ft').nullable().optional(),
+  elevationFloors: positiveWhole('Floors').nullable().optional(),
+  committedDurationMonths: positiveWhole('Committed duration').nullable().optional(),
+  actualDurationMonths: positiveWhole('Actual duration').nullable().optional(),
   imageUrls: z
     .array(z.string().url())
     .max(20)

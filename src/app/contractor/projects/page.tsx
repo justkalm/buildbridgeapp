@@ -23,7 +23,6 @@ type Project = {
   title: string;
   developerName: string | null;
   projectType: string | null;
-  completedYear: number | null;
   squareFeet: number | null;
   elevationFloors: number | null;
   committedDurationMonths: number | null;
@@ -37,7 +36,6 @@ const emptyDraft = (): NewProjectDraft => ({
   title: '',
   developerName: '',
   projectType: '',
-  completedYear: null,
   squareFeet: null,
   elevationFloors: null,
   committedDurationMonths: null,
@@ -134,9 +132,7 @@ export default function ContractorProjectsPage() {
                   <div>
                     <p className="font-medium text-sm">{p.title}</p>
                     <p className="text-xs text-stone mt-1">
-                      {[p.projectType, p.completedYear ? `Completed ${p.completedYear}` : null]
-                        .filter(Boolean)
-                        .join(' · ')}
+                      {p.projectType}
                     </p>
                   </div>
                   <button
@@ -182,48 +178,57 @@ export default function ContractorProjectsPage() {
                 className={inputCls}
               />
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <input
-                type="number"
-                placeholder="Sq ft"
-                value={draft.squareFeet ?? ''}
-                onChange={(e) => setDraft({ ...draft, squareFeet: e.target.value ? Number(e.target.value) : null })}
-                className={inputCls}
-              />
-              <input
-                type="number"
-                placeholder="Floors"
-                value={draft.elevationFloors ?? ''}
-                onChange={(e) => setDraft({ ...draft, elevationFloors: e.target.value ? Number(e.target.value) : null })}
-                className={inputCls}
-              />
-              <input
-                type="number"
-                placeholder="Completed year"
-                value={draft.completedYear ?? ''}
-                onChange={(e) => setDraft({ ...draft, completedYear: e.target.value ? Number(e.target.value) : null })}
-                className={inputCls}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block">
+                <span className="block text-xs text-stone mb-1">Built-up area (sq ft)</span>
+                <input
+                  type="number"
+                  placeholder="e.g. 45000"
+                  min={1}
+                  value={draft.squareFeet ?? ''}
+                  onChange={(e) => setDraft({ ...draft, squareFeet: e.target.value ? Number(e.target.value) : null })}
+                  className={inputCls}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs text-stone mb-1">Floors</span>
+                <input
+                  type="number"
+                  placeholder="e.g. 18"
+                  min={1}
+                  value={draft.elevationFloors ?? ''}
+                  onChange={(e) => setDraft({ ...draft, elevationFloors: e.target.value ? Number(e.target.value) : null })}
+                  className={inputCls}
+                />
+              </label>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                type="number"
-                placeholder="Committed duration (months)"
-                value={draft.committedDurationMonths ?? ''}
-                onChange={(e) =>
-                  setDraft({ ...draft, committedDurationMonths: e.target.value ? Number(e.target.value) : null })
-                }
-                className={inputCls}
-              />
-              <input
-                type="number"
-                placeholder="Actual duration (months)"
-                value={draft.actualDurationMonths ?? ''}
-                onChange={(e) =>
-                  setDraft({ ...draft, actualDurationMonths: e.target.value ? Number(e.target.value) : null })
-                }
-                className={inputCls}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block">
+                <span className="block text-xs text-stone mb-1">Committed duration (months)</span>
+                <input
+                  type="number"
+                  placeholder="e.g. 24"
+                  min={1}
+                  value={draft.committedDurationMonths ?? ''}
+                  onChange={(e) =>
+                    setDraft({ ...draft, committedDurationMonths: e.target.value ? Number(e.target.value) : null })
+                  }
+                  className={inputCls}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs text-stone mb-1">Actual duration (months)</span>
+                <input
+                  type="number"
+                  placeholder="e.g. 26"
+                  min={1}
+                  value={draft.actualDurationMonths ?? ''}
+                  onChange={(e) =>
+                    setDraft({ ...draft, actualDurationMonths: e.target.value ? Number(e.target.value) : null })
+                  }
+                  className={inputCls}
+                />
+              </label>
             </div>
 
             <div className="flex flex-wrap gap-3 items-end">

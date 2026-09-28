@@ -25,6 +25,26 @@
 // A contractor whose email matches an existing row that ALREADY has a
 // passwordHash is rejected with a generic error either way — don't
 // confirm which emails already have active accounts.
+//
+// Password rules come from src/lib/password-policy.ts (shared with the
+// developer routes). On the CLAIM path the submitted password is still
+// validated but then discarded — the real one is set via the emailed link,
+// where the same policy applies again.
+//
+// City and area are required on every signup (normalized via
+// src/lib/location.ts, same rule as the admin add-contractor route), for
+// the same reason the password is: the form can't know in advance whether
+// this email is a FRESH signup or a CLAIM, so it always asks for them.
+//   - FRESH: saved as the contractor's location. They used to be saved as
+//     '' and filled in later from the profile page, which left new
+//     listings unfindable by the /browse location filters in the meantime
+//     and gave admin nothing to check when verifying.
+//   - CLAIM: validated, then ignored, like the password. Admin entered this
+//     contractor's location by hand when creating the listing, and this
+//     request hasn't proven inbox ownership yet (that's the whole point of
+//     the claim link), so letting it rewrite the listing's location would
+//     reopen a smaller version of the takeover hole described above. Once
+//     they've claimed the account they can change it from their profile.
 
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
@@ -33,13 +53,20 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { sendVerificationEmail, sendClaimAccountEmail } from '@/lib/email';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { newPasswordSchema, refinePasswordNotEmail } from '@/lib/password-policy';
+import { normalizeLocation } from '@/lib/location';
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(200),
   email: z.string().trim().email('Enter a valid email address').max(320),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
+  // Length, common-password and not-your-email rules all live in
+  // src/lib/password-policy.ts — shared with both reset-password routes.
+  password: newPasswordSchema,
   phone: z.string().trim().min(7, 'Enter a valid phone number').max(20),
-});
+  // Required on both paths but only saved on FRESH; see file header.
+  city: z.string().trim().min(1, 'City is required').max(100).transform(normalizeLocation),
+  area: z.string().trim().min(1, 'Area is required').max(100).transform(normalizeLocation),
+}).superRefine(refinePasswordNotEmail);
 
 const GENERIC_CLAIM_RESPONSE = {
   claimRequested: true,
@@ -79,7 +106,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, email, password, phone } = parsed.data;
+  const { name, email, password, phone, city, area } = parsed.data;
   const normalizedEmail = email.toLowerCase();
 
   const existing = await prisma.contractor.findUnique({
@@ -98,6 +125,8 @@ export async function POST(req: NextRequest) {
     // CLAIM path — no password is set here. Email a claim link instead;
     // the password only gets set once that link is actually clicked (via
     // the existing reset-password flow), which proves inbox ownership.
+    // city/area from the form are deliberately NOT written here: the
+    // admin-entered location stays as it is (see file header).
     const passwordResetToken = crypto.randomBytes(32).toString('hex');
     const passwordResetTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1h
 
@@ -145,8 +174,8 @@ export async function POST(req: NextRequest) {
       passwordHash,
       phone,
       slug,
-      city: '',
-      area: '',
+      city,
+      area,
       tradeTypes: [],
       licenseNumber: `PENDING-${crypto.randomBytes(6).toString('hex')}`,
       emailVerifyToken,

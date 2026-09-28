@@ -35,7 +35,7 @@ const TIERS = [
     description: 'For contractors ready to stop missing leads.',
     features: [
       'Everything in Listed',
-      'Unlimited leads — no monthly cap',
+      'Unlimited leads, no monthly cap',
       'Eligible for project-post alerts from our team',
     ],
     cta: 'Upgrade to Plus',
@@ -143,7 +143,7 @@ export default function PricingPage() {
           <div className="max-w-[640px] mx-auto text-center">
             <h2 className="font-display font-light text-2xl text-ink mb-3">Questions about a plan?</h2>
             <p className="text-sm text-stone mb-6">
-              Pricing is new and we&apos;re still refining it — reach out and we&apos;ll walk you
+              Pricing is new and we&apos;re still refining it. Reach out and we&apos;ll walk you
               through what fits.
             </p>
             <Link

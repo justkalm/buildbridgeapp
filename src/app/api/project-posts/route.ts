@@ -8,6 +8,16 @@
 // The key difference from quote-requests: this has no contractorId at
 // all. It notifies admin, not any contractor — see the ProjectPost schema
 // comment for the full reasoning.
+//
+// Same email-verification gate as quote-requests too (403, code
+// 'EMAIL_NOT_VERIFIED', checked after auth and before the rate limiter) —
+// admin acts on these posts by contacting the developer, so an
+// unverified address is just as much of a dead end here.
+//
+// location is normalized with the shared src/lib/location.ts rule (same
+// as contractor city/area), so posts read consistently in admin and in the
+// notification email however the developer typed it. It stays a single
+// free-text "Area, City" field; the rule copes with the comma.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -15,10 +25,12 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendProjectPostAdminEmail } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { requireVerifiedDeveloperEmail } from '@/lib/require-verified-email';
+import { normalizeLocation } from '@/lib/location';
 
 const projectPostSchema = z.object({
   projectType: z.string().trim().min(1).max(200),
-  location: z.string().trim().min(1).max(200),
+  location: z.string().trim().min(1).max(200).transform(normalizeLocation),
   budgetRangeLabel: z.string().trim().min(1).max(100),
   details: z.string().trim().min(1).max(2000),
   contactPhone: z.string().trim().min(6).max(20),
@@ -30,6 +42,12 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id || (session.user as { role?: string }).role !== 'developer') {
     return NextResponse.json({ error: 'You must be signed in to post a project' }, { status: 401 });
   }
+
+  const notVerified = await requireVerifiedDeveloperEmail(
+    session.user.id,
+    'Please verify your email before posting a project. Check your inbox for the verification link, or resend it from your dashboard.'
+  );
+  if (notVerified) return notVerified;
 
   // Same per-developer limit and reasoning as quote-requests — this is a
   // separate bucket (different key prefix), so posting projects and

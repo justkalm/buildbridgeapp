@@ -44,7 +44,6 @@ export async function GET(req: NextRequest) {
       yearsInBusiness: true,
       rating: true,
       reviewCount: true,
-      licenseNumber: true,
       _count: { select: { projects: true } },
     },
     // Paid tiers surface first — the visible payoff for paying, once

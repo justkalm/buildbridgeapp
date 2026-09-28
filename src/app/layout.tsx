@@ -4,7 +4,7 @@ import Providers from "@/components/Providers";
 import CookieBanner from "@/components/CookieBanner";
 
 export const metadata: Metadata = {
-  title: "(Kalm) — Kaam. Connected.",
+  title: "(kalm) | Kaam. Connected.",
   description:
     "(Kalm) connects developers with licensed contractors, backed by verified project history.",
 };

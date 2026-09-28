@@ -10,8 +10,16 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AdminTabs from '@/components/AdminTabs';
+
+type ThreadSummary = {
+  quoteRequestId: string;
+  developerName: string;
+  projectType: string;
+  messageCount: number;
+  lastMessageAt: string;
+};
 
 type ContractorStat = {
   contractorId: string;
@@ -19,6 +27,7 @@ type ContractorStat = {
   totalLeads: number;
   threadsWithMessages: number;
   totalMessages: number;
+  threads: ThreadSummary[];
 };
 
 type Analytics = {
@@ -46,6 +55,7 @@ export default function AdminMessagesPage() {
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
+  const [expandedContractorId, setExpandedContractorId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/messages')
@@ -58,6 +68,10 @@ export default function AdminMessagesPage() {
     setLoadingThread(true);
     setThreadError(null);
     setThread(null);
+    // Keep the pasted-ID input in sync so it's clear which thread is open
+    // whether it got here by pasting an ID or by clicking a thread row —
+    // both paths land on the same drill-in route and the same view below.
+    setQuoteRequestIdInput(id);
     const res = await fetch(`/api/admin/quote-requests/${id}/messages`);
     if (res.ok) {
       setThread(await res.json());
@@ -65,6 +79,10 @@ export default function AdminMessagesPage() {
       setThreadError('Could not find a quote request with that ID.');
     }
     setLoadingThread(false);
+  }
+
+  function toggleContractorThreads(contractorId: string) {
+    setExpandedContractorId((prev) => (prev === contractorId ? null : contractorId));
   }
 
   return (
@@ -76,7 +94,7 @@ export default function AdminMessagesPage() {
         </div>
         <p className="text-stone text-sm mb-8">
           Activity across all in-app conversations. Message content is only shown when you
-          deliberately open a specific thread below — this page never lists what anyone actually
+          deliberately open a specific thread below. This page never lists what anyone actually
           said.
         </p>
 
@@ -122,12 +140,53 @@ export default function AdminMessagesPage() {
                   </thead>
                   <tbody>
                     {analytics.contractorStats.map((c) => (
-                      <tr key={c.contractorId} className="border-b border-line last:border-b-0">
-                        <td className="px-4 py-3 font-medium">{c.contractorName}</td>
-                        <td className="px-4 py-3 text-stone">{c.totalLeads}</td>
-                        <td className="px-4 py-3 text-stone">{c.threadsWithMessages}</td>
-                        <td className="px-4 py-3 text-stone">{c.totalMessages}</td>
-                      </tr>
+                      <React.Fragment key={c.contractorId}>
+                        <tr className="border-b border-line last:border-b-0">
+                          <td className="px-4 py-3 font-medium">
+                            {c.threadsWithMessages > 0 ? (
+                              <button
+                                onClick={() => toggleContractorThreads(c.contractorId)}
+                                className="underline underline-offset-2 hover:text-ink transition-colors text-left"
+                              >
+                                {c.contractorName}
+                              </button>
+                            ) : (
+                              c.contractorName
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-stone">{c.totalLeads}</td>
+                          <td className="px-4 py-3 text-stone">{c.threadsWithMessages}</td>
+                          <td className="px-4 py-3 text-stone">{c.totalMessages}</td>
+                        </tr>
+                        {expandedContractorId === c.contractorId && (
+                          <tr className="border-b border-line last:border-b-0 bg-paper-dim/40">
+                            <td colSpan={4} className="px-4 py-3">
+                              {c.threads.length === 0 ? (
+                                <p className="text-xs text-stone">No threads yet.</p>
+                              ) : (
+                                <div className="flex flex-col gap-1.5">
+                                  {c.threads.map((t) => (
+                                    <button
+                                      key={t.quoteRequestId}
+                                      onClick={() => openThread(t.quoteRequestId)}
+                                      className="flex justify-between items-center gap-3 text-left text-xs px-3 py-2 rounded-[4px] border border-line bg-white hover:border-ink transition-colors"
+                                    >
+                                      <span className="font-medium text-ink">{t.developerName}</span>
+                                      <span className="text-stone">{t.projectType}</span>
+                                      <span className="text-stone">
+                                        {t.messageCount} message{t.messageCount === 1 ? '' : 's'}
+                                      </span>
+                                      <span className="text-stone">
+                                        {new Date(t.lastMessageAt).toLocaleDateString()}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -139,7 +198,7 @@ export default function AdminMessagesPage() {
         <div className="border-t border-line pt-8">
           <h2 className="font-display text-lg mb-2">View a conversation</h2>
           <p className="text-stone text-sm mb-4">
-            For dispute resolution — paste a quote request ID to read that specific thread.
+            For dispute resolution, paste a quote request ID to read that specific thread.
           </p>
           <div className="flex gap-2 mb-4">
             <input

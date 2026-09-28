@@ -6,6 +6,14 @@
 // and the compare table on the dashboard, so it returns everything either
 // view needs rather than having two separate endpoints.
 //
+// GET ?ids=1 is a lightweight variant that returns only the shortlisted
+// contractor IDs (`{ contractorIds: string[] }`), for pages that need to
+// know "is contractor X already saved?" for potentially many contractors
+// (browse cards, a profile page's save button) without paying for the
+// full comparison payload above. Added rather than reusing the default
+// shape because /browse may be rendering dozens of ShortlistButtons and
+// only needs a Set of IDs to check against.
+//
 // POST adds a contractor to the shortlist, with an optional note. Uses
 // upsert on the [developerId, contractorId] unique constraint — calling
 // this again for an already-shortlisted contractor updates the note
@@ -13,7 +21,7 @@
 // idempotent from the UI's point of view (the save button doesn't need to
 // know whether this is the first save or an edit).
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -27,10 +35,19 @@ async function requireDeveloper() {
   return session.user.id as string;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const developerId = await requireDeveloper();
   if (!developerId) {
     return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  if (searchParams.get('ids') === '1') {
+    const rows = await prisma.shortlistedContractor.findMany({
+      where: { developerId },
+      select: { contractorId: true },
+    });
+    return NextResponse.json({ contractorIds: rows.map((r) => r.contractorId) });
   }
 
   const shortlist = await prisma.shortlistedContractor.findMany({

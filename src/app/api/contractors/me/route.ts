@@ -4,14 +4,40 @@
 // record plus projects and quote requests. PATCH updates editable profile
 // fields.
 //
-// IMPORTANT: any PATCH that changes profile content resets
-// verificationStatus back to PENDING and clears verifiedAt. Verification
-// means you (admin) checked the license number and the details attached to
-// it — if a contractor can silently edit their bio, trade types, or
-// license number after being verified, "Verified" stops meaning anything.
-// The one exception is the consent-only PATCH (see PATCH_CONSENT_FIELDS
-// below), which doesn't touch anything admin verified and so doesn't
-// reset status.
+// IMPORTANT (updated, see CREDENTIAL_FIELDS below): a PATCH only resets
+// verificationStatus back to PENDING and clears verifiedAt when it
+// actually CHANGES one of the "credential" fields, the ones tied to what
+// admin actually checked during verification (see the three checks listed
+// on the homepage's verification section: document review, GSTIN check,
+// and a direct phone/in-person conversation). Editing a purely cosmetic
+// field (bio, team size, years in business, insurance cover) no longer
+// knocks a Verified contractor back to Pending. There is nothing in those
+// fields that the badge claims was checked, so there's nothing for a
+// change to invalidate.
+//
+// CREDENTIAL_FIELDS and why each one is here:
+//   - city / area:    the in-person/phone conversation is tied to where
+//                      the business operates, so relocating changes what
+//                      would need re-confirming.
+//   - phone:           this is the number admin actually rang as part of
+//                      verification (see check (c)); changing it means
+//                      the verified conversation no longer maps to the
+//                      current contact.
+//   - gstRegistered:   directly tied to check (b), the GSTIN lookup on the
+//                      GST portal. Flipping this claim invalidates that
+//                      check outright.
+//   - tradeTypes:      the license, GST, and registration documents admin
+//                      reviewed (check (a)) only cover the trades on file
+//                      at verification time. Adding a trade the checked
+//                      documents may not actually cover would let a
+//                      contractor borrow the Verified badge for unrelated
+//                      work.
+// Anything else editable here (bio, yearsInBusiness, teamSizeMin/Max,
+// insuranceCoverLakh) is cosmetic: none of the three verification checks
+// touch these values, so changing them doesn't retroactively invalidate
+// anything the badge claims. (name/business name and licenseNumber aren't
+// editable through this route at all today — if that ever changes, they
+// belong in CREDENTIAL_FIELDS too.)
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -19,6 +45,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { computeLeadVisibility, getMonthStart, LISTED_MONTHLY_LEAD_CAP } from '@/lib/lead-limits';
 import { isValidTradeType } from '@/lib/trade-types';
+import { normalizeLocation } from '@/lib/location';
 
 async function requireContractor() {
   const session = await auth();
@@ -160,11 +187,18 @@ export async function GET() {
   });
 }
 
-// Profile fields that trigger a re-verification reset when changed.
+// Fields whose CHANGE (not merely presence in the request body) resets
+// verification — see the file header for why each one is here. Kept as an
+// explicit list (rather than e.g. "everything except bio") so it's an
+// intentional decision per field, not a default that silently expands as
+// the schema grows.
+const CREDENTIAL_FIELDS = ['city', 'area', 'phone', 'gstRegistered', 'tradeTypes'] as const;
+
 const profileSchema = z.object({
   bio: z.string().trim().max(2000).optional(),
-  city: z.string().trim().min(1).max(100).optional(),
-  area: z.string().trim().min(1).max(100).optional(),
+  // Normalized to consistent capitalisation — see src/lib/location.ts.
+  city: z.string().trim().min(1).max(100).transform(normalizeLocation).optional(),
+  area: z.string().trim().min(1).max(100).transform(normalizeLocation).optional(),
   tradeTypes: z
     .array(z.string().trim().min(1))
     .max(10)
@@ -179,6 +213,16 @@ const profileSchema = z.object({
   insuranceCoverLakh: z.number().int().min(0).nullable().optional(),
   phone: z.string().trim().min(7).max(20).optional(),
 });
+
+function valuesDiffer(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return true;
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.some((v, i) => v !== sortedB[i]);
+  }
+  return a !== b;
+}
 
 export async function PATCH(req: Request) {
   const contractorId = await requireContractor();
@@ -205,13 +249,42 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
   }
 
+  // Only reset verification if a CREDENTIAL field is actually changing —
+  // comparing against the current row, not just "was it in the request
+  // body", since the profile page always submits the full form (every
+  // field present) even when only a cosmetic field like bio was edited.
+  // Without this diff, every save would look like a credential edit again.
+  const current = await prisma.contractor.findUnique({
+    where: { id: contractorId },
+    select: { city: true, area: true, phone: true, gstRegistered: true, tradeTypes: true },
+  });
+  if (!current) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  const credentialChanged = CREDENTIAL_FIELDS.some((field) => {
+    if (!(field in parsed.data)) return false;
+    const incoming = parsed.data[field as keyof typeof parsed.data];
+    let existing = current[field as keyof typeof current];
+    // Compare locations in normalized form on both sides, so a row saved
+    // as "thane" before capitalisation was enforced doesn't count as a
+    // credential change (and cost a Verified badge) the first time it's
+    // re-saved as "Thane".
+    if ((field === 'city' || field === 'area') && typeof existing === 'string') {
+      existing = normalizeLocation(existing);
+    }
+    return valuesDiffer(incoming, existing);
+  });
+
   const updated = await prisma.contractor.update({
     where: { id: contractorId },
     data: {
       ...parsed.data,
-      // Any profile edit resets verification — see file header comment.
-      verificationStatus: 'PENDING',
-      verifiedAt: null,
+      // Reset verification only when a credential field changed — see
+      // CREDENTIAL_FIELDS and the file header for the reasoning. A
+      // cosmetic-only save (bio, team size, years in business, insurance
+      // cover) leaves an existing Verified status untouched.
+      ...(credentialChanged ? { verificationStatus: 'PENDING', verifiedAt: null } : {}),
     },
   });
 

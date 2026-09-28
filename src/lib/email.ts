@@ -1,12 +1,14 @@
 // src/lib/email.ts
 //
-// Wraps Resend for the one email this slice actually needs to send: a quote
-// request notification. Kept as a single narrow function rather than a
-// generic "send any email" helper — when the supplier/interior-designer
-// sides get built later, they'll likely want different templates, and it's
-// easier to add a second specific function than to unpick a generic one.
+// Wraps Resend. One narrow function per email the app sends (quote request,
+// project post, verification, reset, claim, contact form, quote status
+// change, new message, and the four site visit emails) rather than a
+// generic "send any email" helper. Each has its own template and failure
+// wording, and it's easier to add another specific function than to unpick
+// a generic one.
 
 import { Resend } from 'resend';
+import { formatVisitTime } from '@/lib/site-visits';
 
 function getResendClient() {
   if (!process.env.RESEND_API_KEY) {
@@ -111,7 +113,7 @@ export async function sendProjectPostAdminEmail(input: ProjectPostEmailInput): P
       html: `
         <div style="font-family: sans-serif; max-width: 560px;">
           <h2 style="margin-bottom: 4px;">New Project Posted</h2>
-          <p style="color: #666; margin-top: 0;">Not yet matched to any contractor — review and alert PRO contractors from admin.</p>
+          <p style="color: #666; margin-top: 0;">Not yet matched to any contractor. Review it and alert PRO contractors from admin.</p>
 
           <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
             <tr><td style="padding: 8px 0; color: #666; width: 140px;">From</td><td style="padding: 8px 0;">${escapeHtml(input.developerName)} (${escapeHtml(input.developerEmail)})</td></tr>
@@ -273,7 +275,7 @@ export async function sendPasswordResetEmail(input: {
           <h2>Reset your password</h2>
           <p>Hi ${escapeHtml(input.toName)}, click below to set a new password:</p>
           <p><a href="${input.resetUrl}" style="display:inline-block;background:#1c1e22;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;">Reset password</a></p>
-          <p style="color:#666;font-size:13px;">This link expires in 1 hour. If you didn't request this, you can ignore this email — your password won't change.</p>
+          <p style="color:#666;font-size:13px;">This link expires in 1 hour. If you didn't request this, you can ignore this email and your password won't change.</p>
         </div>
       `,
     });
@@ -314,7 +316,7 @@ export async function sendClaimAccountEmail(input: {
           (kalm) contractor listing using this email address. Click below to set a password and
           claim it:</p>
           <p><a href="${input.claimUrl}" style="display:inline-block;background:#1c1e22;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;">Claim my listing</a></p>
-          <p style="color:#666;font-size:13px;">This link expires in 1 hour. If this wasn't you, you can ignore this email — no changes will be made to your listing.</p>
+          <p style="color:#666;font-size:13px;">This link expires in 1 hour. If this wasn't you, you can ignore this email and no changes will be made to your listing.</p>
         </div>
       `,
     });
@@ -368,4 +370,228 @@ export async function sendContactFormEmail(input: {
     console.error('Failed to send contact form email:', err);
     return false;
   }
+}
+
+// Tells a developer that a contractor has moved their quote request along
+// (accepted / quote sent / declined). Goes to the developer's own address,
+// so like the verification and reset emails above, it only actually
+// delivers once a real domain is verified in Resend. Before that, the
+// failure is logged and the status change itself still goes through: the
+// developer will see it on their dashboard either way.
+export async function sendQuoteStatusEmail(input: {
+  toEmail: string;
+  toName: string;
+  contractorName: string;
+  projectType: string;
+  statusLabel: string;
+  dashboardUrl: string;
+}): Promise<boolean> {
+  try {
+    const { error } = await getResendClient().emails.send({
+      from: '(kalm) <onboarding@resend.dev>',
+      to: input.toEmail,
+      subject: `${sanitizeSubject(input.contractorName)} updated your quote request: ${sanitizeSubject(input.statusLabel)}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px;">
+          <h2 style="margin-bottom: 4px;">Your quote request was updated</h2>
+          <p>Hi ${escapeHtml(input.toName)},</p>
+          <p><strong>${escapeHtml(input.contractorName)}</strong> updated your request for
+          <em>${escapeHtml(input.projectType)}</em>. It's now:</p>
+          <p style="font-size: 17px; font-weight: 600;">${escapeHtml(input.statusLabel)}</p>
+          <p><a href="${input.dashboardUrl}" style="display:inline-block;background:#1c1e22;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;">Open your dashboard</a></p>
+        </div>
+      `,
+    });
+    if (error) {
+      console.error('Resend error sending quote status email:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Failed to send quote status email:', err);
+    return false;
+  }
+}
+
+// "You have a new message" nudge for the in-app thread. Deliberately does
+// NOT include the message text: the email is a prompt to come back to the
+// site, not a second copy of the conversation sitting in someone's inbox.
+// How often this fires is throttled by the caller (see the
+// developerNotifiedAt / contractorNotifiedAt comment in schema.prisma).
+export async function sendNewMessageEmail(input: {
+  toEmail: string;
+  toName: string;
+  fromName: string;
+  projectType: string;
+  dashboardUrl: string;
+}): Promise<boolean> {
+  try {
+    const { error } = await getResendClient().emails.send({
+      from: '(kalm) <onboarding@resend.dev>',
+      to: input.toEmail,
+      subject: `New message from ${sanitizeSubject(input.fromName)} on (kalm)`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px;">
+          <h2 style="margin-bottom: 4px;">You have a new message</h2>
+          <p>Hi ${escapeHtml(input.toName)},</p>
+          <p><strong>${escapeHtml(input.fromName)}</strong> sent you a message about
+          <em>${escapeHtml(input.projectType)}</em>.</p>
+          <p><a href="${input.dashboardUrl}" style="display:inline-block;background:#1c1e22;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;">Read and reply</a></p>
+          <p style="color:#666;font-size:13px;">We won't email you again about this conversation until you've read it.</p>
+        </div>
+      `,
+    });
+    if (error) {
+      console.error('Resend error sending new message email:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Failed to send new message email:', err);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Site visit emails
+// ---------------------------------------------------------------------------
+// Four moments get an email: a new request (to the contractor), a
+// confirmation (to BOTH sides, each with a calendar invite attached), a
+// decline (to the developer), and a cancellation (to whichever side didn't
+// cancel). All times are shown in India time via formatVisitTime, since
+// this server runs in UTC. Like the other person-to-person emails here,
+// these only reach real inboxes once a domain is verified in Resend.
+
+const btn = 'display:inline-block;background:#1c1e22;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;';
+
+function siteList(titles: string[]): string {
+  return `<ul style="padding-left: 20px;">${titles.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
+}
+
+async function sendSimple(label: string, payload: Parameters<ReturnType<typeof getResendClient>['emails']['send']>[0]) {
+  try {
+    const { error } = await getResendClient().emails.send(payload);
+    if (error) {
+      console.error(`Resend error sending ${label} email:`, error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(`Failed to send ${label} email:`, err);
+    return false;
+  }
+}
+
+export async function sendSiteVisitRequestEmail(input: {
+  toEmail: string;
+  contractorName: string;
+  developerName: string;
+  siteTitles: string[];
+  slots: Date[];
+  developerNote: string | null;
+  dashboardUrl: string;
+}): Promise<boolean> {
+  return sendSimple('site visit request', {
+    from: '(kalm) <onboarding@resend.dev>',
+    to: input.toEmail,
+    subject: `${sanitizeSubject(input.developerName)} wants to visit ${input.siteTitles.length} of your sites`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 520px;">
+        <h2 style="margin-bottom: 4px;">New site visit request</h2>
+        <p>Hi ${escapeHtml(input.contractorName)},</p>
+        <p><strong>${escapeHtml(input.developerName)}</strong>, a developer on (kalm), would like to see your
+        completed work in person. They picked these projects:</p>
+        ${siteList(input.siteTitles)}
+        <p>They can make any of these times:</p>
+        <ul style="padding-left: 20px;">${input.slots.map((s) => `<li>${escapeHtml(formatVisitTime(s))}</li>`).join('')}</ul>
+        ${input.developerNote ? `<p style="color:#666;">Their note:</p><p style="white-space: pre-wrap;">${escapeHtml(input.developerNote)}</p>` : ''}
+        <p>Pick a time and tell them where to meet, or decline, from your dashboard:</p>
+        <p><a href="${input.dashboardUrl}" style="${btn}">Respond to this request</a></p>
+      </div>
+    `,
+  });
+}
+
+export async function sendSiteVisitConfirmedEmail(input: {
+  toEmail: string;
+  toName: string;
+  otherPartyLine: string; // e.g. "with Kunal Raut Constructions" / "from Rahul Mehta"
+  siteTitles: string[];
+  slot: Date;
+  meetingPoint: string;
+  responseNote: string | null;
+  contactLine: string; // how to reach the other side on the day
+  icsContent: string;
+  dashboardUrl: string;
+}): Promise<boolean> {
+  return sendSimple('site visit confirmed', {
+    from: '(kalm) <onboarding@resend.dev>',
+    to: input.toEmail,
+    subject: `Site visit confirmed: ${sanitizeSubject(formatVisitTime(input.slot))}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 520px;">
+        <h2 style="margin-bottom: 4px;">Your site visit is confirmed</h2>
+        <p>Hi ${escapeHtml(input.toName)}, your site visit ${escapeHtml(input.otherPartyLine)} is set for:</p>
+        <p style="font-size: 17px; font-weight: 600;">${escapeHtml(formatVisitTime(input.slot))}</p>
+        <p style="color:#666; margin-bottom: 4px;">Meeting point</p>
+        <p style="white-space: pre-wrap; margin-top: 0;">${escapeHtml(input.meetingPoint)}</p>
+        <p style="color:#666; margin-bottom: 4px;">Sites</p>
+        ${siteList(input.siteTitles)}
+        ${input.responseNote ? `<p style="color:#666; margin-bottom: 4px;">Note</p><p style="white-space: pre-wrap; margin-top: 0;">${escapeHtml(input.responseNote)}</p>` : ''}
+        <p>${escapeHtml(input.contactLine)}</p>
+        <p>The attached invite adds this to your calendar.</p>
+        <p><a href="${input.dashboardUrl}" style="${btn}">Open your dashboard</a></p>
+      </div>
+    `,
+    attachments: [{ filename: 'site-visit.ics', content: input.icsContent, contentType: 'text/calendar; charset=utf-8' }],
+  });
+}
+
+export async function sendSiteVisitDeclinedEmail(input: {
+  toEmail: string;
+  toName: string;
+  contractorName: string;
+  responseNote: string | null;
+  profileUrl: string;
+}): Promise<boolean> {
+  return sendSimple('site visit declined', {
+    from: '(kalm) <onboarding@resend.dev>',
+    to: input.toEmail,
+    subject: `${sanitizeSubject(input.contractorName)} can't do your site visit`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 520px;">
+        <h2 style="margin-bottom: 4px;">Site visit declined</h2>
+        <p>Hi ${escapeHtml(input.toName)}, <strong>${escapeHtml(input.contractorName)}</strong> couldn't make any of the
+        times you offered for your site visit.</p>
+        ${input.responseNote ? `<p style="color:#666; margin-bottom: 4px;">Their reason</p><p style="white-space: pre-wrap; margin-top: 0;">${escapeHtml(input.responseNote)}</p>` : ''}
+        <p>You can request again with different times from their profile.</p>
+        <p><a href="${input.profileUrl}" style="${btn}">View their profile</a></p>
+      </div>
+    `,
+  });
+}
+
+export async function sendSiteVisitCancelledEmail(input: {
+  toEmail: string;
+  toName: string;
+  cancelledByName: string;
+  slotLine: string;
+  note: string | null;
+  dashboardUrl: string;
+}): Promise<boolean> {
+  return sendSimple('site visit cancelled', {
+    from: '(kalm) <onboarding@resend.dev>',
+    to: input.toEmail,
+    subject: `Site visit cancelled by ${sanitizeSubject(input.cancelledByName)}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 520px;">
+        <h2 style="margin-bottom: 4px;">Site visit cancelled</h2>
+        <p>Hi ${escapeHtml(input.toName)}, <strong>${escapeHtml(input.cancelledByName)}</strong> cancelled the site
+        visit ${escapeHtml(input.slotLine)}.</p>
+        ${input.note ? `<p style="color:#666; margin-bottom: 4px;">Their note</p><p style="white-space: pre-wrap; margin-top: 0;">${escapeHtml(input.note)}</p>` : ''}
+        <p>If you remove it from your calendar, nothing else is needed.</p>
+        <p><a href="${input.dashboardUrl}" style="${btn}">Open your dashboard</a></p>
+      </div>
+    `,
+  });
 }
