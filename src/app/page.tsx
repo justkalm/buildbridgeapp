@@ -66,131 +66,10 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Trust comes straight after the trade shortcuts: "Verified" is the
+          thing that sets (kalm) apart, so it's explained before anything
+          else about how the site works. */}
       <section className="py-24 border-t border-line">
-        <div className="max-w-[880px] mx-auto px-5 sm:px-8">
-          <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-center text-ink mb-16">
-            Browse, notify, negotiate.
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
-            {[
-              { title: 'Browse verified profiles', body: 'Filter by location and trade. See reviews and project history with photos, timelines and sizes.' },
-              { title: 'Request a quote', body: 'Create an account, shortlist contractors, and share your project details.' },
-              { title: 'They get notified', body: 'Your request lands on the contractor\'s dashboard, and they reach out to you directly.' },
-              { title: 'Negotiate & decide', body: 'You talk terms directly. No obligation either way.' },
-            ].map((step) => (
-              <div key={step.title} className="text-center md:text-left">
-                <h3 className="font-display text-lg text-ink mb-2">{step.title}</h3>
-                <p className="text-sm text-stone leading-relaxed">{step.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="py-24 border-t border-line bg-paper-dim">
-        <div className="max-w-[880px] mx-auto px-5 sm:px-8">
-          <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-center text-ink mb-4">
-            More than a directory.
-          </h2>
-          <p className="text-[15.5px] leading-relaxed text-stone text-center max-w-[520px] mx-auto mb-16">
-            Tools for developers to compare contractors and see their work before deciding.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            {[
-              {
-                icon: '\u{1F4CB}',
-                title: 'Shortlist and compare',
-                body: 'Save contractors to a shortlist, compare them side by side, and keep private notes only you can see.',
-              },
-              {
-                icon: '\u{1F4AC}',
-                title: 'Message in the app',
-                body: 'Talk to contractors without leaving (kalm). Ask questions and share project details in one thread.',
-              },
-              {
-                icon: '\u{1F3D7}\uFE0F',
-                title: 'Visit their finished sites',
-                body: 'Pick 3 to 5 completed projects to see in person and offer 3 times. You get a calendar invite once it is set.',
-              },
-              {
-                icon: '\u2B50',
-                title: 'Reviews from past clients',
-                body: 'The (kalm) team collects reviews directly from the named past client, so they are not written by the contractor.',
-              },
-            ].map((item) => (
-              <div key={item.title} className="text-center md:text-left">
-                <h3 className="font-display text-lg text-ink mb-2">
-                  <span aria-hidden="true" className="mr-2">{item.icon}</span>
-                  {item.title}
-                </h3>
-                <p className="text-sm text-stone leading-relaxed">{item.body}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex gap-4 flex-wrap justify-center mt-16">
-            <Link
-              href="/browse"
-              className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
-            >
-              Browse Contractors
-            </Link>
-            <Link
-              href="/signup"
-              className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full border border-line bg-paper text-ink hover:border-ink transition-colors"
-            >
-              Create an account
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-24 border-t border-line">
-        <div className="max-w-[880px] mx-auto px-5 sm:px-8">
-          <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-center text-ink mb-4">
-            Built for contractors too.
-          </h2>
-          <p className="text-[15.5px] leading-relaxed text-stone text-center max-w-[520px] mx-auto mb-16">
-            A listing on (kalm) isn&apos;t just a directory entry, it&apos;s a dashboard you actually
-            control.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            {[
-              {
-                title: 'A profile that shows your work',
-                body: 'Add completed projects with photos, timelines, and square footage for developers to look through.',
-              },
-              {
-                title: 'Leads land in one place',
-                body: 'See every quote request as it comes in, with the developer\u2019s contact details, right in your dashboard.',
-              },
-              {
-                title: 'You stay in control',
-                body: 'Update your bio, photos and projects any time and your listing stays live. Changing checked details like your location or phone just adds an "update in review" note to your badge until we check it.',
-              },
-            ].map((item) => (
-              <div key={item.title} className="text-center md:text-left">
-                <h3 className="font-display text-lg text-ink mb-2">{item.title}</h3>
-                <p className="text-sm text-stone leading-relaxed">{item.body}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-center mt-16">
-            <Link
-              href="/contractor/signup"
-              className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
-            >
-              List your business
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-24 border-t border-line bg-paper-dim">
         <div className="max-w-[640px] mx-auto px-5 sm:px-8 text-center">
           <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-ink mb-6">
             A badge that means something.
@@ -213,6 +92,79 @@ export default function Home() {
           <span className="inline-flex items-center gap-2 text-sm text-ink border border-line rounded-full px-5 py-2.5">
             ( verified: documents & GSTIN checked, contractor contacted directly )
           </span>
+        </div>
+      </section>
+
+      {/* One "how it works" for developers. This used to be two sections
+          ("Browse, notify, negotiate" and "More than a directory") that
+          covered the same journey twice; the owner asked for a shorter
+          homepage, so they're merged into these four steps. */}
+      <section className="py-24 border-t border-line bg-paper-dim">
+        <div className="max-w-[880px] mx-auto px-5 sm:px-8">
+          <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-center text-ink mb-16">
+            How it works.
+          </h2>
+
+          <ol className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10">
+            {[
+              {
+                title: 'Find verified contractors',
+                body: 'Filter by trade and location. See project history with photos, timelines and sizes.',
+              },
+              {
+                title: 'Shortlist and message',
+                body: 'Save contractors, compare them side by side, and ask questions in the app.',
+              },
+              {
+                title: 'Visit their finished sites',
+                body: 'Pick a few completed projects to see in person. You get a calendar invite once it\'s set.',
+              },
+              {
+                title: 'Request a quote',
+                body: 'Share your project details. You deal with the contractor directly, no obligation.',
+              },
+            ].map((step, i) => (
+              <li key={step.title} className="text-center md:text-left">
+                <p className="text-xs font-medium tracking-wider text-stone mb-2">STEP {i + 1}</p>
+                <h3 className="font-display text-lg text-ink mb-2">{step.title}</h3>
+                <p className="text-sm text-stone leading-relaxed">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+
+          <div className="flex gap-4 flex-wrap justify-center mt-16">
+            <Link
+              href="/browse"
+              className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
+            >
+              Browse Contractors
+            </Link>
+            <Link
+              href="/signup"
+              className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full border border-line bg-paper text-ink hover:border-ink transition-colors"
+            >
+              Create an account
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Contractors get one slim banner rather than a full section; the
+          details of what a listing offers live on the signup page. */}
+      <section className="py-12 border-t border-line">
+        <div className="max-w-[880px] mx-auto px-5 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+          <div>
+            <p className="font-display text-xl text-ink">Are you a contractor?</p>
+            <p className="text-sm text-stone mt-1">
+              Show your completed work and get quote requests from developers, free during the trial.
+            </p>
+          </div>
+          <Link
+            href="/contractor/signup"
+            className="shrink-0 inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
+          >
+            List your business
+          </Link>
         </div>
       </section>
 
