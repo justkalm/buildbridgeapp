@@ -57,7 +57,10 @@ export async function sendPush(
   try {
     if (!ensureConfigured()) return;
     const subs = await prisma.pushSubscription.findMany({ where: { ownerRole, ownerId } });
-    if (subs.length === 0) return;
+    if (subs.length === 0) {
+      console.log(`Web push: no devices for ${ownerRole.toLowerCase()} ${ownerId}`);
+      return;
+    }
 
     const json = JSON.stringify(payload);
     await Promise.all(
@@ -69,12 +72,13 @@ export async function sendPush(
             { TTL: 60 * 60 * 24 } // keep trying for a day if the device is offline
           );
           await prisma.pushSubscription.update({ where: { id: s.id }, data: { lastUsedAt: new Date() } });
+          console.log(`Web push: delivered to ${ownerRole.toLowerCase()} ${ownerId} (${new URL(s.endpoint).host})`);
         } catch (err) {
           const status = (err as { statusCode?: number }).statusCode;
           if (status === 404 || status === 410) {
             await prisma.pushSubscription.delete({ where: { id: s.id } }).catch(() => {});
           } else {
-            console.error('Web push send failed:', status ?? err);
+            console.error('Web push send failed:', status ?? '', (err as { body?: string }).body ?? err);
           }
         }
       })

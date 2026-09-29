@@ -6,8 +6,8 @@
 // reaching someone who isn't looking at it). The in-app unread badge needs
 // nothing from here; it's computed from the messages themselves.
 //
-// Push goes out for every message (the device groups them per conversation
-// via the notification tag, so a burst shows as one updating notification).
+// Push goes out for every message, each as its own notification (see the
+// note at the sendPush call for why they aren't grouped by conversation).
 // Email is throttled: at most one per unread batch, i.e. only if we haven't
 // emailed this side since they last read the thread (see notifiedAt on
 // QuoteRequest in schema.prisma), so a quick back-and-forth doesn't flood
@@ -66,7 +66,11 @@ export async function notifyNewMessage(
     title: fromName,
     body: preview,
     url: path,
-    tag: `conversation-${quoteRequestId}`,
+    // No tag on purpose: every message gets its own notification. With a
+    // shared per-conversation tag, each new message REPLACED the previous
+    // notification, and on macOS Chrome does that replacement silently
+    // (straight into Notification Center, no banner), so only the first
+    // message of a conversation ever popped up.
   });
 
   const lastRead = toDeveloper ? qr.developerLastReadAt : qr.contractorLastReadAt;
