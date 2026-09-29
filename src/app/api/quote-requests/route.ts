@@ -27,11 +27,12 @@
 // and BEFORE the rate limiter, so a blocked attempt doesn't also eat one
 // of the developer's 20/hour.
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendQuoteRequestEmail } from '@/lib/email';
+import { sendNewQuoteToContractorEmail, sendQuoteRequestEmail } from '@/lib/email';
+import { sendPush } from '@/lib/push';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { requireVerifiedDeveloperEmail } from '@/lib/require-verified-email';
 
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   const contractor = await prisma.contractor.findUnique({
     where: { id: contractorId },
-    select: { id: true, name: true },
+    select: { id: true, name: true, email: true, passwordHash: true },
   });
 
   if (!contractor) {
@@ -130,6 +131,35 @@ export async function POST(req: NextRequest) {
       contactPhone,
     },
   });
+
+  // Also tell the contractor, by email (here) and in the app (the request
+  // shows as "New" on their dashboard and counts toward the Nav badge; see
+  // QuoteRequest.contractorSeenAt). Only contractors who have claimed their
+  // account: an admin-entered placeholder has nobody to read it and often a
+  // placeholder address. Sent after the response so it never slows the
+  // developer down. The email carries no contact details (see the function
+  // for why), so the free-plan lead cap still holds.
+  if (contractor.passwordHash) {
+    const baseUrl = process.env.NEXTAUTH_URL ?? '';
+    after(() =>
+      Promise.all([
+        sendNewQuoteToContractorEmail({
+          toEmail: contractor.email,
+          contractorName: contractor.name,
+          projectType,
+          location,
+          dashboardUrl: `${baseUrl}/contractor/dashboard`,
+        }),
+        // Same rule as the email: no developer details, so the lead cap holds.
+        sendPush('CONTRACTOR', contractor.id, {
+          title: 'New quote request',
+          body: `${projectType} in ${location}`,
+          url: '/contractor/dashboard',
+          tag: `quote-${quoteRequest.id}`,
+        }),
+      ])
+    );
+  }
 
   const emailSent = await sendQuoteRequestEmail({
     contractorName: contractor.name,

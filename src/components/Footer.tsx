@@ -11,7 +11,7 @@ export default function Footer() {
 
   return (
     <footer className="bg-paper-dim text-stone pt-16 pb-8 mt-auto border-t border-line">
-      <div className="max-w-[1440px] mx-auto px-8">
+      <div className="max-w-[1440px] mx-auto px-5 sm:px-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10 pb-12 border-b border-line">
           <div>
             <div className="font-display text-xl text-ink mb-3.5">(kalm)</div>

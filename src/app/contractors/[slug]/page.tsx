@@ -1,8 +1,28 @@
 // src/app/contractors/[slug]/page.tsx
+//
+// Public contractor profile: header, completed projects, business details
+// and the "Request a Quotation" form in the sidebar.
+//
+// Accessibility / mobile notes (section E polish):
+//   - Project cards open the lightbox from a real <button> on the card
+//     title, stretched over the whole card with ::after (KALM-069). The
+//     card can't itself be a <button> because ProjectGallery's photo
+//     arrows are buttons, and buttons can't nest. The page keeps a ref to
+//     each card button so closing the lightbox puts focus back on the card
+//     that opened it.
+//   - Below lg the sidebar (and so the quote form) ends up under every
+//     project card, so a sticky ProfileQuoteBar at the bottom of the
+//     screen jumps to it (KALM-060). See goToQuoteForm().
+//   - "Message" buttons (header and sidebar) start or reopen a conversation:
+//     developers get ProfileMessageButton, logged-out visitors a /login link,
+//     contractors nothing. Hidden unless acceptsSiteVisits (the contractor has
+//     an active account, which messaging needs too).
+//   - Star ratings and decorative emoji are hidden from screen readers,
+//     with words in their place where the meaning matters (KALM-066/067).
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -11,7 +31,15 @@ import Footer from '@/components/Footer';
 import ProjectGallery from '@/components/ProjectGallery';
 import SiteVisitRequest from '@/components/SiteVisitRequest';
 import ProjectLightbox from '@/components/ProjectLightbox';
+import VerifiedBadge from '@/components/VerifiedBadge';
 import ShortlistButton from '@/components/ShortlistButton';
+import ProfileMessageButton from '@/components/ProfileMessageButton';
+import ProfileMessageLoginLink from '@/components/ProfileMessageLoginLink';
+import ProfileImage from '@/components/ProfileImage';
+import ProfileStars from '@/components/ProfileStars';
+import ProfileReview from '@/components/ProfileReview';
+import ProfileSkeleton from '@/components/ProfileSkeleton';
+import ProfileQuoteBar, { ProfileQuoteBarSpacer } from '@/components/ProfileQuoteBar';
 import { isPlaceholderLicense } from '@/lib/license';
 import { formatLocation } from '@/lib/location';
 
@@ -29,6 +57,17 @@ type Project = {
   reviewText: string | null;
 };
 
+// Offset for the sticky quote box, and the scroll margin used when the
+// mobile quote bar scrolls to it: the Nav's height (--nav-h in
+// globals.css, which Nav itself uses) plus a 16px gap. It used to be a
+// hard-coded `top-24` (96px) that assumed a taller nav. Tailwind only sees
+// complete class strings, so these stay literal.
+const BELOW_NAV_STICKY = 'lg:sticky lg:top-[calc(var(--nav-h)+1rem)]';
+const BELOW_NAV_SCROLL_MARGIN = 'scroll-mt-[calc(var(--nav-h)+1rem)]';
+
+// Target of the mobile "Request a quote" bar.
+const QUOTE_SECTION_ID = 'request-quote';
+
 type ContractorDetail = {
   id: string;
   slug: string;
@@ -38,6 +77,7 @@ type ContractorDetail = {
   area: string;
   tradeTypes: string[];
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  reverifyPending: boolean;
   tier: 'LISTED' | 'PLUS' | 'PRO';
   yearsInBusiness: number | null;
   teamSizeMin: number | null;
@@ -62,6 +102,9 @@ export default function ContractorProfilePage() {
   const [notFound, setNotFound] = useState(false);
   const [openProject, setOpenProject] = useState<Project | null>(null);
   const [shortlistedIds, setShortlistedIds] = useState<Set<string> | null>(null);
+  // Card "Open project" buttons by project id, so focus can go back to the
+  // right card when the lightbox closes (KALM-069).
+  const cardButtons = useRef(new Map<string, HTMLButtonElement>());
 
   const [projectType, setProjectType] = useState('');
   const [location, setLocation] = useState('');
@@ -115,6 +158,29 @@ export default function ContractorProfilePage() {
         // Non-fatal — button falls back to showing "+ Save".
       });
   }, [isDeveloper]);
+
+  function closeLightbox() {
+    const id = openProject?.id;
+    setOpenProject(null);
+    // After the lightbox has unmounted (and restored body scrolling), put
+    // focus back on the card that opened it.
+    if (id) requestAnimationFrame(() => cardButtons.current.get(id)?.focus());
+  }
+
+  // Mobile quote bar: scroll the quote box into view and move focus into
+  // it, onto whatever the box is currently showing: the first form field
+  // for a developer, or the sign-up link for a logged-out visitor (the same
+  // prompt the box itself shows). Elements marked data-quote-focus are the
+  // targets; the box itself (tabIndex -1) is the fallback. Scrolling is
+  // smooth unless the visitor prefers reduced motion (globals.css sets
+  // scroll-behavior on <html>).
+  function goToQuoteForm() {
+    const box = document.getElementById(QUOTE_SECTION_ID);
+    if (!box) return;
+    box.scrollIntoView({ block: 'start' });
+    const target = box.querySelector<HTMLElement>('[data-quote-focus]') ?? box;
+    target.focus({ preventScroll: true });
+  }
 
   async function handleQuoteSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -184,26 +250,38 @@ export default function ContractorProfilePage() {
     return (
       <>
         <Nav />
-        <main className="flex-1 flex items-center justify-center py-24">
-          <p className="text-stone text-sm">Loading…</p>
-        </main>
+        <ProfileSkeleton />
         <Footer />
       </>
     );
   }
+
+  // Not for contractor viewers (they can't send one), not while the
+  // session is still resolving (avoids a flash for contractors), and not
+  // once a request has gone through.
+  const showQuoteBar = status !== 'loading' && !isContractorViewer && submitResult !== 'success';
+
+  // Messaging: developers message, visitors are sent to log in, contractors
+  // see nothing. Not while the session is resolving (avoids a flash).
+  const showMessage = contractor.acceptsSiteVisits && status !== 'loading' && !isContractorViewer;
 
   return (
     <>
       <Nav />
 
       <header className="bg-paper text-ink border-b border-line pt-11 pb-9">
-        <div className="max-w-[1440px] mx-auto px-8">
+        <div className="max-w-[1440px] mx-auto px-5 sm:px-8">
           <div className="flex items-start gap-5 flex-wrap justify-between">
             <div className="flex gap-5">
-              <div className="w-[84px] h-[84px] rounded-xl bg-paper-dim border border-line text-ink font-display text-3xl flex items-center justify-center shrink-0 overflow-hidden">
+              <div className="relative w-[84px] h-[84px] rounded-xl bg-paper-dim border border-line text-ink font-display text-3xl flex items-center justify-center shrink-0 overflow-hidden">
                 {contractor.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- external Blob URL
-                  <img src={contractor.logoUrl} alt={`${contractor.name} logo`} className="w-full h-full object-cover" />
+                  <ProfileImage
+                    src={contractor.logoUrl}
+                    alt={`${contractor.name} logo`}
+                    fill
+                    sizes="84px"
+                    className="object-cover"
+                  />
                 ) : (
                   contractor.name.slice(0, 2).toUpperCase()
                 )}
@@ -211,39 +289,56 @@ export default function ContractorProfilePage() {
               <div>
                 <div className="flex items-center gap-3 flex-wrap mb-2">
                   <h1 className="font-display font-light text-[28px]">{contractor.name}</h1>
-                  {contractor.verificationStatus === 'VERIFIED' && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] text-sage bg-sage-soft border border-sage/25 rounded-full px-2.5 py-1">
-                      ✓ Verified
-                    </span>
-                  )}
+                  {contractor.verificationStatus === 'VERIFIED' && <VerifiedBadge reviewPending={contractor.reverifyPending} />}
                 </div>
                 <div className="flex gap-4 flex-wrap text-[13.5px] text-stone mb-3">
-                  <span>📍 {formatLocation(contractor.area, contractor.city)}</span>
-                  <span>🏗️ {contractor.tradeTypes.join(', ')}</span>
-                  {contractor.yearsInBusiness && <span>📅 {contractor.yearsInBusiness}+ years in business</span>}
+                  <span>
+                    <span aria-hidden="true">📍 </span>
+                    <span className="sr-only">Location: </span>
+                    {formatLocation(contractor.area, contractor.city)}
+                  </span>
+                  <span>
+                    <span aria-hidden="true">🏗️ </span>
+                    <span className="sr-only">Trades: </span>
+                    {contractor.tradeTypes.join(', ')}
+                  </span>
+                  {contractor.yearsInBusiness ? (
+                    <span>
+                      <span aria-hidden="true">📅 </span>
+                      {contractor.yearsInBusiness}+ years in business
+                    </span>
+                  ) : null}
                 </div>
                 {contractor.reviewCount > 0 && (
                   <div className="flex items-center gap-2.5">
-                    <span className="text-ink text-base tracking-wide">
-                      {'★'.repeat(Math.round(contractor.rating))}
-                      {'☆'.repeat(5 - Math.round(contractor.rating))}
+                    <ProfileStars rating={contractor.rating} className="text-ink text-base tracking-wide" />
+                    {/* Visible number repeats the screen-reader sentence above. */}
+                    <span aria-hidden="true" className="font-medium text-[15px]">
+                      {contractor.rating.toFixed(1)}
                     </span>
-                    <span className="font-medium text-[15px]">{contractor.rating.toFixed(1)}</span>
                     <span className="text-stone text-[13.5px]">({contractor.reviewCount} reviews)</span>
                   </div>
                 )}
               </div>
             </div>
-            <ShortlistButton
-              contractorId={contractor.id}
-              initiallySaved={shortlistedIds?.has(contractor.id) ?? false}
-              className="text-sm px-4 py-2.5 rounded-full border border-line text-ink hover:border-ink transition-colors shrink-0"
-            />
+            <div className="flex items-start gap-2 flex-wrap shrink-0">
+              {showMessage &&
+                (isDeveloper ? (
+                  <ProfileMessageButton contractorId={contractor.id} contractorName={contractor.name} />
+                ) : (
+                  <ProfileMessageLoginLink />
+                ))}
+              <ShortlistButton
+                contractorId={contractor.id}
+                initiallySaved={shortlistedIds?.has(contractor.id) ?? false}
+                className="text-sm px-4 py-2.5 rounded-full border border-line text-ink hover:border-ink transition-colors shrink-0"
+              />
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-[1440px] mx-auto px-8 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-11 py-12">
+      <div className="max-w-[1440px] mx-auto px-5 sm:px-8 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-11 py-12">
         <div>
           {contractor.bio && <p className="text-[15px] text-stone leading-relaxed mb-8">{contractor.bio}</p>}
 
@@ -265,12 +360,27 @@ export default function ContractorProfilePage() {
               {contractor.projects.map((p) => (
                 <div
                   key={p.id}
-                  className="border border-line rounded-md overflow-hidden bg-paper cursor-pointer hover:border-ink transition-colors"
-                  onClick={() => setOpenProject(p)}
+                  className="relative border border-line rounded-md overflow-hidden bg-paper hover:border-ink transition-colors"
                 >
                   <ProjectGallery imageUrls={p.imageUrls} projectTitle={p.title} />
                   <div className="p-4">
-                    <h3 className="font-display text-[15px] mb-1">{p.title}</h3>
+                    <h3 className="font-display text-[15px] mb-1">
+                      {/* Stretched button: its ::after covers the whole
+                          card, so a click anywhere opens the project, and
+                          the focus ring is drawn around the card. */}
+                      <button
+                        type="button"
+                        ref={(el) => {
+                          if (el) cardButtons.current.set(p.id, el);
+                          else cardButtons.current.delete(p.id);
+                        }}
+                        onClick={() => setOpenProject(p)}
+                        aria-label={`Open project: ${p.title}`}
+                        className="text-left cursor-pointer focus-visible:outline-none after:absolute after:inset-0 after:rounded-md focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ink"
+                      >
+                        {p.title}
+                      </button>
+                    </h3>
                     {(p.developerName || p.projectType || p.elevationFloors) && (
                       <p className="text-xs text-stone mb-3">
                         {[
@@ -280,17 +390,11 @@ export default function ContractorProfilePage() {
                         ].filter(Boolean).join(' · ')}
                       </p>
                     )}
-                    {p.reviewRating && (
+                    {p.reviewRating ? (
                       <div className="border-t border-line pt-3 mt-1">
-                        <p className="text-sage text-sm mb-1" aria-label={`${p.reviewRating} out of 5 stars`}>
-                          {'★'.repeat(p.reviewRating)}
-                          <span className="text-line">{'★'.repeat(5 - p.reviewRating)}</span>
-                        </p>
-                        {p.reviewText && (
-                          <p className="text-xs text-stone italic">&quot;{p.reviewText}&quot;</p>
-                        )}
+                        <ProfileReview rating={p.reviewRating} text={p.reviewText} developerName={p.developerName} />
                       </div>
-                    )}
+                    ) : null}
                     <div className="flex justify-between items-center pt-3 border-t border-line">
                       {p.squareFeet && (
                         <span className="font-medium text-sm text-ink">
@@ -350,18 +454,47 @@ export default function ContractorProfilePage() {
             </dl>
           </div>
 
-          <div className="bg-paper border border-line rounded-md p-6 sticky top-24">
-            <h4 className="font-display text-[15.5px] mb-4">Request a Quotation</h4>
+          {showMessage && (
+            <div className="bg-paper border border-line rounded-md p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[13.5px] text-stone">Have a question first? Message {contractor.name}</p>
+              {isDeveloper ? (
+                <ProfileMessageButton
+                  contractorId={contractor.id}
+                  contractorName={contractor.name}
+                  className="text-sm px-4 py-2 rounded-full border border-line text-ink hover:border-ink transition-colors disabled:opacity-60"
+                />
+              ) : (
+                <ProfileMessageLoginLink className="text-sm px-4 py-2 rounded-full border border-line text-ink hover:border-ink transition-colors" />
+              )}
+            </div>
+          )}
+
+          <div
+            id={QUOTE_SECTION_ID}
+            tabIndex={-1}
+            aria-labelledby="request-quote-heading"
+            className={`bg-paper border border-line rounded-md p-6 focus:outline-none ${BELOW_NAV_STICKY} ${BELOW_NAV_SCROLL_MARGIN}`}
+          >
+            <h4 id="request-quote-heading" className="font-display text-[15.5px] mb-4">
+              Request a Quotation
+            </h4>
 
             {status === 'loading' ? null : status !== 'authenticated' ? (
               <div>
                 <p className="text-sm text-stone mb-4">Sign in to request a quote from this contractor.</p>
                 <Link
                   href="/signup"
+                  data-quote-focus
                   className="block text-center bg-ink text-paper font-medium text-sm py-3 rounded-full hover:bg-stone transition-colors"
                 >
                   Sign up to continue
                 </Link>
+                <p className="text-xs text-stone text-center mt-3">
+                  Already have an account?{' '}
+                  <Link href="/login" className="underline underline-offset-2 hover:text-ink">
+                    Sign in
+                  </Link>
+                </p>
               </div>
             ) : isContractorViewer ? (
               // Quote requests are a developer-to-contractor flow — a
@@ -384,8 +517,12 @@ export default function ContractorProfilePage() {
             ) : (
               <form onSubmit={handleQuoteSubmit} className="flex flex-col gap-3.5">
                 <div>
-                  <label className="block text-xs font-medium text-stone mb-1.5">Project type</label>
+                  <label htmlFor="quote-project-type" className="block text-xs font-medium text-stone mb-1.5">
+                    Project type
+                  </label>
                   <select
+                    id="quote-project-type"
+                    data-quote-focus
                     value={projectType}
                     onChange={(e) => setProjectType(e.target.value)}
                     className="w-full px-3 py-2.5 border border-line rounded-[4px] text-[13.5px] bg-paper"
@@ -443,7 +580,7 @@ export default function ContractorProfilePage() {
                 </div>
 
                 {submitResult === 'error' && submitError && (
-                  <div className="text-sm text-red-600">
+                  <div role="alert" className="text-sm text-danger">
                     <p>{submitError.message}</p>
                     {/* POST /api/quote-requests returns 403 with code
                         EMAIL_NOT_VERIFIED for a developer whose email isn't
@@ -476,9 +613,14 @@ export default function ContractorProfilePage() {
 
       <Footer />
 
-      {openProject && (
-        <ProjectLightbox project={openProject} onClose={() => setOpenProject(null)} />
+      {showQuoteBar && (
+        <>
+          <ProfileQuoteBarSpacer />
+          <ProfileQuoteBar onClick={goToQuoteForm} />
+        </>
       )}
+
+      {openProject && <ProjectLightbox project={openProject} onClose={closeLightbox} />}
     </>
   );
 }

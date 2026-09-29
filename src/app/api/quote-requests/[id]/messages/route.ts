@@ -18,18 +18,18 @@
 // "loaded the thread" is a fair stand-in for "saw the messages". The
 // unread counts themselves are computed in /api/messages/unread.
 //
-// EMAIL NOTIFICATION: a POST emails the OTHER party, at most once per
-// unread batch — see the notifiedAt comment on QuoteRequest in
-// schema.prisma. The email is sent with after(), i.e. once the response
-// has already gone back to the sender, so a slow or failing email
-// provider never makes the chat feel laggy or makes a send look failed.
+// NOTIFICATIONS: a POST tells the OTHER party by phone/browser
+// notification and (at most once per unread batch) by email; see
+// src/lib/message-notifications.ts. Sent with after(), i.e. once the
+// response has gone back to the sender, so a slow email or push service
+// never makes the chat feel laggy or makes a send look failed.
 
 import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getQuoteRequestParty } from '@/lib/quote-request-access';
-import { sendNewMessageEmail } from '@/lib/email';
+import { notifyNewMessage } from '@/lib/message-notifications';
 
 function lastReadField(role: 'DEVELOPER' | 'CONTRACTOR') {
   return role === 'DEVELOPER' ? 'developerLastReadAt' : 'contractorLastReadAt';
@@ -112,60 +112,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }),
   ]);
 
-  after(() => notifyRecipient(id, party.role));
+  after(() => notifyNewMessage(id, party.role, parsed.data.body));
 
   return NextResponse.json(message);
-}
-
-// Emails the other party unless they've already been emailed since they
-// last read this thread. Read-then-write rather than a single atomic
-// update, so two messages sent in the same instant could both email. That
-// worst case is one duplicate email, which isn't worth a raw-SQL
-// column-to-column comparison to prevent.
-async function notifyRecipient(quoteRequestId: string, senderRole: 'DEVELOPER' | 'CONTRACTOR') {
-  const qr = await prisma.quoteRequest.findUnique({
-    where: { id: quoteRequestId },
-    select: {
-      projectType: true,
-      developerLastReadAt: true,
-      contractorLastReadAt: true,
-      developerNotifiedAt: true,
-      contractorNotifiedAt: true,
-      developer: { select: { name: true, email: true } },
-      contractor: { select: { name: true, email: true, passwordHash: true } },
-    },
-  });
-  if (!qr) return;
-
-  const toDeveloper = senderRole === 'CONTRACTOR';
-  const lastRead = toDeveloper ? qr.developerLastReadAt : qr.contractorLastReadAt;
-  const lastNotified = toDeveloper ? qr.developerNotifiedAt : qr.contractorNotifiedAt;
-
-  const alreadyNotifiedSinceLastRead = lastNotified !== null && (lastRead === null || lastNotified > lastRead);
-  if (alreadyNotifiedSinceLastRead) return;
-
-  // An admin-entered placeholder contractor with no password can't log in
-  // to read the message anyway (and its email is often a placeholder
-  // address), so there's nobody to notify.
-  if (!toDeveloper && !qr.contractor.passwordHash) return;
-
-  const baseUrl = process.env.NEXTAUTH_URL ?? '';
-  const sent = await sendNewMessageEmail({
-    toEmail: toDeveloper ? qr.developer.email : qr.contractor.email,
-    toName: toDeveloper ? qr.developer.name : qr.contractor.name,
-    fromName: toDeveloper ? qr.contractor.name : qr.developer.name,
-    projectType: qr.projectType,
-    dashboardUrl: `${baseUrl}${toDeveloper ? '/dashboard' : '/contractor/dashboard'}`,
-  });
-
-  // Only record the notification if it actually went out, so a failed
-  // send (e.g. Resend's test domain rejecting the address) doesn't
-  // suppress the next attempt.
-  if (sent) {
-    await prisma.quoteRequest.update({
-      where: { id: quoteRequestId },
-      data: { [toDeveloper ? 'developerNotifiedAt' : 'contractorNotifiedAt']: new Date() },
-      select: { id: true },
-    });
-  }
 }

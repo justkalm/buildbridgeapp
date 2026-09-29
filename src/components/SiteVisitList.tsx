@@ -14,6 +14,11 @@
 // no visits, so it doesn't add an empty box to every dashboard. Has
 // id="site-visits" so the links in the visit emails land right on it.
 //
+// Each card has a "Message {other party}" button. Developers start or
+// reopen a conversation through ProfileMessageButton (compose dialog when
+// there is none yet); contractors can't start one, so they only get a link,
+// and only when /api/site-visits/mine reports a conversationId.
+//
 // Cards the other side has changed since you last looked get a "New"
 // label. Loading this list marks them seen server-side, so it then tells
 // the Nav badge to refresh.
@@ -22,6 +27,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import ProfileMessageButton from '@/components/ProfileMessageButton';
 import { announceNotificationsChanged } from '@/lib/use-unread-messages';
 import {
   contractorVisitStatusLabel,
@@ -43,6 +49,10 @@ type Visit = {
   cancelledBy: 'DEVELOPER' | 'CONTRACTOR' | null;
   createdAt: string;
   isNew: boolean;
+  contractorId: string;
+  // Latest conversation between the two, or null (contractors can only
+  // message into an existing one).
+  conversationId: string | null;
   contractor: { name: string; slug: string; phone: string | null };
   developer: { name: string; email?: string };
 };
@@ -329,7 +339,7 @@ function VisitCard({
               <button
                 onClick={decline}
                 disabled={busy}
-                className="text-xs px-4 py-1.5 rounded-full border border-line text-stone hover:border-red-300 hover:text-red-700 transition-colors disabled:opacity-60"
+                className="text-xs px-4 py-1.5 rounded-full border border-line text-stone hover:border-danger hover:text-danger transition-colors disabled:opacity-60"
               >
                 Decline
               </button>
@@ -339,7 +349,7 @@ function VisitCard({
             <button
               onClick={cancel}
               disabled={busy}
-              className="text-xs px-4 py-1.5 rounded-full border border-line text-stone hover:border-red-300 hover:text-red-700 transition-colors disabled:opacity-60"
+              className="text-xs px-4 py-1.5 rounded-full border border-line text-stone hover:border-danger hover:text-danger transition-colors disabled:opacity-60"
             >
               Cancel visit
             </button>
@@ -347,7 +357,27 @@ function VisitCard({
         </div>
       )}
 
-      {error && <p className="text-[11px] text-red-600 mt-2">{error}</p>}
+      {(!isContractor || v.conversationId) && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {isContractor ? (
+            <Link
+              href={`/messages/${v.conversationId}`}
+              className="text-xs px-4 py-1.5 rounded-full border border-line text-ink hover:border-ink transition-colors"
+            >
+              Message {v.developer.name}
+            </Link>
+          ) : (
+            <ProfileMessageButton
+              contractorId={v.contractorId}
+              contractorName={v.contractor.name}
+              label={`Message ${v.contractor.name}`}
+              className="text-xs px-4 py-1.5 rounded-full border border-line text-ink hover:border-ink transition-colors disabled:opacity-60"
+            />
+          )}
+        </div>
+      )}
+
+      {error && <p className="text-[11px] text-danger mt-2">{error}</p>}
     </div>
   );
 }

@@ -55,7 +55,7 @@ export default function ContactPage() {
       <Nav />
 
       <header className="pt-28 pb-16 text-center">
-        <div className="max-w-[680px] mx-auto px-8">
+        <div className="max-w-[680px] mx-auto px-5 sm:px-8">
           <h1 className="font-display font-light text-[clamp(32px,4vw,46px)] leading-[1.15] text-ink mb-4">
             Get in touch.
           </h1>
@@ -66,7 +66,7 @@ export default function ContactPage() {
       </header>
 
       <section className="pb-24 border-t border-line pt-16">
-        <div className="max-w-[880px] mx-auto px-8 grid grid-cols-1 md:grid-cols-2 gap-16">
+        <div className="max-w-[880px] mx-auto px-5 sm:px-8 grid grid-cols-1 md:grid-cols-2 gap-16">
           {/* Contact details */}
           <div>
             <h2 className="font-display text-xl text-ink mb-6">Reach out directly</h2>
@@ -150,7 +150,7 @@ export default function ContactPage() {
                       className="w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink resize-none"
                     />
                   </div>
-                  {error && <p className="text-sm text-red-600">{error}</p>}
+                  {error && <p className="text-sm text-danger">{error}</p>}
                   <button
                     type="submit"
                     disabled={submitting}

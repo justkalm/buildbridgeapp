@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import ImageUpload from '@/components/ImageUpload';
@@ -114,7 +115,7 @@ export default function ContractorProjectsPage() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-[760px] mx-auto px-8 py-10 w-full">
+      <main className="flex-1 max-w-[760px] mx-auto px-5 sm:px-8 py-10 w-full">
         <Link href="/contractor/dashboard" className="text-sm text-stone hover:text-ink mb-6 inline-block">
           ← Back to dashboard
         </Link>
@@ -137,7 +138,7 @@ export default function ContractorProjectsPage() {
                   </div>
                   <button
                     onClick={() => handleDelete(p.id)}
-                    className="text-xs text-red-600 hover:text-red-800 shrink-0"
+                    className="text-xs text-danger hover:text-danger shrink-0"
                   >
                     Delete
                   </button>
@@ -145,8 +146,7 @@ export default function ContractorProjectsPage() {
                 {p.imageUrls.length > 0 && (
                   <div className="flex gap-2 mt-3 flex-wrap">
                     {p.imageUrls.map((url) => (
-                      // eslint-disable-next-line @next/next/no-img-element -- external Blob URL
-                      <img key={url} src={url} alt="" className="w-14 h-14 rounded-md object-cover border border-line" />
+                      <Image key={url} src={url} alt="" width={56} height={56} className="w-14 h-14 rounded-md object-cover border border-line" />
                     ))}
                   </div>
                 )}
@@ -234,12 +234,12 @@ export default function ContractorProjectsPage() {
             <div className="flex flex-wrap gap-3 items-end">
               {draft.imageUrls.map((url) => (
                 <div key={url} className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- external Blob URL */}
-                  <img src={url} alt="" className="w-16 h-16 rounded-md object-cover border border-line" />
+                  {/* Remote Vercel Blob URL (already uploaded), so next/image can optimise it. */}
+                  <Image src={url} alt="" width={64} height={64} className="w-16 h-16 rounded-md object-cover border border-line" />
                   <button
                     type="button"
                     onClick={() => setDraft({ ...draft, imageUrls: draft.imageUrls.filter((u) => u !== url) })}
-                    className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-600 text-white text-xs leading-5 text-center"
+                    className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-danger text-white text-xs leading-5 text-center"
                     aria-label="Remove photo"
                   >
                     ×
@@ -256,7 +256,7 @@ export default function ContractorProjectsPage() {
               </div>
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-danger">{error}</p>}
 
             <button
               type="submit"

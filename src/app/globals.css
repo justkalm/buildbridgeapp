@@ -1,5 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Inter:wght@400;500;600&display=swap');
 @import "tailwindcss";
+
+/* Fonts are loaded by next/font in src/app/layout.tsx (self-hosted at build
+   time, no render-blocking request to Google), which sets the
+   --font-fraunces and --font-inter variables used below. They used to be
+   pulled in with a CSS @import from fonts.googleapis.com, which blocked
+   rendering and caused text to flash in a fallback font first. */
 
 :root {
   --ink: #0a0a0b;
@@ -9,6 +14,18 @@
   --stone: #6b6963;
   --sage: #8b9a7e;
   --sage-soft: #eef1ea;
+
+  /* One shared error colour (text, borders) and its soft background, so
+     every error message across the site looks the same and can be changed
+     in one place. Use text-danger / bg-danger-soft / border-danger instead
+     of Tailwind's red-* classes. */
+  /* Height of the sticky top Nav (src/components/Nav.tsx uses it), so
+     anything that sticks or scrolls to just below the nav can reference
+     one value instead of repeating a magic number. */
+  --nav-h: 76px;
+
+  --danger: #b42318;
+  --danger-soft: #fdeceb;
 }
 
 @theme inline {
@@ -19,9 +36,11 @@
   --color-stone: var(--stone);
   --color-sage: var(--sage);
   --color-sage-soft: var(--sage-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
 
-  --font-display: "Fraunces", serif;
-  --font-body: "Inter", sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
 }
 
 * {

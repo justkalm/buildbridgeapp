@@ -22,11 +22,15 @@ function VerifyEmailInner() {
   const [status, setStatus] = useState<'checking' | 'success' | 'error'>('checking');
   const [error, setError] = useState<string | null>(null);
 
+  // Derive status and error during render: if no token, the status is 'error'
+  // without needing setState. The async fetch path (with setState after await)
+  // runs only when a token is present.
+  const displayStatus = !token ? 'error' : status;
+  const displayError = !token ? 'No verification token was provided.' : error;
+
   useEffect(() => {
     if (!token) {
-      setStatus('error');
-      setError('No verification token was provided.');
-      return;
+      return; // No token, nothing to verify
     }
 
     fetch(`/api/${role}s/verify-email`, {
@@ -52,9 +56,9 @@ function VerifyEmailInner() {
   return (
     <main className="flex-1 flex items-center justify-center px-6 py-20">
       <div className="w-full max-w-[420px] text-center">
-        {status === 'checking' && <p className="text-stone text-sm">Verifying your email…</p>}
+        {displayStatus === 'checking' && <p className="text-stone text-sm">Verifying your email…</p>}
 
-        {status === 'success' && (
+        {displayStatus === 'success' && (
           <>
             <h1 className="font-display font-light text-2xl mb-3">Email verified</h1>
             <p className="text-stone text-sm mb-8">Your email is confirmed. You&apos;re all set.</p>
@@ -67,10 +71,10 @@ function VerifyEmailInner() {
           </>
         )}
 
-        {status === 'error' && (
+        {displayStatus === 'error' && (
           <>
             <h1 className="font-display font-light text-2xl mb-3">Couldn&apos;t verify email</h1>
-            <p className="text-stone text-sm mb-8">{error}</p>
+            <p className="text-stone text-sm mb-8">{displayError}</p>
             <Link href="/login" className="text-sm text-ink underline underline-offset-2">
               Back to sign in
             </Link>

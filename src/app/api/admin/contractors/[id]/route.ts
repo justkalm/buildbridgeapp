@@ -69,6 +69,16 @@ const VALID_STATUSES = ['PENDING', 'VERIFIED', 'REJECTED'] as const;
 type VerificationStatus = (typeof VALID_STATUSES)[number];
 const VALID_TIERS = ['LISTED', 'PLUS', 'PRO'] as const;
 type ContractorTier = (typeof VALID_TIERS)[number];
+//
+// RE-VERIFICATION (owner's rule: editing never takes a listing offline):
+// when a Verified contractor changes a checked detail they stay Verified,
+// flagged reverifyPending (see src/app/api/contractors/me/route.ts). Admin
+// clears the flag by sending { confirmReverification: true } once the new
+// details check out (which also re-stamps verifiedAt), or by setting any
+// verificationStatus (PENDING/REJECTED if they don't check out; VERIFIED
+// counts as a confirmation too). An admin correcting a license number no
+// longer drops a Verified contractor to PENDING either: admin made the
+// change, so it's already checked, and verifiedAt is re-stamped.
 
 export async function PATCH(
   req: NextRequest,
@@ -84,8 +94,9 @@ export async function PATCH(
   const hasStatus = 'verificationStatus' in body;
   const hasTier = 'tier' in body;
   const hasLicense = 'licenseNumber' in body;
+  const confirmReverify = body.confirmReverification === true;
 
-  if (!hasStatus && !hasTier && !hasLicense) {
+  if (!hasStatus && !hasTier && !hasLicense && !confirmReverify) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
   }
 
@@ -134,12 +145,21 @@ export async function PATCH(
   // this request is setting it, otherwise the one on file.
   const effectiveLicense = newLicense ?? existing.licenseNumber;
 
-  let nextStatus: VerificationStatus | undefined = hasStatus
+  const nextStatus: VerificationStatus | undefined = hasStatus
     ? (body.verificationStatus as VerificationStatus)
     : undefined;
-  if (licenseChanging && !hasStatus && existing.verificationStatus === 'VERIFIED') {
-    nextStatus = 'PENDING';
+
+  if (confirmReverify && existing.verificationStatus !== 'VERIFIED' && nextStatus !== 'VERIFIED') {
+    return NextResponse.json(
+      { error: 'Only a Verified contractor has an update to confirm. Set their status instead.' },
+      { status: 400 }
+    );
   }
+  // Re-stamp the verification date whenever admin has just (re)checked a
+  // Verified contractor: confirming an update, or correcting their license.
+  const restampVerified =
+    (existing.verificationStatus === 'VERIFIED' && (confirmReverify || licenseChanging) && nextStatus !== 'PENDING' && nextStatus !== 'REJECTED');
+  const clearReverify = hasStatus || confirmReverify;
 
   // A PENDING-* license number means no real license has been looked up
   // yet (see src/lib/license.ts) — block flipping such a contractor to
@@ -186,6 +206,8 @@ export async function PATCH(
               : { verifiedAt: null }),
           }
         : {}),
+      ...(restampVerified && !nextStatus ? { verifiedAt: new Date() } : {}),
+      ...(clearReverify ? { reverifyPending: false, reverifyRequestedAt: null, reverifyFields: [] } : {}),
       ...(hasTier ? { tier: body.tier as ContractorTier } : {}),
       ...(licenseChanging ? { licenseNumber: newLicense } : {}),
     },

@@ -70,7 +70,7 @@ export default function ContractorConsentPage() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-[600px] mx-auto px-8 py-10 w-full">
+      <main className="flex-1 max-w-[600px] mx-auto px-5 sm:px-8 py-10 w-full">
         <Link href="/contractor/dashboard" className="text-sm text-stone hover:text-ink mb-6 inline-block">
           ← Back to dashboard
         </Link>

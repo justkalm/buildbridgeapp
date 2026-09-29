@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { sendProjectPostAlertEmail } from '@/lib/email';
+import { sendPush } from '@/lib/push';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const alertSchema = z.object({
@@ -111,6 +112,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         location: projectPost.location,
         budgetRangeLabel: projectPost.budgetRangeLabel,
         details: projectPost.details,
+      })
+    )
+  );
+
+  // Phone/browser notification alongside each alert email. Never throws.
+  await Promise.all(
+    contractors.map((c) =>
+      sendPush('CONTRACTOR', c.id, {
+        title: 'A project matches your profile',
+        body: `${projectPost.projectType} in ${projectPost.location}`,
+        url: '/contractor/dashboard',
+        tag: `project-alert-${id}`,
       })
     )
   );

@@ -31,6 +31,7 @@ import { prisma } from '@/lib/prisma';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { requireVerifiedDeveloperEmail } from '@/lib/require-verified-email';
 import { sendSiteVisitRequestEmail } from '@/lib/email';
+import { sendPush } from '@/lib/push';
 import { MAX_AHEAD_MS, MAX_SITES, MIN_NOTICE_MS, SLOT_COUNT, minSitesFor } from '@/lib/site-visits';
 
 const requestSchema = z.object({
@@ -149,6 +150,13 @@ export async function POST(req: NextRequest) {
   });
 
   const baseUrl = process.env.NEXTAUTH_URL ?? '';
+  await sendPush('CONTRACTOR', contractorId, {
+    title: 'New site visit request',
+    body: `${developer.name} wants to visit ${projectIds.length} of your sites`,
+    url: '/contractor/dashboard#site-visits',
+    tag: `site-visit-${visit.id}`,
+  });
+
   const emailSent = await sendSiteVisitRequestEmail({
     toEmail: contractor.email,
     contractorName: contractor.name,

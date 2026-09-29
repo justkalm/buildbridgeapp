@@ -99,7 +99,7 @@ export default function AdminMessagesPage() {
         </p>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-md p-4 mb-6">
+          <div className="bg-danger-soft border border-danger/30 text-danger text-sm rounded-md p-4 mb-6">
             {error}
           </div>
         )}
@@ -217,7 +217,7 @@ export default function AdminMessagesPage() {
             </button>
           </div>
 
-          {threadError && <p className="text-sm text-red-600 mb-4">{threadError}</p>}
+          {threadError && <p className="text-sm text-danger mb-4">{threadError}</p>}
 
           {thread && (
             <div className="bg-white border border-line rounded-md p-5">

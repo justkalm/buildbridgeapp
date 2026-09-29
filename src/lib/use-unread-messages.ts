@@ -4,23 +4,25 @@
 // user's unread message counts. Used by the Nav (total, for the badge)
 // and both dashboards (per quote request, for each thread's badge).
 //
-// Same polling rules as MessageThread: pause while the tab is hidden and
+// Same polling rules as the conversation screen: pause while the tab is hidden and
 // catch up as soon as it's visible again. Also refreshes immediately when
 // anything on the page announces NOTIFICATIONS_CHANGED_EVENT (e.g. the
 // site visits list after it marks visits as seen), so the Nav badge clears
 // straight away instead of on the next poll.
 //
-// `total` counts unread messages plus site-visit updates; `siteVisits` is
-// the site-visit part on its own. `enabled` should be false for
+// `total` counts every notification (unread messages, site visits, new
+// quote requests, status changes, project alerts); `messages` is unread
+// messages alone (the Messages icon's count), `siteVisits` the site-visit
+// part. `enabled` should be false for
 // logged-out visitors, so they never hit an endpoint that would just 401.
 
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 
-type Unread = { total: number; byQuoteRequest: Record<string, number>; siteVisits: number };
+type Unread = { total: number; messages: number; byQuoteRequest: Record<string, number>; siteVisits: number };
 
-const EMPTY: Unread = { total: 0, byQuoteRequest: {}, siteVisits: 0 };
+const EMPTY: Unread = { total: 0, messages: 0, byQuoteRequest: {}, siteVisits: 0 };
 
 export const NOTIFICATIONS_CHANGED_EVENT = 'kalm:notifications-changed';
 
@@ -67,7 +69,7 @@ export function useUnreadMessages(enabled: boolean, pollMs = 60_000) {
       if (!count) return prev;
       const byQuoteRequest = { ...prev.byQuoteRequest };
       delete byQuoteRequest[quoteRequestId];
-      return { ...prev, total: prev.total - count, byQuoteRequest };
+      return { ...prev, total: prev.total - count, messages: Math.max(0, prev.messages - count), byQuoteRequest };
     });
   }, []);
 

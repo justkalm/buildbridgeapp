@@ -29,6 +29,7 @@ import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { PASSWORD_MIN_LENGTH, PASSWORD_HINT } from '@/lib/password-rules';
 import { normalizeLocation } from '@/lib/location';
+import PasswordInput from '@/components/PasswordInput';
 
 export default function ContractorSignupPage() {
   const router = useRouter();
@@ -208,8 +209,8 @@ export default function ContractorSignupPage() {
             </fieldset>
             <div>
               <label className="block text-sm font-medium mb-1.5">Password</label>
-              <input
-                type="password"
+              <PasswordInput
+                autoComplete="new-password"
                 required
                 minLength={PASSWORD_MIN_LENGTH}
                 value={password}
@@ -219,7 +220,7 @@ export default function ContractorSignupPage() {
               <p className="text-xs text-stone mt-1">{PASSWORD_HINT}</p>
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-danger">{error}</p>}
 
             <p className="text-xs text-stone">
               By creating an account, you agree to our{' '}

@@ -106,7 +106,8 @@ export default function ShortlistButton({
         }`
       }
     >
-      {saved ? '✓ Saved' : '+ Save'}
+      <span aria-hidden="true">{saved ? '✓ ' : '+ '}</span>
+      {saved ? 'Saved' : 'Save'}
     </button>
   );
 }

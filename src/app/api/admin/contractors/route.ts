@@ -17,7 +17,13 @@ import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
 import { isValidTradeType } from '@/lib/trade-types';
 import { isPlaceholderLicense } from '@/lib/license';
 import { normalizeLocation } from '@/lib/location';
-import { positiveWhole } from '@/lib/project-validation';
+import {
+  insuranceCoverLakhField,
+  positiveWhole,
+  teamSizeField,
+  teamSizeRangeError,
+} from '@/lib/project-validation';
+import { uniqueContractorSlug } from '@/lib/slugify';
 
 const projectSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -54,27 +60,22 @@ const contractorSchema = z.object({
   // sorting can be tested/used ahead of Razorpay integration.
   tier: z.enum(['LISTED', 'PLUS', 'PRO']).default('LISTED'),
   yearsInBusiness: z.number().int().min(0).max(150).optional(),
-  teamSizeMin: z.number().int().min(0).optional(),
-  teamSizeMax: z.number().int().min(0).optional(),
+  teamSizeMin: teamSizeField('Team size').optional(),
+  teamSizeMax: teamSizeField('Team size').optional(),
   gstRegistered: z.boolean().default(false),
-  insuranceCoverLakh: z.number().int().positive().optional(),
+  // Positive (admin has never allowed 0 here) and capped, see project-validation.ts.
+  insuranceCoverLakh: insuranceCoverLakhField()
+    .refine((n) => n > 0, 'Insurance cover must be more than 0')
+    .optional(),
   phone: z.string().trim().min(6).max(20),
   // Required now — this becomes the contractor's dashboard login. The
   // admin form's UI-level `required` attribute doesn't stop a raw API
   // call, so it needs enforcing here too.
   email: z.string().trim().email('A valid email is required').toLowerCase(),
-   bio: z.string().trim().max(2000).optional(),
+  bio: z.string().trim().max(2000).optional(),
   logoUrl: z.string().url().optional(),
   projects: z.array(projectSchema).default([]),
 });
-
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-');
-}
 
 export async function GET() {
   if (!(await isAdminAuthenticated())) {
@@ -119,7 +120,11 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
-  const slug = slugify(data.name);
+
+  const rangeError = teamSizeRangeError(data.teamSizeMin, data.teamSizeMax);
+  if (rangeError) {
+    return NextResponse.json({ error: rangeError }, { status: 400 });
+  }
 
   // A PENDING-* license number is a self-signup placeholder, not a real
   // license we've reviewed against the license, GST, and registration
@@ -145,6 +150,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Shared slug builder: never empty for non-Latin names, and de-duplicated
+  // (-2, -3...) so two same-named contractors no longer crash on the unique
+  // constraint.
+  const slug = await uniqueContractorSlug(data.name, prisma);
+
   const contractor = await prisma.contractor.create({
     data: {
       name: data.name,
@@ -163,7 +173,7 @@ export async function POST(req: NextRequest) {
       insuranceCoverLakh: data.insuranceCoverLakh,
       phone: data.phone,
       email: data.email,
-      bio: data.bio,
+     bio: data.bio,
       logoUrl: data.logoUrl,
       projects: {
         create: data.projects.map((p) => ({

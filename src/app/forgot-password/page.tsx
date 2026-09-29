@@ -1,4 +1,15 @@
 // src/app/forgot-password/page.tsx
+//
+// One "forgot password" form for developers AND contractors, matching the
+// single login form (src/lib/auth.ts tries developer, then contractor).
+// The login page's "Forgot password?" link carries no role, and this page
+// used to default to developer, so a contractor entering their email got
+// "a link has been sent" while nothing was ever sent: the developer route
+// found no developer with that address. Now, unless a link explicitly
+// says ?role=contractor or ?role=developer, the request goes to BOTH
+// routes; each one only emails if it owns that address, and both give the
+// same generic answer, so this still doesn't reveal which emails have
+// accounts or what kind.
 
 'use client';
 
@@ -10,7 +21,9 @@ import Footer from '@/components/Footer';
 
 function ForgotPasswordInner() {
   const searchParams = useSearchParams();
-  const role = searchParams.get('role') === 'contractor' ? 'contractor' : 'developer';
+  const roleParam = searchParams.get('role');
+  const roles =
+    roleParam === 'contractor' ? ['contractor'] : roleParam === 'developer' ? ['developer'] : ['developer', 'contractor'];
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -19,11 +32,15 @@ function ForgotPasswordInner() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await fetch(`/api/${role}s/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
+      await Promise.allSettled(
+        roles.map((role) =>
+          fetch(`/api/${role}s/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          })
+        )
+      );
     } finally {
       setSubmitted(true);
       setSubmitting(false);

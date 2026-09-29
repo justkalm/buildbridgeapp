@@ -32,6 +32,7 @@ import {
   sendSiteVisitConfirmedEmail,
   sendSiteVisitDeclinedEmail,
 } from '@/lib/email';
+import { sendPush } from '@/lib/push';
 
 // In-app notification bookkeeping (see the SiteVisit schema comment): the
 // contractor just acted, so the change is new for the developer and
@@ -124,6 +125,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     };
     after(async () => {
       await Promise.all([
+        sendPush('DEVELOPER', visit.developerId, {
+          title: `Site visit confirmed: ${visit.contractor.name}`,
+          body: formatVisitTime(slot),
+          url: '/dashboard#site-visits',
+          tag: `site-visit-${visit.id}`,
+        }),
         sendSiteVisitConfirmedEmail({
           toEmail: visit.developer.email,
           toName: visit.developer.name,
@@ -161,13 +168,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (count === 0) return stale;
 
     after(() =>
-      sendSiteVisitDeclinedEmail({
+      Promise.all([
+        sendPush('DEVELOPER', visit.developerId, {
+          title: `${visit.contractor.name} declined your site visit`,
+          body: note ?? 'You can request again with different times.',
+          url: '/dashboard#site-visits',
+          tag: `site-visit-${visit.id}`,
+        }),
+        sendSiteVisitDeclinedEmail({
         toEmail: visit.developer.email,
         toName: visit.developer.name,
         contractorName: visit.contractor.name,
         responseNote: note,
         profileUrl: `${baseUrl}/contractors/${visit.contractor.slug}`,
-      })
+      }),
+      ])
     );
     return NextResponse.json({ status: 'DECLINED' });
   }
@@ -194,14 +209,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const toDeveloper = party === 'CONTRACTOR';
   after(() =>
-    sendSiteVisitCancelledEmail({
+    Promise.all([
+      sendPush(toDeveloper ? 'DEVELOPER' : 'CONTRACTOR', toDeveloper ? visit.developerId : visit.contractorId, {
+        title: `Site visit cancelled by ${toDeveloper ? visit.contractor.name : visit.developer.name}`,
+        body: visit.confirmedSlot ? `Was planned for ${formatVisitTime(visit.confirmedSlot)}` : 'The visit request was withdrawn.',
+        url: `${toDeveloper ? '/dashboard' : '/contractor/dashboard'}#site-visits`,
+        tag: `site-visit-${visit.id}`,
+      }),
+      sendSiteVisitCancelledEmail({
       toEmail: toDeveloper ? visit.developer.email : visit.contractor.email,
       toName: toDeveloper ? visit.developer.name : visit.contractor.name,
       cancelledByName: toDeveloper ? visit.contractor.name : visit.developer.name,
       slotLine: visit.confirmedSlot ? `planned for ${formatVisitTime(visit.confirmedSlot)}` : 'you were arranging',
       note,
       dashboardUrl: `${baseUrl}${toDeveloper ? '/dashboard' : '/contractor/dashboard'}#site-visits`,
-    })
+    }),
+    ])
   );
   return NextResponse.json({ status: 'CANCELLED' });
 }

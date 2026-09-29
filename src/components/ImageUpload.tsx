@@ -17,6 +17,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 type ImageUploadProps = {
   label: string;
@@ -84,12 +85,13 @@ export default function ImageUpload({
 
       {value ? (
         <div className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element -- external Blob URLs, not a local/optimizable asset */}
-          <img src={value} alt="" className="w-16 h-16 rounded-md object-cover border border-line" />
+          {/* value is always a remote Vercel Blob URL (set from the upload
+              response), which next.config.ts allows through the optimiser. */}
+          <Image src={value} alt="" width={64} height={64} className="w-16 h-16 rounded-md object-cover border border-line" />
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="text-xs font-medium text-red-600 hover:text-red-800"
+            className="text-xs font-medium text-danger hover:text-danger"
           >
             Remove
           </button>
@@ -104,7 +106,7 @@ export default function ImageUpload({
             className="text-[13px] w-full text-stone file:mr-3 file:py-2 file:px-3 file:rounded-[4px] file:border file:border-line file:bg-paper file:text-[13px] file:font-medium disabled:opacity-50"
           />
           {uploading && <p className="text-xs text-stone mt-1">Uploading…</p>}
-          {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+          {error && <p className="text-xs text-danger mt-1">{error}</p>}
         </div>
       )}
     </div>

@@ -4,16 +4,23 @@
 // record plus projects and quote requests. PATCH updates editable profile
 // fields.
 //
-// IMPORTANT (updated, see CREDENTIAL_FIELDS below): a PATCH only resets
-// verificationStatus back to PENDING and clears verifiedAt when it
-// actually CHANGES one of the "credential" fields, the ones tied to what
-// admin actually checked during verification (see the three checks listed
-// on the homepage's verification section: document review, GSTIN check,
-// and a direct phone/in-person conversation). Editing a purely cosmetic
-// field (bio, team size, years in business, insurance cover) no longer
-// knocks a Verified contractor back to Pending. There is nothing in those
-// fields that the badge claims was checked, so there's nothing for a
-// change to invalidate.
+// IMPORTANT (see CREDENTIAL_FIELDS below): editing NEVER takes a listing
+// offline (the owner's rule). When a VERIFIED contractor actually CHANGES
+// one of the "credential" fields, the ones tied to what admin checked
+// during verification (document review, GSTIN check, a direct phone or
+// in-person conversation; see the homepage's verification section), they
+// stay VERIFIED and listed, but the contractor is flagged reverifyPending
+// with the changed fields recorded, the public badge reads "Verified ·
+// update in review", and admin is emailed to re-check. Admin then confirms
+// (clears the flag) or downgrades them from Admin > Contractors.
+// Editing a purely cosmetic field (bio, team size, years in business,
+// insurance cover) doesn't flag anything: nothing in those fields is
+// something the badge claims was checked.
+//
+// GET also drives in-app notifications: quote requests and project alerts
+// the contractor hasn't seen yet come back with isNew: true and are then
+// marked seen (loading the dashboard is what "seeing" means), so the Nav
+// badge (via /api/messages/unread) clears.
 //
 // CREDENTIAL_FIELDS and why each one is here:
 //   - city / area:    the in-person/phone conversation is tied to where
@@ -39,13 +46,15 @@
 // editable through this route at all today — if that ever changes, they
 // belong in CREDENTIAL_FIELDS too.)
 
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { computeLeadVisibility, getMonthStart, LISTED_MONTHLY_LEAD_CAP } from '@/lib/lead-limits';
 import { isValidTradeType } from '@/lib/trade-types';
+import { sendReverifyRequestEmail } from '@/lib/email';
 import { normalizeLocation } from '@/lib/location';
+import { insuranceCoverLakhField, teamSizeField, teamSizeRangeError } from '@/lib/project-validation';
 
 async function requireContractor() {
   const session = await auth();
@@ -94,6 +103,7 @@ export async function GET() {
         include: {
           projectPost: {
             select: {
+              id: true,
               projectType: true,
               location: true,
               budgetRangeLabel: true,
@@ -167,6 +177,37 @@ export async function GET() {
     ...safe
   } = contractor;
 
+  // In-app notifications (see file header): anything not yet seen is
+  // flagged isNew for this response, then marked seen.
+  const newQuoteIds = contractor.quoteRequests.filter((r) => !r.contractorSeenAt).map((r) => r.id);
+  const newAlertIds = rawProjectAlerts.filter((a) => !a.seenAt).map((a) => a.id);
+  if (newQuoteIds.length > 0 || newAlertIds.length > 0) {
+    const now = new Date();
+    await Promise.all([
+      newQuoteIds.length > 0
+        ? prisma.quoteRequest.updateMany({ where: { id: { in: newQuoteIds } }, data: { contractorSeenAt: now } })
+        : null,
+      newAlertIds.length > 0
+        ? prisma.projectPostAlert.updateMany({ where: { id: { in: newAlertIds } }, data: { seenAt: now } })
+        : null,
+    ]);
+  }
+  const newQuoteSet = new Set(newQuoteIds);
+
+  // Conversations this contractor already started from an alert ("I'm
+  // interested"), so each alert can show "Open conversation" instead of
+  // offering to start a second one.
+  const alertConversations = await prisma.quoteRequest.findMany({
+    where: {
+      kind: 'PROJECT',
+      contractorId,
+      projectPostId: { in: rawProjectAlerts.map((a) => a.projectPost.id) },
+    },
+    select: { id: true, projectPostId: true },
+  });
+  const conversationByPost = new Map(alertConversations.map((c) => [c.projectPostId, c.id]));
+  const newAlertSet = new Set(newAlertIds);
+
   // Defensive strip, independent of the write-time PLUS/PRO enforcement —
   // see the comment on the projectAlerts select above for why this
   // exists as its own check rather than trusting that the other file
@@ -174,11 +215,20 @@ export async function GET() {
   const projectAlerts =
     contractor.tier === 'LISTED'
       ? []
-      : rawProjectAlerts;
+      : rawProjectAlerts.map((a) => ({
+          ...a,
+          isNew: newAlertSet.has(a.id),
+          conversationId: conversationByPost.get(a.projectPost.id) ?? null,
+        }));
 
   return NextResponse.json({
     ...safe,
-    quoteRequests: quoteRequestsWithVisibility,
+    // Only real quote requests are listed on the dashboard; enquiries and
+    // project conversations live in Messages. (They still counted toward
+    // the lead cap above, since every kind is a lead.)
+    quoteRequests: quoteRequestsWithVisibility
+      .filter((r) => r.kind === 'QUOTE')
+      .map((r) => ({ ...r, isNew: newQuoteSet.has(r.id) })),
     projectAlerts,
     leadLimit:
       contractor.tier === 'LISTED'
@@ -194,6 +244,16 @@ export async function GET() {
 // the schema grows.
 const CREDENTIAL_FIELDS = ['city', 'area', 'phone', 'gstRegistered', 'tradeTypes'] as const;
 
+// How each credential field is named to admin in the re-check email and
+// the Admin > Contractors flag.
+const CREDENTIAL_FIELD_LABELS: Record<(typeof CREDENTIAL_FIELDS)[number], string> = {
+  city: 'City',
+  area: 'Area',
+  phone: 'Phone',
+  gstRegistered: 'GST registration',
+  tradeTypes: 'Trades',
+};
+
 const profileSchema = z.object({
   bio: z.string().trim().max(2000).optional(),
   // Normalized to consistent capitalisation — see src/lib/location.ts.
@@ -207,10 +267,12 @@ const profileSchema = z.object({
     })
     .optional(),
   yearsInBusiness: z.number().int().min(0).max(100).nullable().optional(),
-  teamSizeMin: z.number().int().min(0).max(10000).nullable().optional(),
-  teamSizeMax: z.number().int().min(0).max(10000).nullable().optional(),
+  // 'from' <= 'to' is checked in PATCH, where the stored value is available
+  // for partial updates. Insurance cap: see MAX_INSURANCE_COVER_LAKH.
+  teamSizeMin: teamSizeField('Team size').nullable().optional(),
+  teamSizeMax: teamSizeField('Team size').nullable().optional(),
   gstRegistered: z.boolean().optional(),
-  insuranceCoverLakh: z.number().int().min(0).nullable().optional(),
+  insuranceCoverLakh: insuranceCoverLakhField().nullable().optional(),
   phone: z.string().trim().min(7).max(20).optional(),
 });
 
@@ -256,13 +318,34 @@ export async function PATCH(req: Request) {
   // Without this diff, every save would look like a credential edit again.
   const current = await prisma.contractor.findUnique({
     where: { id: contractorId },
-    select: { city: true, area: true, phone: true, gstRegistered: true, tradeTypes: true },
+    select: {
+      name: true,
+      city: true,
+      area: true,
+      phone: true,
+      gstRegistered: true,
+      tradeTypes: true,
+      teamSizeMin: true,
+      teamSizeMax: true,
+      verificationStatus: true,
+      reverifyFields: true,
+    },
   });
   if (!current) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const credentialChanged = CREDENTIAL_FIELDS.some((field) => {
+  // Team size 'from' must not exceed 'to'. For a partial PATCH (only one of
+  // the two sent) compare against the stored value of the other; an explicit
+  // null clears that side and so can't conflict.
+  const nextMin = 'teamSizeMin' in parsed.data ? parsed.data.teamSizeMin : current.teamSizeMin;
+  const nextMax = 'teamSizeMax' in parsed.data ? parsed.data.teamSizeMax : current.teamSizeMax;
+  const rangeError = teamSizeRangeError(nextMin, nextMax);
+  if (rangeError) {
+    return NextResponse.json({ error: rangeError }, { status: 400 });
+  }
+
+  const changedCredentials = CREDENTIAL_FIELDS.filter((field) => {
     if (!(field in parsed.data)) return false;
     const incoming = parsed.data[field as keyof typeof parsed.data];
     let existing = current[field as keyof typeof current];
@@ -276,17 +359,38 @@ export async function PATCH(req: Request) {
     return valuesDiffer(incoming, existing);
   });
 
+  const flagForReverify = changedCredentials.length > 0 && current.verificationStatus === 'VERIFIED';
+
   const updated = await prisma.contractor.update({
     where: { id: contractorId },
     data: {
       ...parsed.data,
-      // Reset verification only when a credential field changed — see
-      // CREDENTIAL_FIELDS and the file header for the reasoning. A
-      // cosmetic-only save (bio, team size, years in business, insurance
-      // cover) leaves an existing Verified status untouched.
-      ...(credentialChanged ? { verificationStatus: 'PENDING', verifiedAt: null } : {}),
+      // A Verified contractor changing a checked detail stays Verified
+      // and listed, flagged for admin to re-check (see the file header).
+      // Fields already awaiting a re-check are kept, so admin sees
+      // everything that changed since the last confirmation. A PENDING or
+      // REJECTED contractor is already waiting on admin, so there's
+      // nothing extra to flag.
+      ...(flagForReverify
+        ? {
+            reverifyPending: true,
+            reverifyRequestedAt: new Date(),
+            reverifyFields: [...new Set([...current.reverifyFields, ...changedCredentials])],
+          }
+        : {}),
     },
   });
+
+  if (flagForReverify) {
+    const baseUrl = process.env.NEXTAUTH_URL ?? '';
+    after(() =>
+      sendReverifyRequestEmail({
+        contractorName: current.name,
+        changedFields: changedCredentials.map((f) => CREDENTIAL_FIELD_LABELS[f]),
+        adminUrl: `${baseUrl}/admin/contractors`,
+      })
+    );
+  }
 
   const {
     passwordHash: _passwordHash,

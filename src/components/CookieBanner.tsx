@@ -16,21 +16,53 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 const STORAGE_KEY = 'kalm-cookie-consent-dismissed';
 
-export default function CookieBanner() {
-  const [dismissed, setDismissed] = useState(true); // default true avoids a flash before the localStorage check runs
+// The dismissed flag lives in localStorage, which only exists in the
+// browser. Reading it during the first render (e.g. in a lazy useState
+// initialiser) makes the server's HTML (no localStorage, banner hidden)
+// disagree with the browser's first render (no stored flag, banner shown),
+// which React reports as a hydration mismatch on every first visit.
+// Setting state inside an effect avoids that but trips the repo's
+// set-state-in-effect lint rule and renders twice.
+//
+// useSyncExternalStore is React's built-in answer: the server snapshot
+// says "dismissed" (so the HTML never includes the banner), React uses
+// that same value while hydrating, then switches to the real browser value
+// straight after. Dismissing notifies subscribers so the banner hides.
+const listeners = new Set<() => void>();
 
-  useEffect(() => {
-    const alreadyDismissed = localStorage.getItem(STORAGE_KEY) === 'true';
-    setDismissed(alreadyDismissed);
-  }, []);
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  // Also pick up a dismissal made in another tab.
+  window.addEventListener('storage', onChange);
+  return () => {
+    listeners.delete(onChange);
+    window.removeEventListener('storage', onChange);
+  };
+}
+
+function isDismissed(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === 'true';
+  } catch {
+    // Storage blocked (private mode, strict settings): don't nag.
+    return true;
+  }
+}
+
+export default function CookieBanner() {
+  const dismissed = useSyncExternalStore(subscribe, isDismissed, () => true);
 
   function dismiss() {
-    localStorage.setItem(STORAGE_KEY, 'true');
-    setDismissed(true);
+    try {
+      localStorage.setItem(STORAGE_KEY, 'true');
+    } catch {
+      // Storage unavailable: the banner still hides for this page view below.
+    }
+    listeners.forEach((notify) => notify());
   }
 
   if (dismissed) return null;

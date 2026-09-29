@@ -254,7 +254,7 @@ export default function SiteVisitRequest({
       </div>
 
       {error && (
-        <div className="text-sm text-red-600 mb-3">
+        <div role="alert" className="text-sm text-danger mb-3">
           <p>{error.message}</p>
           {error.code === 'EMAIL_NOT_VERIFIED' && (
             <Link href="/dashboard" className="underline underline-offset-2 font-medium">

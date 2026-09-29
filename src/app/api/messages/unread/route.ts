@@ -5,7 +5,11 @@
 // siteVisits }. `siteVisits` is the number of site visits the OTHER side
 // has acted on since this side last opened their dashboard (see the
 // SiteVisit schema comment). `total` includes it, so the Nav badge
-// covers both kinds of notification.
+// covers every kind of notification. Also `quoteRequests` (contractor:
+// new requests not yet seen on their dashboard), `quoteUpdates`
+// (developer: status changes not yet seen) and `projectAlerts`
+// (contractor: admin alerts not yet seen). Each is marked seen when the
+// relevant dashboard loads; see those routes.
 //
 // Polled by the Nav badge and both dashboards, so it's kept cheap: one
 // query for message threads (only those that actually have messages from
@@ -104,5 +108,45 @@ export async function GET() {
     return !seenAt || v.lastActionAt > seenAt;
   }).length;
 
-  return NextResponse.json({ total: total + siteVisits, byQuoteRequest, siteVisits });
+  let quoteRequests = 0;
+  let quoteUpdates = 0;
+  let projectAlerts = 0;
+  if (isDeveloper) {
+    const updated = await prisma.quoteRequest.findMany({
+      where: { developerId: userId, statusUpdatedAt: { not: null } },
+      select: { statusUpdatedAt: true, developerStatusSeenAt: true },
+      orderBy: { statusUpdatedAt: 'desc' },
+      take: 50,
+    });
+    quoteUpdates = updated.filter(
+      (r) => r.statusUpdatedAt && (!r.developerStatusSeenAt || r.statusUpdatedAt > r.developerStatusSeenAt)
+    ).length;
+  } else {
+    [quoteRequests, projectAlerts] = await Promise.all([
+      // New quote requests only; a new enquiry or project conversation
+      // shows up as an unread message instead, so it isn't counted twice.
+      prisma.quoteRequest.count({ where: { contractorId: userId, contractorSeenAt: null, kind: 'QUOTE' } }),
+      // LISTED contractors never see alerts (the dashboard strips them), so
+      // they mustn't be counted either.
+      prisma.contractor
+        .findUnique({ where: { id: userId }, select: { tier: true } })
+        .then((c) =>
+          c && c.tier !== 'LISTED'
+            ? prisma.projectPostAlert.count({ where: { contractorId: userId, seenAt: null } })
+            : 0
+        ),
+    ]);
+  }
+
+  return NextResponse.json({
+    total: total + siteVisits + quoteRequests + quoteUpdates + projectAlerts,
+    // Unread messages only, for the Messages icon's count bubble in Nav
+    // (`total` also includes the other notification kinds).
+    messages: total,
+    byQuoteRequest,
+    siteVisits,
+    quoteRequests,
+    quoteUpdates,
+    projectAlerts,
+  });
 }

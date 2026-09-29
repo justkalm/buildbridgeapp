@@ -1,20 +1,20 @@
 // src/app/contractor/profile/page.tsx
 //
 // Self-service profile editing. Submitting this form hits
-// PATCH /api/contractors/me, which now only resets verificationStatus to
-// PENDING when a CREDENTIAL field actually changes (city, area, phone,
-// GST registration, trade types) — see that route's file header for the
-// full reasoning and CREDENTIAL_FIELDS list. Cosmetic fields (bio, team
-// size, years in business, insurance cover) no longer touch verification.
+// PATCH /api/contractors/me. Editing never takes a listing offline (the
+// owner's rule): when a Verified contractor changes a CREDENTIAL field
+// (city, area, phone, GST registration, trade types) they stay Verified
+// and listed, their badge reads "Verified · update in review", and admin
+// is asked to re-check. See that route's file header and CREDENTIAL_FIELDS.
+// Cosmetic fields (bio, team size, years in business, insurance cover)
+// don't affect verification at all.
 //
-// The form below is grouped into two visual sections — "Profile details"
-// (cosmetic, safe to edit any time) and "Verified credentials" (resets
-// verification if changed) — so a contractor can see at a glance which
-// edits are consequence-free. If any credential field is actually being
-// changed on a currently-Verified profile, submitting shows a confirm
-// step instead of saving immediately, since that save has a real,
-// possibly-unwanted side effect (dropping out of Verified + browse until
-// admin re-checks).
+// The form below is grouped into two visual sections, "Profile details"
+// (edit freely) and "Verified credentials" (changes get re-checked), so a
+// contractor can see at a glance what each edit means. If a credential
+// field is actually being changed on a Verified profile, submitting shows
+// a short confirm step first so the "update in review" note on their
+// badge isn't a surprise.
 
 'use client';
 
@@ -26,6 +26,7 @@ import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import TradeTypePicker from '@/components/TradeTypePicker';
 import { normalizeLocation } from '@/lib/location';
+import { MAX_INSURANCE_COVER_LAKH, MAX_TEAM_SIZE, teamSizeRangeError } from '@/lib/project-validation';
 
 type ContractorMe = {
   id: string;
@@ -115,6 +116,22 @@ export default function ContractorProfilePage() {
     }
     setConfirmingReset(false);
 
+    // Same rules as the API (src/lib/project-validation.ts), checked here so
+    // the person gets the message without a round trip.
+    const rangeError = teamSizeRangeError(me.teamSizeMin, me.teamSizeMax);
+    if (rangeError) {
+      setSaved(false);
+      setError(rangeError);
+      return;
+    }
+    if (me.insuranceCoverLakh != null && me.insuranceCoverLakh > MAX_INSURANCE_COVER_LAKH) {
+      setSaved(false);
+      setError(
+        `Insurance cover can't be more than ${MAX_INSURANCE_COVER_LAKH.toLocaleString('en-IN')} lakh (₹10,000 crore). Check for extra zeros.`
+      );
+      return;
+    }
+
     setSaving(true);
     setSaved(false);
     setError(null);
@@ -166,7 +183,7 @@ export default function ContractorProfilePage() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-[720px] mx-auto px-8 py-10 w-full">
+      <main className="flex-1 max-w-[720px] mx-auto px-5 sm:px-8 py-10 w-full">
         <Link href="/contractor/dashboard" className="text-sm text-stone hover:text-ink mb-6 inline-block">
           ← Back to dashboard
         </Link>
@@ -174,9 +191,9 @@ export default function ContractorProfilePage() {
 
         {me.verificationStatus === 'VERIFIED' && (
           <div className="mb-6 px-4 py-3 rounded-[6px] bg-paper-dim text-stone text-sm">
-            You&apos;re currently verified. Changing anything in &quot;Verified credentials&quot;
-            below will move your listing back to pending review until admin re-checks it. The
-            rest of your profile is safe to edit any time.
+            You&apos;re verified. If you change anything in &quot;Verified credentials&quot; below,
+            your listing stays live and your badge shows &quot;Verified · update in review&quot; until
+            (kalm) checks the new details. The rest of your profile is yours to edit any time.
           </div>
         )}
 
@@ -213,6 +230,7 @@ export default function ContractorProfilePage() {
                 <input
                   type="number"
                   min={0}
+                  max={MAX_TEAM_SIZE}
                   value={me.teamSizeMin ?? ''}
                   onChange={(e) =>
                     update({ teamSizeMin: e.target.value ? Number(e.target.value) : null })
@@ -225,6 +243,7 @@ export default function ContractorProfilePage() {
                 <input
                   type="number"
                   min={0}
+                  max={MAX_TEAM_SIZE}
                   value={me.teamSizeMax ?? ''}
                   onChange={(e) =>
                     update({ teamSizeMax: e.target.value ? Number(e.target.value) : null })
@@ -238,6 +257,7 @@ export default function ContractorProfilePage() {
               <input
                 type="number"
                 min={0}
+                max={MAX_INSURANCE_COVER_LAKH}
                 value={me.insuranceCoverLakh ?? ''}
                 onChange={(e) =>
                   update({ insuranceCoverLakh: e.target.value ? Number(e.target.value) : null })
@@ -250,9 +270,9 @@ export default function ContractorProfilePage() {
           <fieldset className="flex flex-col gap-4 pt-6 border-t border-line">
             <legend className="font-display text-base mb-1">Verified credentials</legend>
             <p className="text-xs text-stone -mt-2 mb-1">
-              These are what admin actually checks before marking you Verified (location, trade
-              license, GST, and a direct conversation): changing one sends you back to Pending
-              review if you&apos;re currently Verified.
+              These are the details (kalm) checks before marking you Verified. If you&apos;re
+              Verified and change one, you stay listed and your badge shows &quot;update in
+              review&quot; until we check it.
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -305,21 +325,21 @@ export default function ContractorProfilePage() {
             </div>
           </fieldset>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
           {saved && <p className="text-sm text-sage">Saved.</p>}
 
           {confirmingReset && pendingCredentialReset && (
-            <div className="px-4 py-3.5 rounded-[6px] bg-red-50 border border-red-200 text-sm text-red-700 flex flex-col gap-3">
+            <div className="px-4 py-3.5 rounded-[6px] bg-paper-dim border border-line text-sm text-ink flex flex-col gap-3">
               <p>
-                Changing your verified credentials will send your profile back for
-                re-verification and hide it from browse until admin reviews it. Continue?
+                Your listing stays live. Your badge will show &quot;Verified · update in review&quot;
+                until (kalm) checks the new details. Save these changes?
               </p>
               <div className="flex gap-3">
                 <button
                   type="submit"
-                  className="text-xs font-medium px-4 py-2 rounded-full bg-red-600 text-white"
+                  className="text-xs font-medium px-4 py-2 rounded-full bg-ink text-paper"
                 >
-                  Yes, save and go back to Pending
+                  Save changes
                 </button>
                 <button
                   type="button"
@@ -336,7 +356,7 @@ export default function ContractorProfilePage() {
             <button
               type="submit"
               disabled={saving}
-              className="mt-2 bg-ink text-paper font-medium text-sm py-3 rounded-full hover:bg-stone transition-colors disabled:opacity-60 self-start px-8"
+              className="mt-2 bg-ink text-paper font-medium text-sm py-3 rounded-full hover:bg-stone transition-colors disabled:opacity-60 self-start px-5 sm:px-8"
             >
               {saving ? 'Saving…' : 'Save changes'}
             </button>

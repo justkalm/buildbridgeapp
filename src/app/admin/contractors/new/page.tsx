@@ -9,6 +9,7 @@ import AdminTabs from '@/components/AdminTabs';
 import TradeTypePicker from '@/components/TradeTypePicker';
 import { isPlaceholderLicense } from '@/lib/license';
 import { normalizeLocation } from '@/lib/location';
+import { MAX_INSURANCE_COVER_LAKH, MAX_TEAM_SIZE, teamSizeRangeError } from '@/lib/project-validation';
 
 type ProjectDraft = {
   title: string;
@@ -87,6 +88,23 @@ export default function NewContractorPage() {
     // the browser validates on its own. Check explicitly instead.
     if (tradeTypes.length === 0) {
       setError('Select at least one trade type');
+      return;
+    }
+
+    // Same rules as the API (src/lib/project-validation.ts), checked before
+    // submit so the admin sees the message immediately.
+    const rangeError = teamSizeRangeError(
+      teamSizeMin ? Number(teamSizeMin) : undefined,
+      teamSizeMax ? Number(teamSizeMax) : undefined
+    );
+    if (rangeError) {
+      setError(rangeError);
+      return;
+    }
+    if (insuranceCoverLakh && Number(insuranceCoverLakh) > MAX_INSURANCE_COVER_LAKH) {
+      setError(
+        `Insurance cover can't be more than ${MAX_INSURANCE_COVER_LAKH.toLocaleString('en-IN')} lakh (₹10,000 crore). Check for extra zeros.`
+      );
       return;
     }
 
@@ -192,7 +210,7 @@ export default function NewContractorPage() {
           </div>
         )}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-md p-3.5 mb-5">
+          <div className="bg-danger-soft border border-danger text-danger text-sm rounded-md p-3.5 mb-5">
             {error}
           </div>
         )}
@@ -254,7 +272,7 @@ export default function NewContractorPage() {
                 </option>
               </select>
               {isPlaceholderLicense(licenseNumber) && (
-                <p className="text-xs text-red-600 mt-1">
+                <p className="text-xs text-danger mt-1">
                   This looks like a placeholder license number. Enter the real one to enable Verified.
                 </p>
               )}
@@ -278,16 +296,16 @@ export default function NewContractorPage() {
               <input type="number" min="0" value={yearsInBusiness} onChange={(e) => setYearsInBusiness(e.target.value)} className={inputCls} />
             </Field>
             <Field label="Team size (min)">
-              <input type="number" min="0" value={teamSizeMin} onChange={(e) => setTeamSizeMin(e.target.value)} className={inputCls} />
+              <input type="number" min="0" max={MAX_TEAM_SIZE} value={teamSizeMin} onChange={(e) => setTeamSizeMin(e.target.value)} className={inputCls} />
             </Field>
             <Field label="Team size (max)">
-              <input type="number" min="0" value={teamSizeMax} onChange={(e) => setTeamSizeMax(e.target.value)} className={inputCls} />
+              <input type="number" min="0" max={MAX_TEAM_SIZE} value={teamSizeMax} onChange={(e) => setTeamSizeMax(e.target.value)} className={inputCls} />
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-4 items-end">
             <Field label="Insurance cover (₹ lakh)">
-              <input type="number" min="0" value={insuranceCoverLakh} onChange={(e) => setInsuranceCoverLakh(e.target.value)} className={inputCls} />
+              <input type="number" min="0" max={MAX_INSURANCE_COVER_LAKH} value={insuranceCoverLakh} onChange={(e) => setInsuranceCoverLakh(e.target.value)} className={inputCls} />
             </Field>
             <label className="flex items-center gap-2 text-sm font-medium pb-2.5">
               <input type="checkbox" checked={gstRegistered} onChange={(e) => setGstRegistered(e.target.checked)} />
@@ -331,7 +349,7 @@ export default function NewContractorPage() {
                       placeholder="Project title"
                       className={`${inputCls} flex-1 mr-2`}
                     />
-                    <button type="button" onClick={() => removeProject(i)} className="text-xs text-red-600 px-1">
+                    <button type="button" onClick={() => removeProject(i)} className="text-xs text-danger px-1">
                       Remove
                     </button>
                   </div>
@@ -386,7 +404,7 @@ export default function NewContractorPage() {
                         <button
                           type="button"
                           onClick={() => removeProjectImage(i, url)}
-                          className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-600 text-white text-xs leading-5 text-center"
+                          className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-danger text-white text-xs leading-5 text-center"
                           aria-label="Remove photo"
                         >
                           ×

@@ -15,6 +15,7 @@
 'use client';
 
 import { useState } from 'react';
+import PasswordInput from '@/components/PasswordInput';
 
 export default function AdminLoginForm() {
   const [password, setPassword] = useState('');
@@ -51,8 +52,8 @@ export default function AdminLoginForm() {
         <h1 className="font-display font-bold text-2xl tracking-tight mb-1">Admin</h1>
         <p className="text-stone text-sm mb-6">Enter the admin password and your 2FA code.</p>
 
-        <input
-          type="password"
+        <PasswordInput
+          autoComplete="current-password"
           required
           autoFocus
           placeholder="Password"
@@ -73,7 +74,7 @@ export default function AdminLoginForm() {
           className="w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-ink mb-3 tracking-[0.3em] text-center font-mono"
         />
 
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+        {error && <p className="text-sm text-danger mb-3">{error}</p>}
 
         <button
           type="submit"

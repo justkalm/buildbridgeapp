@@ -8,6 +8,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { PASSWORD_MIN_LENGTH, PASSWORD_HINT } from '@/lib/password-rules';
+import PasswordInput from '@/components/PasswordInput';
 
 function ResetPasswordInner() {
   const searchParams = useSearchParams();
@@ -75,8 +76,8 @@ function ResetPasswordInner() {
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1.5">New password</label>
-                <input
-                  type="password"
+                <PasswordInput
+                  autoComplete="new-password"
                   required
                   minLength={PASSWORD_MIN_LENGTH}
                   value={password}
@@ -85,7 +86,7 @@ function ResetPasswordInner() {
                 />
                 <p className="text-xs text-stone mt-1">{PASSWORD_HINT}</p>
               </div>
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <p className="text-sm text-danger">{error}</p>}
               <button
                 type="submit"
                 disabled={submitting}

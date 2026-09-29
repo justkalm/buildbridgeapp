@@ -84,6 +84,28 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // DEVELOPMENT ONLY: lets a phone on the same Wi-Fi open the local dev
+  // site at http://<this laptop's Wi-Fi address>:3000 for testing. Next.js
+  // blocks dev-server requests from any host but localhost unless listed
+  // here. The laptop's address can change when the router hands out a new
+  // one; if phone testing stops working, find the new address with
+  // `ipconfig getifaddr en0` and update it here. No effect on the live site.
+  allowedDevOrigins: ['192.168.0.157'],
+  // Hosts next/image may fetch and optimise (resize, compress, convert to
+  // modern formats) images from. Anything else is refused, so the image
+  // optimiser can't be used to proxy arbitrary URLs.
+  //   - Vercel Blob: every logo and project photo uploaded through the app
+  //     (see src/lib/validate-image-url.ts);
+  //   - picsum.photos (+ its fastly CDN, which it redirects to): placeholder
+  //     photos used only by the DEMO contractors in prisma/seed-demo.ts.
+  //     Remove these two once the demo contractors are gone.
+  images: {
+    remotePatterns: [
+      new URL('https://*.public.blob.vercel-storage.com/**'),
+      new URL('https://picsum.photos/**'),
+      new URL('https://fastly.picsum.photos/**'),
+    ],
+  },
   async headers() {
     return [
       {

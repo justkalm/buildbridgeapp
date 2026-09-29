@@ -7,6 +7,9 @@
 // — this page-level guard is about UX (don't flash the page before
 // redirecting), not the real security boundary.
 //
+// Each lead links to its conversation in Messages (/messages/{id}); the
+// thread itself no longer renders inline.
+//
 // Quote request actions: each fully-visible lead shows Accept / Mark quote
 // sent / Decline buttons for whichever moves are allowed from its current
 // status (rules in src/lib/quote-status.ts; the server enforces the same
@@ -20,17 +23,20 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import MessageThread from '@/components/MessageThread';
+import AlertMessageButton from '@/components/AlertMessageButton';
+import InstallAppPrompt from '@/components/InstallAppPrompt';
+import PushPrompt from '@/components/PushPrompt';
 import SiteVisitList from '@/components/SiteVisitList';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import Skeleton from '@/components/Skeleton';
 import {
   ALLOWED_TRANSITIONS,
   contractorActionLabel,
   contractorStatusLabel,
   type QuoteStatus,
 } from '@/lib/quote-status';
-import { useUnreadMessages } from '@/lib/use-unread-messages';
+import { announceNotificationsChanged, useUnreadMessages } from '@/lib/use-unread-messages';
 
 type QuoteRequestRow = {
   id: string;
@@ -42,11 +48,17 @@ type QuoteRequestRow = {
   createdAt: string;
   developer: { name: string; email: string | null; phone: string | null };
   leadVisibility: 'full' | 'blurred';
+  // Not seen on this dashboard before this load (see GET
+  // /api/contractors/me). Shows a "New" label once.
+  isNew: boolean;
 };
 
 type ProjectAlertRow = {
   id: string;
   alertedAt: string;
+  isNew: boolean;
+  // Conversation this contractor already started from the alert, if any.
+  conversationId: string | null;
   projectPost: {
     projectType: string;
     location: string;
@@ -71,7 +83,7 @@ type ContractorMe = {
 const verificationCopy: Record<ContractorMe['verificationStatus'], { label: string; style: string }> = {
   PENDING: { label: 'Verification pending', style: 'bg-paper-dim text-stone' },
   VERIFIED: { label: 'Verified', style: 'bg-sage-soft text-sage' },
-  REJECTED: { label: 'Verification rejected', style: 'bg-red-50 text-red-700' },
+  REJECTED: { label: 'Verification rejected', style: 'bg-danger-soft text-danger' },
 };
 
 const contractorStatusStyle: Record<QuoteStatus, string> = {
@@ -145,21 +157,34 @@ export default function ContractorDashboardPage() {
     if (sessionStatus !== 'authenticated') return;
     fetch('/api/contractors/me')
       .then((res) => (res.ok ? res.json() : null))
-      .then(setMe);
+      .then((data: ContractorMe | null) => {
+        setMe(data);
+        // Loading this page marked new requests/alerts as seen, so let the
+        // Nav badge refresh now rather than on its next poll.
+        if (data && (data.quoteRequests.some((r) => r.isNew) || data.projectAlerts.some((a) => a.isNew))) {
+          announceNotificationsChanged();
+        }
+      });
   }, [sessionStatus]);
 
   if (sessionStatus !== 'authenticated' || !me) {
     // Previously returned null here — a fully blank white page (no Nav,
     // no Footer) during the session check and the me-fetch, unlike every
     // other dashboard/account page in the app which keeps the layout
-    // mounted and shows a "Loading…" message in the content area instead.
-    // Keeping Nav/Footer up avoids the blank-flash and matches the
-    // developer dashboard's loading treatment.
+    // mounted and shows a placeholder in the content area instead.
+    // Keeping Nav/Footer up avoids the blank-flash; the grey Skeleton
+    // shapes (a heading line and a few cards) hold the layout steady.
     return (
       <>
         <Nav />
-        <main className="flex-1 max-w-[1440px] mx-auto px-8 py-10 w-full">
-          <p className="text-sm text-stone">Loading…</p>
+        <main className="flex-1 max-w-[1440px] mx-auto px-5 sm:px-8 py-10 w-full">
+          <div role="status" className="flex flex-col gap-3">
+            <span className="sr-only">Loading…</span>
+            <Skeleton className="h-7 w-64 mb-4" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
         </main>
         <Footer />
       </>
@@ -171,7 +196,7 @@ export default function ContractorDashboardPage() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-[1440px] mx-auto px-8 py-10 w-full">
+      <main className="flex-1 max-w-[1440px] mx-auto px-5 sm:px-8 py-10 w-full">
         <div className="flex justify-between items-start flex-wrap gap-4 mb-9">
           <div>
             <h1 className="font-display font-light text-[28px] mb-1">Welcome back, {me.name}</h1>
@@ -213,8 +238,9 @@ export default function ContractorDashboardPage() {
             </span>
             {me.verificationStatus !== 'PENDING' && (
               <p className="text-xs text-stone mt-2">
-                Changing your location, phone, GST status or trades sends your profile back for
-                review. Editing your bio, team details or projects doesn&apos;t.
+                Your listing always stays live when you edit. Changing your location, phone, GST
+                status or trades adds &quot;update in review&quot; to your badge until we check it.
+                Editing your bio, team details or projects doesn&apos;t.
               </p>
             )}
           </div>
@@ -226,6 +252,9 @@ export default function ContractorDashboardPage() {
             </p>
           </div>
         </div>
+
+        <InstallAppPrompt />
+        <PushPrompt />
 
         <SiteVisitList viewerRole="CONTRACTOR" />
 
@@ -245,7 +274,8 @@ export default function ContractorDashboardPage() {
                         {a.projectPost.projectType} · {a.projectPost.location} · {a.projectPost.budgetRangeLabel}
                       </p>
                     </div>
-                    <span className="text-xs text-stone">
+                    <span className="flex items-center gap-2 text-xs text-stone">
+                      {a.isNew && <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-ink text-paper">New</span>}
                       {new Date(a.alertedAt).toLocaleDateString()}
                     </span>
                   </div>
@@ -258,6 +288,13 @@ export default function ContractorDashboardPage() {
                       {a.projectPost.contactPhone}
                     </a>
                   </div>
+                  <div className="mt-3">
+                    <AlertMessageButton
+                      alertId={a.id}
+                      developerName={a.projectPost.developer.name}
+                      conversationId={a.conversationId}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
@@ -265,7 +302,16 @@ export default function ContractorDashboardPage() {
         )}
 
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <h2 className="font-display font-light text-xl">Quote requests received</h2>
+          <div>
+            <h2 className="font-display font-light text-xl">Quote requests received</h2>
+            <p className="text-xs text-stone mt-1">
+              Replies and developers&apos; questions are in{' '}
+              <Link href="/messages" className="underline underline-offset-2 hover:text-ink">
+                Messages
+              </Link>
+              .
+            </p>
+          </div>
           {me.leadLimit && (
             <span className="text-xs text-stone">
               {me.leadLimit.usedThisMonth} of {me.leadLimit.cap} full leads used this month
@@ -278,8 +324,22 @@ export default function ContractorDashboardPage() {
           <div className="flex flex-col gap-3">
             {me.quoteRequests.map((r) =>
               r.leadVisibility === 'blurred' ? (
-                <div key={r.id} className="border border-line rounded-[6px] p-4 relative overflow-hidden">
-                  <div className="blur-[3px] select-none pointer-events-none">
+                // The blurred details are still in the DOM (they're only visually
+                // blurred), so they are hidden from assistive tech and made inert
+                // (no focus, no find-in-page selection); the overlay's upgrade
+                // message stays readable and the card gets a plain label.
+                <div
+                  key={r.id}
+                  role="group"
+                  aria-label={r.isNew ? 'New locked lead. Upgrade to see details.' : 'Locked lead. Upgrade to see details.'}
+                  className="border border-line rounded-[6px] p-4 relative overflow-hidden"
+                >
+                  {r.isNew && (
+                    <span className="absolute top-3 right-3 z-10" aria-hidden="true">
+                      <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-ink text-paper">New</span>
+                    </span>
+                  )}
+                  <div aria-hidden="true" inert className="blur-[3px] select-none pointer-events-none">
                     <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
                       <div>
                         <p className="font-medium text-sm">{r.developer.name}</p>
@@ -322,6 +382,7 @@ export default function ContractorDashboardPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
+                      {r.isNew && <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-ink text-paper">New</span>}
                       <span
                         className={`inline-block text-[11px] font-medium px-2.5 py-0.5 rounded-full ${contractorStatusStyle[r.status]}`}
                       >
@@ -352,7 +413,7 @@ export default function ContractorDashboardPage() {
                             disabled={updatingId === r.id}
                             className={
                               action === 'DECLINED'
-                                ? 'text-xs px-4 py-1.5 rounded-full border border-line text-stone hover:border-red-300 hover:text-red-700 transition-colors disabled:opacity-60'
+                                ? 'text-xs px-4 py-1.5 rounded-full border border-line text-stone hover:border-danger hover:text-danger transition-colors disabled:opacity-60'
                                 : 'text-xs px-4 py-1.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors disabled:opacity-60'
                             }
                           >
@@ -363,18 +424,19 @@ export default function ContractorDashboardPage() {
                     </div>
                   )}
                   {statusError?.id === r.id && (
-                    <p className="text-[11px] text-red-600 mt-1.5">{statusError.message}</p>
+                    <p className="text-[11px] text-danger mt-1.5">{statusError.message}</p>
                   )}
-                  {unread.byQuoteRequest[r.id] > 0 && (
-                    <p className="text-[11px] font-medium text-ink mt-3">
-                      {unread.byQuoteRequest[r.id]} new message{unread.byQuoteRequest[r.id] === 1 ? '' : 's'}
-                    </p>
-                  )}
-                  <MessageThread
-                    quoteRequestId={r.id}
-                    viewerRole="CONTRACTOR"
-                    onRead={() => unread.markRead(r.id)}
-                  />
+                  <Link
+                    href={`/messages/${r.id}`}
+                    className="mt-3 inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-line text-ink hover:border-ink transition-colors"
+                  >
+                    Open conversation
+                    {unread.byQuoteRequest[r.id] > 0 && (
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-ink text-paper">
+                        {unread.byQuoteRequest[r.id]} new message{unread.byQuoteRequest[r.id] === 1 ? '' : 's'}
+                      </span>
+                    )}
+                  </Link>
                 </div>
               )
             )}

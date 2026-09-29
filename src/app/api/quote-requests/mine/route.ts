@@ -3,6 +3,11 @@
 // Returns the signed-in developer's own quote requests, for the dashboard.
 // Scoped strictly to session.user.id — a developer can only ever see their
 // own requests, never another developer's.
+//
+// Also drives the developer's in-app notifications: a request whose status
+// changed since the developer last saw it (statusUpdatedAt after
+// developerStatusSeenAt) comes back with isNew: true and is then marked
+// seen, so the "New" label shows once and the Nav badge clears.
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
@@ -20,13 +25,16 @@ export async function GET() {
   }
 
   const requests = await prisma.quoteRequest.findMany({
-    where: { developerId: session.user.id },
+    // Quote requests only; enquiries and project conversations are in
+    // Messages (/api/conversations).
+    where: { developerId: session.user.id, kind: 'QUOTE' },
     select: {
       id: true,
       projectType: true,
       location: true,
       status: true,
       statusUpdatedAt: true,
+      developerStatusSeenAt: true,
       createdAt: true,
       emailSentAt: true,
       contractor: { select: { id: true, name: true, slug: true } },
@@ -34,5 +42,18 @@ export async function GET() {
     orderBy: { createdAt: 'desc' },
   });
 
-  return NextResponse.json(requests);
+  const newIds = requests
+    .filter((r) => r.statusUpdatedAt && (!r.developerStatusSeenAt || r.statusUpdatedAt > r.developerStatusSeenAt))
+    .map((r) => r.id);
+  if (newIds.length > 0) {
+    await prisma.quoteRequest.updateMany({
+      where: { id: { in: newIds } },
+      data: { developerStatusSeenAt: new Date() },
+    });
+  }
+  const newSet = new Set(newIds);
+
+  return NextResponse.json(
+    requests.map(({ developerStatusSeenAt: _seen, ...r }) => ({ ...r, isNew: newSet.has(r.id) }))
+  );
 }

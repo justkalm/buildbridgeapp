@@ -40,6 +40,7 @@ export async function GET(
       area: true,
       tradeTypes: true,
       verificationStatus: true,
+      reverifyPending: true, // shows "Verified · update in review"; see VerifiedBadge
       tier: true,
       yearsInBusiness: true,
       teamSizeMin: true,

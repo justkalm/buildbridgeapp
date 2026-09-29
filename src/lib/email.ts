@@ -413,17 +413,17 @@ export async function sendQuoteStatusEmail(input: {
   }
 }
 
-// "You have a new message" nudge for the in-app thread. Deliberately does
-// NOT include the message text: the email is a prompt to come back to the
-// site, not a second copy of the conversation sitting in someone's inbox.
-// How often this fires is throttled by the caller (see the
-// developerNotifiedAt / contractorNotifiedAt comment in schema.prisma).
+// "You have a new message" nudge for an in-app conversation, with a short
+// preview of the message (the owner's call: a preview is what makes people
+// open it) and a Reply button straight into the conversation. How often
+// this fires is throttled by the caller (src/lib/message-notifications.ts).
 export async function sendNewMessageEmail(input: {
   toEmail: string;
   toName: string;
   fromName: string;
   projectType: string;
-  dashboardUrl: string;
+  preview: string;
+  conversationUrl: string;
 }): Promise<boolean> {
   try {
     const { error } = await getResendClient().emails.send({
@@ -435,8 +435,9 @@ export async function sendNewMessageEmail(input: {
           <h2 style="margin-bottom: 4px;">You have a new message</h2>
           <p>Hi ${escapeHtml(input.toName)},</p>
           <p><strong>${escapeHtml(input.fromName)}</strong> sent you a message about
-          <em>${escapeHtml(input.projectType)}</em>.</p>
-          <p><a href="${input.dashboardUrl}" style="display:inline-block;background:#1c1e22;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;">Read and reply</a></p>
+          <em>${escapeHtml(input.projectType)}</em>:</p>
+          <p style="border-left: 3px solid #ddd; padding: 6px 12px; color: #333; white-space: pre-wrap;">${escapeHtml(input.preview)}</p>
+          <p><a href="${input.conversationUrl}" style="display:inline-block;background:#1c1e22;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;">Reply</a></p>
           <p style="color:#666;font-size:13px;">We won't email you again about this conversation until you've read it.</p>
         </div>
       `,
@@ -590,6 +591,69 @@ export async function sendSiteVisitCancelledEmail(input: {
         visit ${escapeHtml(input.slotLine)}.</p>
         ${input.note ? `<p style="color:#666; margin-bottom: 4px;">Their note</p><p style="white-space: pre-wrap; margin-top: 0;">${escapeHtml(input.note)}</p>` : ''}
         <p>If you remove it from your calendar, nothing else is needed.</p>
+        <p><a href="${input.dashboardUrl}" style="${btn}">Open your dashboard</a></p>
+      </div>
+    `,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Re-verification and contractor lead emails
+// ---------------------------------------------------------------------------
+
+// Tells admin that a Verified contractor changed a checked detail. They
+// stay listed with "Verified · update in review" until admin re-checks and
+// confirms in Admin > Contractors (see src/app/api/contractors/me/route.ts).
+// Goes to the same admin address as new quote requests.
+export async function sendReverifyRequestEmail(input: {
+  contractorName: string;
+  changedFields: string[];
+  adminUrl: string;
+}): Promise<boolean> {
+  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+  if (!notifyAddress) {
+    console.error('QUOTE_NOTIFICATION_EMAIL is not set, cannot send re-verification email');
+    return false;
+  }
+  return sendSimple('re-verification request', {
+    from: '(kalm) <onboarding@resend.dev>',
+    to: notifyAddress,
+    subject: `Re-check needed: ${sanitizeSubject(input.contractorName)} updated verified details`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 520px;">
+        <h2 style="margin-bottom: 4px;">A verified contractor changed checked details</h2>
+        <p><strong>${escapeHtml(input.contractorName)}</strong> updated:</p>
+        ${siteList(input.changedFields)}
+        <p>Their listing is still live, marked "Verified · update in review". Re-check the new details, then
+        confirm or change their status.</p>
+        <p><a href="${input.adminUrl}" style="${btn}">Open Admin &gt; Contractors</a></p>
+      </div>
+    `,
+  });
+}
+
+// Tells a contractor a developer has sent them a quote request. Deliberately
+// carries NO developer contact details or project description: a LISTED
+// contractor over their monthly lead cap sees the lead blurred on their
+// dashboard, and an email with the details would bypass that cap. The
+// email is a prompt to log in, where the lead cap is enforced.
+export async function sendNewQuoteToContractorEmail(input: {
+  toEmail: string;
+  contractorName: string;
+  projectType: string;
+  location: string;
+  dashboardUrl: string;
+}): Promise<boolean> {
+  return sendSimple('new quote request (contractor)', {
+    from: '(kalm) <onboarding@resend.dev>',
+    to: input.toEmail,
+    subject: `New quote request: ${sanitizeSubject(input.projectType)} in ${sanitizeSubject(input.location)}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px;">
+        <h2 style="margin-bottom: 4px;">You have a new quote request</h2>
+        <p>Hi ${escapeHtml(input.contractorName)}, a developer on (kalm) has asked you for a quote:</p>
+        <p style="font-size: 16px;"><strong>${escapeHtml(input.projectType)}</strong> in ${escapeHtml(input.location)}</p>
+        <p>Log in to see the details and respond.</p>
         <p><a href="${input.dashboardUrl}" style="${btn}">Open your dashboard</a></p>
       </div>
     `,

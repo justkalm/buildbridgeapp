@@ -53,6 +53,7 @@ export async function GET() {
       createdAt: true,
       respondedAt: true,
       contractorId: true,
+      developerId: true,
       lastActionAt: true,
       lastActionBy: true,
       developerSeenAt: true,
@@ -70,6 +71,22 @@ export async function GET() {
       })
     : [];
   const titleById = new Map(projects.map((p) => [p.id, p]));
+
+  // Latest conversation between the two parties of each visit, so a visit
+  // card can offer "Message …" straight into it (contractors can't start
+  // conversations, so for them the button only appears when one exists).
+  const pairThreads = await prisma.quoteRequest.findMany({
+    where: isDeveloper
+      ? { developerId: userId, contractorId: { in: [...new Set(visits.map((v) => v.contractorId))] } }
+      : { contractorId: userId, developerId: { in: [...new Set(visits.map((v) => v.developerId))] } },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, developerId: true, contractorId: true },
+  });
+  const latestThread = new Map<string, string>();
+  for (const t of pairThreads) {
+    const key = `${t.developerId}:${t.contractorId}`;
+    if (!latestThread.has(key)) latestThread.set(key, t.id);
+  }
 
   const side = isDeveloper ? 'DEVELOPER' : 'CONTRACTOR';
   const newIds = new Set(
@@ -102,6 +119,8 @@ export async function GET() {
       createdAt: v.createdAt,
       respondedAt: v.respondedAt,
       isNew: newIds.has(v.id),
+      contractorId: v.contractorId,
+      conversationId: latestThread.get(`${v.developerId}:${v.contractorId}`) ?? null,
       sites: v.projectIds
         .map((id) => titleById.get(id))
         .filter((p) => p && p.contractorId === v.contractorId)

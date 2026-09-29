@@ -2,14 +2,18 @@
 
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { TRADE_TYPE_CATEGORIES, HOMEPAGE_TRADE_CATEGORIES } from '@/lib/trade-types';
+import VerifiedBadge from '@/components/VerifiedBadge';
 import ShortlistButton from '@/components/ShortlistButton';
+import BrowseFilterSheet from '@/components/BrowseFilterSheet';
+import BrowseCardSkeleton from '@/components/BrowseCardSkeleton';
+import BrowseLogo from '@/components/BrowseLogo';
 import { formatLocation, normalizeLocation } from '@/lib/location';
 
 type Contractor = {
@@ -21,6 +25,7 @@ type Contractor = {
   area: string;
   tradeTypes: string[];
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  reverifyPending: boolean;
   tier: 'LISTED' | 'PLUS' | 'PRO';
   yearsInBusiness: number | null;
   rating: number;
@@ -204,144 +209,245 @@ function BrowsePageInner() {
     });
 
     return result;
-  }, [contractors, selectedTrade, categoryParam, selectedCity, selectedArea, minExperience, minProjects, sortBy]);
+    // categoryTrades is safe as a dependency: it's an array straight out of
+    // the HOMEPAGE_TRADE_CATEGORIES constant, so it keeps the same identity
+    // between renders until the ?category= param actually changes.
+  }, [contractors, selectedTrade, categoryTrades, selectedCity, selectedArea, minExperience, minProjects, sortBy]);
 
-  const hasActiveFilters =
-    selectedTrade !== 'all' ||
-    !!categoryParam ||
-    selectedCity !== 'all' ||
-    selectedArea !== 'all' ||
-    minExperience > 0 ||
-    minProjects > 0;
+  // One number for the phone "Filters" button badge. Sort isn't counted:
+  // it reorders results rather than narrowing them, and it always has a
+  // value, so counting it would make the badge never read zero.
+  const activeFilterCount =
+    (selectedTrade !== 'all' ? 1 : 0) +
+    (categoryParam ? 1 : 0) +
+    (selectedCity !== 'all' ? 1 : 0) +
+    (selectedArea !== 'all' ? 1 : 0) +
+    (minExperience > 0 ? 1 : 0) +
+    (minProjects > 0 ? 1 : 0);
+  const hasActiveFilters = activeFilterCount > 0;
+
+  // Shared by the desktop bar's "Clear filters", the phone sheet's
+  // "Clear all" and the no-matches empty state's button, so all three
+  // clear exactly the same things.
+  function clearFilters() {
+    setSelectedTrade('all');
+    setSelectedCity('all');
+    setSelectedArea('all');
+    setMinExperience(0);
+    setMinProjects(0);
+    // categoryParam (and the initial selectedTrade value) come from the
+    // URL, not component state. Clearing just the state above left a
+    // homepage category link's ?category=... still applied after clicking
+    // "Clear filters", since the filter logic reads it straight from
+    // searchParams on every render regardless of component state.
+    // Actually navigating to the bare /browse URL is what clears it for
+    // real.
+    if (searchParams.toString()) {
+      router.replace('/browse');
+    }
+  }
+
+  // Phone filter sheet (KALM-059). closeSheet must be a stable function:
+  // BrowseFilterSheet's open/close effect depends on it, and a new
+  // function every render would re-run that effect (bouncing focus back
+  // to the Filters button) on every filter change.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const closeSheet = useCallback(() => setSheetOpen(false), []);
+  const filtersButtonRef = useRef<HTMLButtonElement>(null);
+
+  // The filter controls, rendered twice from the same state: inline in
+  // the desktop bar, and stacked (label above a full-width select) inside
+  // the phone sheet. Only one of the two is ever displayed at a time (the
+  // bar is `hidden md:flex`, the sheet `md:hidden`), so there's one set of
+  // controls on screen and one source of truth behind both.
+  function renderFilters(stacked: boolean) {
+    return (
+      <>
+        {/* Always rendered, even with only one trade (or one contractor)
+            listed: a filter that vanishes the moment there's little to
+            filter is more confusing than a single-option dropdown, and it
+            flickers in/out as contractors are added/removed. See #11. */}
+        <FilterSelect
+          stacked={stacked}
+          label="Trade"
+          value={selectedTrade}
+          onChange={setSelectedTrade}
+          options={[{ value: 'all', label: 'All trades' }]}
+          optgroups={tradeOptgroups}
+        />
+        <FilterSelect
+          stacked={stacked}
+          label="City"
+          value={selectedCity}
+          onChange={(v) => {
+            setSelectedCity(v);
+            // Area is scoped to city: switching city invalidates whatever
+            // area was selected under the old one.
+            setSelectedArea('all');
+          }}
+          options={[{ value: 'all', label: 'All cities' }, ...availableCities.map((c) => ({ value: c, label: c }))]}
+        />
+        <FilterSelect
+          stacked={stacked}
+          label="Area"
+          value={selectedArea}
+          onChange={setSelectedArea}
+          options={[{ value: 'all', label: 'All areas' }, ...availableAreas.map((a) => ({ value: a, label: a }))]}
+        />
+        <FilterSelect
+          stacked={stacked}
+          label="Min. experience"
+          value={String(minExperience)}
+          onChange={(v) => setMinExperience(Number(v))}
+          options={MIN_EXPERIENCE_OPTIONS.map((n) => ({
+            value: String(n),
+            label: n === 0 ? 'Any experience' : `${n}+ years`,
+          }))}
+        />
+        <FilterSelect
+          stacked={stacked}
+          label="Min. projects"
+          value={String(minProjects)}
+          onChange={(v) => setMinProjects(Number(v))}
+          options={MIN_PROJECTS_OPTIONS.map((n) => ({
+            value: String(n),
+            label: n === 0 ? 'Any' : `${n}+ projects listed`,
+          }))}
+        />
+      </>
+    );
+  }
+
+  function renderSort(stacked: boolean) {
+    return (
+      <FilterSelect
+        stacked={stacked}
+        label="Sort by"
+        value={sortBy}
+        onChange={(v) => setSortBy(v as SortOption)}
+        options={[
+          { value: 'experience', label: 'Most experience' },
+          { value: 'projects', label: 'Most projects' },
+          { value: 'location', label: 'Location (A to Z)' },
+        ]}
+      />
+    );
+  }
+
+  const resultCount = filteredContractors?.length ?? 0;
 
   return (
     <>
       <Nav />
 
       <header className="bg-paper text-ink border-b border-line pt-11 pb-10">
-        <div className="max-w-[1440px] mx-auto px-8">
+        <div className="max-w-[1440px] mx-auto px-5 sm:px-8">
           <h1 className="font-display font-light text-[clamp(28px,3.6vw,38px)]">
             Find your contractor
           </h1>
         </div>
       </header>
 
-      <main className="flex-1 max-w-[1440px] mx-auto px-8 py-10 w-full">
+      <main className="flex-1 max-w-[1440px] mx-auto px-5 sm:px-8 py-10 w-full">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-md p-4 mb-6">
+          <div role="alert" className="bg-danger-soft border border-danger text-danger text-sm rounded-md p-4 mb-6">
             {error}
           </div>
         )}
 
-        {!error && contractors === null && (
-          <p className="text-stone text-sm">Loading contractors…</p>
+        {!error && contractors === null && <BrowseCardSkeleton />}
+
+        {/* Empty state (a): nothing listed on the platform at all (KALM-063).
+            Filters are hidden here, since there's nothing to narrow and
+            "try different filters" would send people hunting for results
+            that don't exist. */}
+        {contractors !== null && contractors.length === 0 && (
+          <div className="border border-line rounded-md p-10 text-center bg-paper">
+            <p className="text-ink font-medium">No verified contractors yet. Check back soon.</p>
+          </div>
         )}
 
-        {contractors !== null && filteredContractors !== null && (
+        {contractors !== null && contractors.length > 0 && filteredContractors !== null && (
           <>
+            {/* Phones: one button that opens the filter sheet, instead of
+                the desktop bar wrapping into half a screen of selects. */}
+            <div className="md:hidden flex items-center justify-between gap-3 mb-6 pb-6 border-b border-line">
+              <button
+                ref={filtersButtonRef}
+                type="button"
+                onClick={() => setSheetOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={sheetOpen}
+                className="inline-flex items-center gap-2 text-sm px-4 py-2.5 rounded-md border border-line bg-paper text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+              >
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="min-w-5 h-5 px-1.5 rounded-full bg-ink text-paper text-[11px] font-medium inline-flex items-center justify-center">
+                    {activeFilterCount}
+                    <span className="sr-only"> active</span>
+                  </span>
+                )}
+              </button>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="text-[13px] text-stone hover:text-ink underline underline-offset-2"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
 
-            {/* Filter + sort bar */}
-            <div className="flex flex-wrap items-center gap-3 mb-6 pb-6 border-b border-line">
-              {/* Always rendered, even with only one trade (or one
-                  contractor) listed — a filter that vanishes the moment
-                  there's little to filter is more confusing than a
-                  single-option dropdown, and it flickers in/out as
-                  contractors are added/removed. See #11. */}
-              <FilterSelect
-                label="Trade"
-                value={selectedTrade}
-                onChange={setSelectedTrade}
-                options={[{ value: 'all', label: 'All trades' }]}
-                optgroups={tradeOptgroups}
-              />
-              <FilterSelect
-                label="City"
-                value={selectedCity}
-                onChange={(v) => {
-                  setSelectedCity(v);
-                  // Area is scoped to city — switching city invalidates
-                  // whatever area was selected under the old one.
-                  setSelectedArea('all');
-                }}
-                options={[{ value: 'all', label: 'All cities' }, ...availableCities.map((c) => ({ value: c, label: c }))]}
-              />
-              <FilterSelect
-                label="Area"
-                value={selectedArea}
-                onChange={setSelectedArea}
-                options={[{ value: 'all', label: 'All areas' }, ...availableAreas.map((a) => ({ value: a, label: a }))]}
-              />
-              <FilterSelect
-                label="Min. experience"
-                value={String(minExperience)}
-                onChange={(v) => setMinExperience(Number(v))}
-                options={MIN_EXPERIENCE_OPTIONS.map((n) => ({
-                  value: String(n),
-                  label: n === 0 ? 'Any experience' : `${n}+ years`,
-                }))}
-              />
-              <FilterSelect
-                label="Min. projects"
-                value={String(minProjects)}
-                onChange={(v) => setMinProjects(Number(v))}
-                options={MIN_PROJECTS_OPTIONS.map((n) => ({
-                  value: String(n),
-                  label: n === 0 ? 'Any' : `${n}+ projects listed`,
-                }))}
-              />
+            <BrowseFilterSheet
+              open={sheetOpen}
+              onClose={closeSheet}
+              triggerRef={filtersButtonRef}
+              resultCount={resultCount}
+              hasActiveFilters={hasActiveFilters}
+              onClearAll={clearFilters}
+            >
+              {renderFilters(true)}
+              {renderSort(true)}
+            </BrowseFilterSheet>
+
+            {/* Desktop: the inline filter + sort bar. */}
+            <div className="hidden md:flex flex-wrap items-center gap-3 mb-6 pb-6 border-b border-line">
+              {renderFilters(false)}
 
               {hasActiveFilters && (
                 <button
-                  onClick={() => {
-                    setSelectedTrade('all');
-                    setSelectedCity('all');
-                    setSelectedArea('all');
-                    setMinExperience(0);
-                    setMinProjects(0);
-                    // categoryParam (and the initial selectedTrade value)
-                    // come from the URL, not component state — clearing
-                    // just the state above left a homepage category link's
-                    // ?category=... still applied after clicking "Clear
-                    // filters", since the filter logic reads it straight
-                    // from searchParams on every render regardless of
-                    // component state. Actually navigating to the bare
-                    // /browse URL is what clears it for real.
-                    if (searchParams.toString()) {
-                      router.replace('/browse');
-                    }
-                  }}
+                  type="button"
+                  onClick={clearFilters}
                   className="text-[13px] text-stone hover:text-ink underline underline-offset-2"
                 >
                   Clear filters
                 </button>
               )}
 
-              <div className="ml-auto">
-                <FilterSelect
-                  label="Sort by"
-                  value={sortBy}
-                  onChange={(v) => setSortBy(v as SortOption)}
-                  options={[
-                    { value: 'experience', label: 'Most experience' },
-                    { value: 'projects', label: 'Most projects' },
-                    { value: 'location', label: 'Location (A–Z)' },
-                  ]}
-                />
-              </div>
+              <div className="ml-auto">{renderSort(false)}</div>
             </div>
 
-            <p className="text-sm text-stone mb-6">
-              {filteredContractors.length === 0
-                ? 'No contractors match these filters yet.'
-                : `${filteredContractors.length} verified contractor${filteredContractors.length === 1 ? '' : 's'}`}
+            {/* aria-live so a screen reader hears the new count after each
+                filter change, without having to go looking for it. */}
+            <p className="text-sm text-stone mb-6" aria-live="polite">
+              {resultCount === 0
+                ? 'No matches'
+                : `${resultCount} verified contractor${resultCount === 1 ? '' : 's'}`}
             </p>
 
-            {filteredContractors.length === 0 ? (
+            {/* Empty state (b): contractors exist, the filters just exclude
+                all of them (KALM-063). The way out is one obvious button. */}
+            {resultCount === 0 ? (
               <div className="border border-line rounded-md p-10 text-center bg-paper">
-                <p className="text-stone font-medium mb-1">No contractors listed yet</p>
-                <p className="text-sm text-stone">
-                  Try different filters, or check back soon as more contractors are added.
-                </p>
+                <p className="text-ink font-medium mb-4">No contractors match these filters.</p>
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="text-sm font-medium px-5 py-2.5 rounded-md bg-ink text-paper focus:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+                >
+                  Clear filters
+                </button>
               </div>
             ) : (
               <div className="flex flex-col gap-4">
@@ -352,21 +458,29 @@ function BrowsePageInner() {
                     className="block bg-paper border border-line rounded-md p-6 shadow-[0_2px_12px_-4px_rgba(28,30,34,0.06)] hover:shadow-[0_8px_28px_-8px_rgba(28,30,34,0.14)] hover:-translate-y-0.5 hover:border-ink transition-all"
                   >
                     <div className="flex items-start gap-4">
-                      <div className="w-14 h-14 rounded-lg bg-ink text-paper font-display text-lg flex items-center justify-center shrink-0 overflow-hidden">
-                        {c.logoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- external Blob URL
-                          <img src={c.logoUrl} alt={`${c.name} logo`} className="w-full h-full object-cover" />
-                        ) : (
-                          c.name.slice(0, 2).toUpperCase()
-                        )}
-                      </div>
+                      <BrowseLogo name={c.name} logoUrl={c.logoUrl} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <div className="flex items-center gap-2.5 flex-wrap">
                             <span className="font-display text-lg">{c.name}</span>
-                            {c.verificationStatus === 'VERIFIED' && (
-                              <span className="inline-flex items-center gap-1.5 text-[11px] text-sage bg-sage-soft border border-sage/25 rounded-full px-2.5 py-1">
-                                ✓ Verified
+                            {c.verificationStatus === 'VERIFIED' && <VerifiedBadge reviewPending={c.reverifyPending} />}
+                            {/* KALM-071: PLUS and PRO contractors are ranked
+                                above free listings (see the tier sort
+                                above), so say so on the card. One honest
+                                label for both paid tiers rather than
+                                "Plus"/"Pro" tier names, which read like a
+                                quality grade rather than a paid placement.
+                                The title is a hover tooltip; the sr-only
+                                text gives screen readers the same
+                                explanation, since title isn't reliably
+                                announced. */}
+                            {(c.tier === 'PLUS' || c.tier === 'PRO') && (
+                              <span
+                                title="Paid listing. Shown higher in results."
+                                className="inline-flex items-center text-[11px] text-stone bg-paper-dim border border-line rounded-full px-2.5 py-1"
+                              >
+                                Promoted
+                                <span className="sr-only">: paid listing, shown higher in results</span>
                               </span>
                             )}
                           </div>
@@ -376,7 +490,9 @@ function BrowsePageInner() {
                           />
                         </div>
                         <p className="text-sm text-stone mb-3">
-                          📍 {formatLocation(c.area, c.city)}
+                          <span aria-hidden="true">📍 </span>
+                          <span className="sr-only">Location: </span>
+                          {formatLocation(c.area, c.city)}
                           {c.yearsInBusiness ? ` · ${c.yearsInBusiness}+ years` : ''}
                         </p>
                         <div className="flex gap-1.5 flex-wrap mb-3">
@@ -392,11 +508,21 @@ function BrowsePageInner() {
                             <span className="text-xs text-stone">Projects listed</span>
                           </div>
                           {c.reviewCount > 0 && (
+                            // KALM-067: the visual "4.5 ★ / 12 reviews"
+                            // pair is hidden from screen readers, which
+                            // would read it as "4.5 black star 12
+                            // reviews"; one plain sentence replaces it.
                             <div>
-                              <span className="font-medium block">
-                                {c.rating.toFixed(1)} ★
+                              <span aria-hidden="true">
+                                <span className="font-medium block">{c.rating.toFixed(1)} ★</span>
+                                <span className="text-xs text-stone">
+                                  {c.reviewCount} review{c.reviewCount === 1 ? '' : 's'}
+                                </span>
                               </span>
-                              <span className="text-xs text-stone">{c.reviewCount} reviews</span>
+                              <span className="sr-only">
+                                Rated {c.rating.toFixed(1)} out of 5 from {c.reviewCount} review
+                                {c.reviewCount === 1 ? '' : 's'}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -421,29 +547,40 @@ function FilterSelect({
   onChange,
   options,
   optgroups,
+  stacked = false,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  // Flat option list — used by every existing filter (location, min
-  // experience, min projects, sort). Left as the default/simple path so
-  // none of those callers need to change.
+  // Flat option list, used by every filter except trade (location, min
+  // experience, min projects, sort).
   options?: { value: string; label: string }[];
-  // Grouped option list, rendered as <optgroup> sections — added for the
+  // Grouped option list, rendered as <optgroup> sections: added for the
   // trade filter specifically, since the 90-item closed trade taxonomy
   // (see src/lib/trade-types.ts) made a flat alphabetical list of
   // whatever trades happen to be in use unreadable once even one
-  // contractor with many trades was added. Exactly one of `options` or
-  // `optgroups` should be passed, not both.
+  // contractor with many trades was added. The trade filter passes both:
+  // `options` for the leading "All trades" entry, `optgroups` for the rest.
   optgroups?: { label: string; options: { value: string; label: string }[] }[];
+  // Label above a full-width select, for the phone filter sheet, instead
+  // of the desktop bar's label-beside-select row. The larger text there
+  // also keeps iOS Safari from zooming the page when a select is tapped
+  // (it zooms on form controls under 16px).
+  stacked?: boolean;
 }) {
   return (
-    <label className="flex items-center gap-2 text-[13px] text-stone">
+    <label
+      className={
+        stacked
+          ? 'flex flex-col gap-1.5 text-[13px] text-stone'
+          : 'flex items-center gap-2 text-[13px] text-stone'
+      }
+    >
       {label}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="text-[13px] px-3 py-2 rounded-md border border-line bg-paper text-ink focus:outline-none focus:ring-2 focus:ring-ink cursor-pointer"
+        className={`${stacked ? 'w-full text-base py-2.5' : 'text-[13px] py-2'} px-3 rounded-md border border-line bg-paper text-ink focus:outline-none focus:ring-2 focus:ring-ink cursor-pointer`}
       >
         {options?.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -464,9 +601,18 @@ function FilterSelect({
   );
 }
 
+// The Suspense fallback (shown while useSearchParams resolves) is the
+// same card skeleton the page shows while contractors load, rather than
+// a blank screen, so the two loading phases look like one.
 export default function BrowsePage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense
+      fallback={
+        <main className="flex-1 max-w-[1440px] mx-auto px-5 sm:px-8 py-10 w-full">
+          <BrowseCardSkeleton />
+        </main>
+      }
+    >
       <BrowsePageInner />
     </Suspense>
   );

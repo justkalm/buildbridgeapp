@@ -31,7 +31,21 @@ type ContractorRow = {
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
   tier: 'LISTED' | 'PLUS' | 'PRO';
   licenseNumber: string;
+  // A Verified contractor changed a checked detail and is waiting for a
+  // re-check (they stay listed as "Verified · update in review").
+  reverifyPending: boolean;
+  reverifyFields: string[];
   _count: { projects: number; quoteRequests: number };
+};
+
+// Admin-facing names for the fields in reverifyFields (the keys match
+// CREDENTIAL_FIELDS in src/app/api/contractors/me/route.ts).
+const REVERIFY_FIELD_LABELS: Record<string, string> = {
+  city: 'city',
+  area: 'area',
+  phone: 'phone',
+  gstRegistered: 'GST registration',
+  tradeTypes: 'trades',
 };
 
 type ProjectRow = {
@@ -46,7 +60,7 @@ type ProjectRow = {
 const statusStyle: Record<ContractorRow['verificationStatus'], string> = {
   VERIFIED: 'bg-sage-soft text-sage',
   PENDING: 'bg-paper-dim text-stone',
-  REJECTED: 'bg-red-50 text-red-600',
+  REJECTED: 'bg-danger-soft text-danger',
 };
 
 export default function AdminContractorsPage() {
@@ -167,8 +181,13 @@ export default function AdminContractorsPage() {
   ) {
     const previous = contractor.verificationStatus;
     // Update optimistically so the dropdown feels instant; roll back on failure.
+    // Setting any status also answers a pending re-check (see the PATCH route).
     setContractors((prev) =>
-      prev ? prev.map((c) => (c.id === contractor.id ? { ...c, verificationStatus } : c)) : prev
+      prev
+        ? prev.map((c) =>
+            c.id === contractor.id ? { ...c, verificationStatus, reverifyPending: false, reverifyFields: [] } : c
+          )
+        : prev
     );
 
     try {
@@ -198,6 +217,28 @@ export default function AdminContractorsPage() {
   // already-Verified contractor back to PENDING if their license changes,
   // so the row is replaced with the server's copy rather than patched
   // optimistically.
+  // The contractor's changed details check out: clear the "update in
+  // review" note and re-stamp their verification date.
+  async function handleConfirmReverify(contractor: ContractorRow) {
+    try {
+      const res = await fetch(`/api/admin/contractors/${contractor.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmReverification: true }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error ?? 'Failed to confirm');
+        return;
+      }
+      setContractors((prev) =>
+        prev ? prev.map((c) => (c.id === contractor.id ? { ...c, ...data.contractor } : c)) : prev
+      );
+    } catch {
+      alert('Failed to confirm. Please try again.');
+    }
+  }
+
   async function handleLicenseEdit(contractor: ContractorRow) {
     const current = isPlaceholderLicense(contractor.licenseNumber) ? '' : contractor.licenseNumber;
     const input = window.prompt(`License number for ${contractor.name}:`, current);
@@ -271,7 +312,7 @@ export default function AdminContractorsPage() {
         </p>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-md p-4 mb-6">
+          <div className="bg-danger-soft border border-danger/30 text-danger text-sm rounded-md p-4 mb-6">
             {error}
           </div>
         )}
@@ -322,7 +363,7 @@ export default function AdminContractorsPage() {
                     <td className="px-4 py-4">
                       <div className="font-medium">{c.name}</div>
                       {placeholderLicense ? (
-                        <div className="text-xs text-red-600 font-medium">
+                        <div className="text-xs text-danger font-medium">
                           No license on file{' '}
                           <button
                             onClick={() => handleLicenseEdit(c)}
@@ -347,7 +388,7 @@ export default function AdminContractorsPage() {
                     <td className="px-4 py-4 text-stone">
                       {missingLocation ? (
                         <span
-                          className="text-xs text-red-600 font-medium"
+                          className="text-xs text-danger font-medium"
                           title="City or area is blank. The contractor adds it in their profile."
                         >
                           No location
@@ -374,6 +415,20 @@ export default function AdminContractorsPage() {
                         </option>
                         <option value="REJECTED">REJECTED</option>
                       </select>
+                      {c.reverifyPending && (
+                        <div className="mt-1.5 text-[11px] leading-snug">
+                          <p className="text-danger font-medium">
+                            Re-check:{' '}
+                            {c.reverifyFields.map((f) => REVERIFY_FIELD_LABELS[f] ?? f).join(', ') || 'details'} changed
+                          </p>
+                          <button
+                            onClick={() => handleConfirmReverify(c)}
+                            className="underline underline-offset-2 text-stone hover:text-ink"
+                          >
+                            Confirm, still verified
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-4">
                       <select
@@ -399,7 +454,7 @@ export default function AdminContractorsPage() {
                       <button
                         onClick={() => handleDelete(c)}
                         disabled={deletingId === c.id}
-                        className="text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
+                        className="text-xs font-medium text-danger hover:text-ink disabled:opacity-50"
                       >
                         {deletingId === c.id ? 'Deleting…' : 'Delete'}
                       </button>
@@ -425,7 +480,7 @@ export default function AdminContractorsPage() {
                                   </div>
                                   {p.reviewRating ? (
                                     <div className="flex gap-2 items-center">
-                                      <span className="text-sage text-sm">{'★'.repeat(p.reviewRating)}</span>
+                                      <span className="text-sage text-sm" aria-label={`${p.reviewRating} out of 5 stars`} role="img">{'★'.repeat(p.reviewRating)}</span>
                                       <button
                                         onClick={() => startReview(p)}
                                         className="text-xs text-stone hover:text-ink underline underline-offset-2"
@@ -434,7 +489,7 @@ export default function AdminContractorsPage() {
                                       </button>
                                       <button
                                         onClick={() => clearReview(c.id, p.id)}
-                                        className="text-xs text-stone hover:text-red-600 underline underline-offset-2"
+                                        className="text-xs text-stone hover:text-danger underline underline-offset-2"
                                       >
                                         Remove
                                       </button>

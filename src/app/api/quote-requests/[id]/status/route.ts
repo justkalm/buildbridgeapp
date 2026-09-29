@@ -25,6 +25,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { getQuoteRequestParty } from '@/lib/quote-request-access';
 import { canTransition, developerStatusLabel } from '@/lib/quote-status';
 import { sendQuoteStatusEmail } from '@/lib/email';
+import { sendPush } from '@/lib/push';
 
 const statusSchema = z.object({
   status: z.enum(['CONTACTED', 'QUOTED', 'DECLINED']),
@@ -59,14 +60,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const current = await prisma.quoteRequest.findUnique({
     where: { id },
     select: {
+      kind: true,
       status: true,
       projectType: true,
+      developerId: true,
       contractor: { select: { name: true } },
       developer: { select: { name: true, email: true } },
     },
   });
   if (!current) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  // Enquiries and project conversations are chats, not quote requests, so
+  // they have no Accept / Quote sent / Decline status.
+  if (current.kind !== 'QUOTE') {
+    return NextResponse.json({ error: 'Only quote requests have a status.' }, { status: 400 });
   }
 
   if (!canTransition(current.status, next)) {
@@ -89,6 +98,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const baseUrl = process.env.NEXTAUTH_URL ?? '';
+  // Phone/browser notification alongside the email (owner's rule: every
+  // notification goes by email and in the app). Never throws.
+  await sendPush('DEVELOPER', current.developerId, {
+    title: `${current.contractor.name}: ${developerStatusLabel[next]}`,
+    body: `Your quote request for ${current.projectType}`,
+    url: '/dashboard',
+    tag: `quote-status-${id}`,
+  });
+
   const emailSent = await sendQuoteStatusEmail({
     toEmail: current.developer.email,
     toName: current.developer.name,

@@ -1,7 +1,9 @@
 // src/app/dashboard/page.tsx
 //
 // Developer home: shortlist (with private notes + compare table) and every
-// quote request they've sent, with its status and in-app thread.
+// quote request they've sent, with its status and a link to its conversation
+// in Messages (/messages/{id}). Requests are stacked cards below md and a
+// horizontally scrollable table from md up.
 //
 // Status wording comes from src/lib/quote-status.ts so it always matches
 // what the contractor's dashboard and the status-change email say.
@@ -14,16 +16,18 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
-import MessageThread from '@/components/MessageThread';
+import Skeleton from '@/components/Skeleton';
+import InstallAppPrompt from '@/components/InstallAppPrompt';
+import PushPrompt from '@/components/PushPrompt';
 import SiteVisitList from '@/components/SiteVisitList';
 import { developerStatusLabel, type QuoteStatus } from '@/lib/quote-status';
-import { useUnreadMessages } from '@/lib/use-unread-messages';
+import { announceNotificationsChanged, useUnreadMessages } from '@/lib/use-unread-messages';
 
 type QuoteRequestRow = {
   id: string;
@@ -33,6 +37,9 @@ type QuoteRequestRow = {
   statusUpdatedAt: string | null;
   createdAt: string;
   emailSentAt: string | null;
+  // Status changed since the developer last looked (see
+  // /api/quote-requests/mine). Shows a "New" label once.
+  isNew: boolean;
   contractor: { id: string; name: string; slug: string };
 };
 
@@ -68,7 +75,6 @@ export default function DashboardPage() {
   const { status, data: session } = useSession();
   const router = useRouter();
   const [requests, setRequests] = useState<QuoteRequestRow[] | null>(null);
-  const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
   const [shortlist, setShortlist] = useState<ShortlistedRow[] | null>(null);
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
@@ -102,7 +108,10 @@ export default function DashboardPage() {
     if (status !== 'authenticated') return;
     fetch('/api/quote-requests/mine')
       .then((res) => (res.ok ? res.json() : []))
-      .then(setRequests);
+      .then((rows: QuoteRequestRow[]) => {
+        setRequests(rows);
+        if (rows.some((r) => r.isNew)) announceNotificationsChanged();
+      });
     fetch('/api/developers/shortlist')
       .then((res) => (res.ok ? res.json() : []))
       .then(setShortlist);
@@ -164,7 +173,7 @@ export default function DashboardPage() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-[1440px] mx-auto px-8 py-10 w-full">
+      <main className="flex-1 max-w-[1440px] mx-auto px-5 sm:px-8 py-10 w-full">
         <div className="flex justify-between items-start flex-wrap gap-4 mb-9">
           <div>
             <h1 className="font-display font-light text-[28px] mb-1">Your dashboard</h1>
@@ -198,7 +207,7 @@ export default function DashboardPage() {
               </button>
             )}
             {resendState !== 'idle' && resendState !== 'sending' && resendState !== 'sent' && (
-              <p className="w-full text-xs text-red-600">{resendState}</p>
+              <p className="w-full text-xs text-danger">{resendState}</p>
             )}
           </div>
         )}
@@ -218,7 +227,7 @@ export default function DashboardPage() {
                     </Link>
                     <button
                       onClick={() => removeFromShortlist(s.contractor.id)}
-                      className="text-xs text-stone hover:text-red-600 transition-colors"
+                      className="text-xs text-stone hover:text-danger transition-colors"
                     >
                       Remove
                     </button>
@@ -265,7 +274,11 @@ export default function DashboardPage() {
             {shortlist.length >= 2 && (
               <>
                 <h3 className="font-display text-lg mb-3">Compare</h3>
-                <div className="bg-paper border border-line rounded-md overflow-hidden mb-10 overflow-x-auto">
+                {/* Outer box owns the rounded border and clips the corners; the
+                    inner box scrolls sideways on phones. One element doing both
+                    overflow-hidden and overflow-x-auto was redundant. */}
+                <div className="bg-paper border border-line rounded-md overflow-hidden mb-10">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-[11px] tracking-wider uppercase text-stone">
@@ -298,17 +311,26 @@ export default function DashboardPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </>
             )}
           </>
         )}
 
+        <InstallAppPrompt />
+        <PushPrompt />
+
         <SiteVisitList viewerRole="DEVELOPER" />
 
         <h2 className="font-display font-light text-xl mb-4">Your quote requests</h2>
         {requests === null ? (
-          <p className="text-sm text-stone">Loading…</p>
+          <div role="status" className="flex flex-col gap-3">
+            <span className="sr-only">Loading…</span>
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+          </div>
         ) : requests.length === 0 ? (
           <div className="border border-line rounded-md p-10 text-center bg-paper">
             <p className="text-stone font-medium mb-1">No quote requests yet</p>
@@ -318,82 +340,122 @@ export default function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="bg-paper border border-line rounded-md overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[11px] tracking-wider uppercase text-stone">
-                  <th className="px-4 py-3 border-b border-line">Contractor</th>
-                  <th className="px-4 py-3 border-b border-line">Project</th>
-                  <th className="px-4 py-3 border-b border-line">Sent</th>
-                  <th className="px-4 py-3 border-b border-line">Status</th>
-                  <th className="px-4 py-3 border-b border-line"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((r) => (
-                  <React.Fragment key={r.id}>
-                  <tr className="border-b border-line last:border-b-0">
-                    <td className="px-4 py-4">
-                      <Link href={`/contractors/${r.contractor.slug}`} className="font-medium hover:text-stone transition-colors">
-                        {r.contractor.name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-4 text-stone">
-                      {r.projectType} · {r.location}
-                    </td>
-                    <td className="px-4 py-4 text-stone">
-                      {new Date(r.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-4">
+          <>
+            <ul className="md:hidden flex flex-col gap-3">
+              {requests.map((r) => (
+                <li key={r.id} className="border border-line rounded-[6px] p-4 bg-paper">
+                  <div className="flex justify-between items-start gap-2 mb-1">
+                    <Link href={`/contractors/${r.contractor.slug}`} className="font-medium text-sm hover:text-stone transition-colors">
+                      {r.contractor.name}
+                    </Link>
+                    <span className="shrink-0">
+                      {r.isNew && (
+                        <span className="inline-block mr-1.5 text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-ink text-paper">
+                          New
+                        </span>
+                      )}
                       <span className={`inline-block text-[11.5px] font-medium px-2.5 py-1 rounded-full ${statusStyle[r.status]}`}>
                         {developerStatusLabel[r.status]}
                       </span>
-                      {r.statusUpdatedAt && (
-                        <p className="text-[11px] text-stone mt-1">
-                          Updated {new Date(r.statusUpdatedAt).toLocaleDateString()}
-                        </p>
-                      )}
-                      {!r.emailSentAt && (
-                        <p className="text-[11px] text-red-600 mt-1">
-                          Notification may not have been delivered
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <button
-                        onClick={() => setExpandedMessageId(expandedMessageId === r.id ? null : r.id)}
-                        className="text-xs text-stone underline underline-offset-2 hover:text-ink transition-colors"
-                      >
-                        Message
-                        {unread.byQuoteRequest[r.id] > 0 && (
-                          <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-ink text-paper text-[10.5px] font-semibold no-underline">
-                            {unread.byQuoteRequest[r.id]}
-                            <span className="sr-only"> unread</span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone">
+                    {r.projectType} · {r.location}
+                  </p>
+                  <p className="text-xs text-stone mt-0.5">Sent {new Date(r.createdAt).toLocaleDateString()}</p>
+                  {r.statusUpdatedAt && (
+                    <p className="text-[11px] text-stone mt-0.5">
+                      Updated {new Date(r.statusUpdatedAt).toLocaleDateString()}
+                    </p>
+                  )}
+                  {!r.emailSentAt && (
+                    <p className="text-[11px] text-danger mt-1">Notification may not have been delivered</p>
+                  )}
+                  <div className="mt-3">
+                    <ConversationLink id={r.id} count={unread.byQuoteRequest[r.id]} block />
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Wrapper scrolls sideways rather than clipping, so the last
+                column stays reachable on narrow tablets. */}
+            <div className="hidden md:block bg-paper border border-line rounded-md overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] tracking-wider uppercase text-stone">
+                    <th className="px-4 py-3 border-b border-line">Contractor</th>
+                    <th className="px-4 py-3 border-b border-line">Project</th>
+                    <th className="px-4 py-3 border-b border-line">Sent</th>
+                    <th className="px-4 py-3 border-b border-line">Status</th>
+                    <th className="px-4 py-3 border-b border-line"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((r) => (
+                    <tr key={r.id} className="border-b border-line last:border-b-0">
+                      <td className="px-4 py-4">
+                        <Link href={`/contractors/${r.contractor.slug}`} className="font-medium hover:text-stone transition-colors">
+                          {r.contractor.name}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-4 text-stone">
+                        {r.projectType} · {r.location}
+                      </td>
+                      <td className="px-4 py-4 text-stone">
+                        {new Date(r.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-4">
+                        {r.isNew && (
+                          <span className="inline-block mr-1.5 text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-ink text-paper">
+                            New
                           </span>
                         )}
-                      </button>
-                    </td>
-                  </tr>
-                  {expandedMessageId === r.id && (
-                    <tr className="border-b border-line last:border-b-0 bg-paper-dim/40">
-                      <td colSpan={5} className="px-4 py-4">
-                        <MessageThread
-                          quoteRequestId={r.id}
-                          viewerRole="DEVELOPER"
-                          startOpen
-                          onRead={() => unread.markRead(r.id)}
-                        />
+                        <span className={`inline-block text-[11.5px] font-medium px-2.5 py-1 rounded-full ${statusStyle[r.status]}`}>
+                          {developerStatusLabel[r.status]}
+                        </span>
+                        {r.statusUpdatedAt && (
+                          <p className="text-[11px] text-stone mt-1">
+                            Updated {new Date(r.statusUpdatedAt).toLocaleDateString()}
+                          </p>
+                        )}
+                        {!r.emailSentAt && (
+                          <p className="text-[11px] text-danger mt-1">
+                            Notification may not have been delivered
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-right whitespace-nowrap">
+                        <ConversationLink id={r.id} count={unread.byQuoteRequest[r.id]} />
                       </td>
                     </tr>
-                  )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </main>
       <Footer />
     </>
+  );
+}
+
+// "Open conversation" link to the request's thread in Messages, with the
+// unread count badge from useUnreadMessages next to it.
+function ConversationLink({ id, count, block }: { id: string; count?: number; block?: boolean }) {
+  return (
+    <Link
+      href={`/messages/${id}`}
+      className={`${block ? 'flex w-full justify-center' : 'inline-flex'} items-center gap-2 text-xs font-medium px-4 py-2 rounded-full border border-line text-ink hover:border-ink transition-colors`}
+    >
+      Open conversation
+      {count !== undefined && count > 0 && (
+        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-ink text-paper text-[10.5px] font-semibold">
+          {count}
+          <span className="sr-only"> unread</span>
+        </span>
+      )}
+    </Link>
   );
 }

@@ -82,3 +82,23 @@ export async function getQuoteRequestParty(quoteRequestId: string): Promise<Quot
 
   return null;
 }
+
+// Ids of this contractor's CURRENT-month leads that are blurred for them
+// (LISTED tier, over the monthly cap). Empty for PLUS/PRO. Used by list
+// views (the Messages inbox, unread counts) that need the same answer as
+// getQuoteRequestParty for many threads at once without a query each.
+export async function blurredLeadIdsFor(contractorId: string): Promise<Set<string>> {
+  const contractor = await prisma.contractor.findUnique({
+    where: { id: contractorId },
+    select: { tier: true },
+  });
+  if (!contractor || contractor.tier !== 'LISTED') return new Set();
+  const monthStart = getMonthStart();
+  const thisMonth = await prisma.quoteRequest.findMany({
+    where: { contractorId, createdAt: { gte: monthStart } },
+    select: { id: true, createdAt: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  const visibility = computeLeadVisibility(contractor.tier, thisMonth);
+  return new Set(thisMonth.filter((r) => visibility.get(r.id) !== 'full').map((r) => r.id));
+}

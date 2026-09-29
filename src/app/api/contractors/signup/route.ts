@@ -55,6 +55,7 @@ import { sendVerificationEmail, sendClaimAccountEmail } from '@/lib/email';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { newPasswordSchema, refinePasswordNotEmail } from '@/lib/password-policy';
 import { normalizeLocation } from '@/lib/location';
+import { uniqueContractorSlug } from '@/lib/slugify';
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(200),
@@ -73,14 +74,6 @@ const GENERIC_CLAIM_RESPONSE = {
   message:
     'This email is already listed. If you own it, check your inbox for a link to set up dashboard access.',
 };
-
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -159,13 +152,9 @@ export async function POST(req: NextRequest) {
   const emailVerifyToken = crypto.randomBytes(32).toString('hex');
   const emailVerifyTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
-  const baseSlug = slugify(name) || 'contractor';
-  let slug = baseSlug;
-  let suffix = 1;
-  while (await prisma.contractor.findUnique({ where: { slug } })) {
-    suffix += 1;
-    slug = `${baseSlug}-${suffix}`;
-  }
+  // Shared with the admin create route (src/lib/slugify.ts): never empty,
+  // collision-safe.
+  const slug = await uniqueContractorSlug(name, prisma);
 
   const contractor = await prisma.contractor.create({
     data: {

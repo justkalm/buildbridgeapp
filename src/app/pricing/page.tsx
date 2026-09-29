@@ -63,7 +63,7 @@ export default function PricingPage() {
     <>
       <Nav />
       <main className="flex-1 w-full">
-        <section className="py-20 px-8 text-center border-b border-line">
+        <section className="py-20 px-5 sm:px-8 text-center border-b border-line">
           <h1 className="font-display font-light text-[clamp(32px,4vw,46px)] text-ink mb-4">
             Simple pricing, real leads.
           </h1>
@@ -73,7 +73,7 @@ export default function PricingPage() {
           <p className="text-xs text-stone/70 mt-4">Pricing shown is introductory and may change.</p>
         </section>
 
-        <section className="py-16 px-8">
+        <section className="py-16 px-5 sm:px-8">
           <div className="max-w-[1080px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
             {TIERS.map((tier) => (
               <div
@@ -139,7 +139,7 @@ export default function PricingPage() {
           </div>
         </section>
 
-        <section className="py-16 px-8 border-t border-line">
+        <section className="py-16 px-5 sm:px-8 border-t border-line">
           <div className="max-w-[640px] mx-auto text-center">
             <h2 className="font-display font-light text-2xl text-ink mb-3">Questions about a plan?</h2>
             <p className="text-sm text-stone mb-6">

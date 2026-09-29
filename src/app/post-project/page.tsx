@@ -101,7 +101,7 @@ export default function PostProjectPage() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-[560px] mx-auto px-8 py-12 w-full">
+      <main className="flex-1 max-w-[560px] mx-auto px-5 sm:px-8 py-12 w-full">
         <h1 className="font-display font-light text-[28px] mb-2">Post a project</h1>
         <p className="text-stone text-sm mb-8">
           Tell us what you need. We&apos;ll review it and connect you with the right contractor
@@ -179,7 +179,7 @@ export default function PostProjectPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-red-600">
+              <p className="text-sm text-danger">
                 {error}
                 {needsVerification && (
                   <>

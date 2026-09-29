@@ -74,6 +74,18 @@ model Contractor {
   verificationStatus VerificationStatus  @default(PENDING)
   verifiedAt         DateTime?
 
+  // Re-verification without going offline. When a VERIFIED contractor
+  // changes a checked detail (see CREDENTIAL_FIELDS in
+  // src/app/api/contractors/me/route.ts), they stay VERIFIED and listed,
+  // but reverifyPending is set and the public badge reads "Verified ·
+  // update in review" until admin re-checks the new detail and confirms
+  // (or downgrades them). reverifyFields names what changed, for admin.
+  // The owner's call: editing must never take a listing offline, and the
+  // badge must stay honest about what has actually been checked.
+  reverifyPending     Boolean   @default(false)
+  reverifyRequestedAt DateTime?
+  reverifyFields      String[]  @default([])
+
   // Paid tier — see ContractorTier comment above. Defaults to free for
   // everyone during the trial period.
   tier ContractorTier @default(LISTED)
@@ -266,8 +278,36 @@ enum QuoteRequestStatus {
   DECLINED
 }
 
+// QUOTE: a real quote request from the contractor's profile form.
+// ENQUIRY: a developer's direct question ("Message" on a profile) with no
+// quote request behind it. Modelled as a QuoteRequest of a different kind
+// rather than a separate Conversation table so that everything built
+// around QuoteRequest (lead-cap visibility, access checks, read tracking,
+// unread counts, notifications) applies to enquiries unchanged. Enquiries
+// only appear in Messages; quote-request lists, status buttons and the
+// admin quote email are for kind QUOTE only. An enquiry DOES count as a
+// lead toward a LISTED contractor's monthly cap, like any other lead.
+//
+// PROJECT: a conversation a contractor started from a project alert (admin
+// matched a developer's posted project to them; see ProjectPostAlert).
+// The one case where a contractor may start a conversation: the developer
+// asked to be connected by posting the project, and admin chose this
+// contractor. projectPostId links it back to the post, so there's at most
+// one per contractor per post and admin can see who reached out.
+enum QuoteRequestKind {
+  QUOTE
+  ENQUIRY
+  PROJECT
+}
+
 model QuoteRequest {
   id String @id @default(cuid())
+
+  kind QuoteRequestKind @default(QUOTE)
+
+  // Set only for kind PROJECT: the posted project this conversation is about.
+  projectPostId String?
+  projectPost   ProjectPost? @relation(fields: [projectPostId], references: [id], onDelete: SetNull)
 
   contractorId String
   contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
@@ -287,6 +327,15 @@ model QuoteRequest {
   emailSentAt DateTime? // null if the notification email failed — lets you spot silently-dropped requests
 
   messages Message[]
+
+  // In-app "New" labels and the Nav badge for the request itself (the
+  // thread has its own read tracking below). contractorSeenAt: when the
+  // contractor last saw this request on their dashboard; a request with
+  // no contractorSeenAt is new to them. developerStatusSeenAt: when the
+  // developer last saw its status; a statusUpdatedAt after that is new
+  // to them. Emails still go out as well; see src/lib/email.ts.
+  contractorSeenAt     DateTime?
+  developerStatusSeenAt DateTime?
 
   // Unread tracking for the in-app thread, one pair of fields per side
   // (there are only ever two parties, so this is simpler than a separate
@@ -308,6 +357,7 @@ model QuoteRequest {
   @@index([contractorId])
   @@index([developerId])
   @@index([status])
+  @@index([projectPostId])
 }
 
 // ---------------------------------------------------------------------------
@@ -345,7 +395,8 @@ model ProjectPost {
 
   emailSentAt DateTime? // the "admin was notified" email, not a contractor alert
 
-  alerts ProjectPostAlert[]
+  alerts        ProjectPostAlert[]
+  conversations QuoteRequest[] // contractors who messaged the developer from an alert (kind PROJECT)
 
   createdAt DateTime @default(now())
 
@@ -372,6 +423,10 @@ model ProjectPostAlert {
   // visible at the same moment — there's no separate "seen" state yet,
   // this timestamp IS what makes it show in the contractor's dashboard).
   alertedAt DateTime @default(now())
+
+  // When the contractor first saw this alert on their dashboard; null
+  // means it's new (shows a "New" label and counts toward the Nav badge).
+  seenAt DateTime?
 
   // A contractor can be alerted about the same project more than once in
   // theory (admin re-sends), so this is NOT unique on
@@ -520,4 +575,31 @@ model SiteVisit {
   @@index([developerId])
   @@index([contractorId])
   @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// PushSubscription
+// ---------------------------------------------------------------------------
+// One browser or phone that a developer or contractor has allowed to show
+// (kalm) notifications ("Turn on notifications"). The endpoint, p256dh and
+// auth values come straight from the browser's PushSubscription and are
+// what src/lib/push.ts needs to deliver a notification to that device.
+// A person can have several (phone + laptop). Rows whose endpoint the push
+// service reports as gone (HTTP 404/410) are deleted on the next send.
+// Polymorphic owner (role + id) rather than two nullable foreign keys, same
+// reasoning as Message.senderRole.
+model PushSubscription {
+  id String @id @default(cuid())
+
+  ownerRole MessageSenderRole
+  ownerId   String
+
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+
+  @@index([ownerRole, ownerId])
 }

@@ -42,19 +42,19 @@ export default function AboutPage() {
       <Nav />
 
       <header className="pt-28 pb-20 text-center">
-        <div className="max-w-[680px] mx-auto px-8">
+        <div className="max-w-[680px] mx-auto px-5 sm:px-8">
           <h1 className="font-display font-light text-[clamp(32px,4vw,46px)] leading-[1.15] text-ink mb-6">
             Built by people tired of the old way.
           </h1>
           <p className="text-[17px] leading-relaxed text-stone max-w-[480px] mx-auto">
             (kalm) exists to make finding a contractor as straightforward as it should&apos;ve
-            always been: verified profiles, real project history, no middleman on the deal.
+            always been: contractors whose documents and GSTIN we check, project history with photos, timelines and sizes, and no middleman on the deal.
           </p>
         </div>
       </header>
 
       <section className="py-24 border-t border-line">
-        <div className="max-w-[880px] mx-auto px-8">
+        <div className="max-w-[880px] mx-auto px-5 sm:px-8">
           <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-center text-ink mb-16">
             Meet the founders.
           </h2>
