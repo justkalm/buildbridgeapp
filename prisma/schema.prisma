@@ -598,6 +598,15 @@ model PushSubscription {
   p256dh   String
   auth     String
 
+  // Which website this device signed up on, e.g. "https://kalm.in" or
+  // "http://localhost:3000". The local dev site and the live site share
+  // one database, so without this a live notification could be sent to a
+  // device registered on the laptop's dev site (showing "localhost" and
+  // opening a page that isn't running). Each site only notifies devices
+  // with its own origin; see src/lib/push.ts. Null for rows created
+  // before this column existed.
+  origin String?
+
   createdAt  DateTime @default(now())
   lastUsedAt DateTime?
 

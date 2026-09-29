@@ -19,6 +19,13 @@
 //
 // iPhone note: Safari only allows web push for sites the user has added to
 // their Home Screen (iOS 16.4+); see src/app/manifest.ts.
+//
+// Dev vs live: the laptop's dev site and the live site share one database,
+// so each subscription records the origin it was created on, and each
+// running site only notifies its own kind: the live site (production build)
+// skips devices registered on localhost / a LAN address, and the dev site
+// skips live devices. Otherwise a live message could pop up as a
+// "localhost" notification that opens a page that isn't running.
 
 import webpush from 'web-push';
 import { prisma } from '@/lib/prisma';
@@ -49,6 +56,27 @@ function ensureConfigured(): boolean {
   return true;
 }
 
+// localhost, 127.x, private LAN ranges, *.local, or any plain-http origin.
+function isDevOrigin(origin: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(origin);
+    return (
+      protocol === 'http:' ||
+      hostname === 'localhost' ||
+      hostname.endsWith('.local') ||
+      /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function belongsToThisSite(origin: string | null): boolean {
+  if (!origin) return false; // pre-origin rows; they re-register with an origin on the next visit
+  const runningLive = process.env.NODE_ENV === 'production';
+  return runningLive ? !isDevOrigin(origin) : isDevOrigin(origin);
+}
+
 export async function sendPush(
   ownerRole: 'DEVELOPER' | 'CONTRACTOR',
   ownerId: string,
@@ -56,7 +84,9 @@ export async function sendPush(
 ): Promise<void> {
   try {
     if (!ensureConfigured()) return;
-    const subs = await prisma.pushSubscription.findMany({ where: { ownerRole, ownerId } });
+    const subs = (await prisma.pushSubscription.findMany({ where: { ownerRole, ownerId } })).filter((s) =>
+      belongsToThisSite(s.origin)
+    );
     if (subs.length === 0) {
       console.log(`Web push: no devices for ${ownerRole.toLowerCase()} ${ownerId}`);
       return;

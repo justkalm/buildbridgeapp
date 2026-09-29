@@ -51,10 +51,14 @@ export async function POST(req: Request) {
   }
   const { endpoint, keys } = parsed.data;
 
+  // Which website this device signed up on (see the origin comment on
+  // PushSubscription in schema.prisma).
+  const origin = new URL(req.url).origin;
+
   await prisma.pushSubscription.upsert({
     where: { endpoint },
-    create: { ...owner, endpoint, p256dh: keys.p256dh, auth: keys.auth },
-    update: { ...owner, p256dh: keys.p256dh, auth: keys.auth },
+    create: { ...owner, endpoint, p256dh: keys.p256dh, auth: keys.auth, origin },
+    update: { ...owner, p256dh: keys.p256dh, auth: keys.auth, origin },
   });
   return NextResponse.json({ ok: true });
 }
