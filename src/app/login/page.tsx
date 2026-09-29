@@ -120,7 +120,11 @@ export default function LoginPage() {
           <p className="text-sm text-stone mt-6 text-center">
             Don&apos;t have an account?{' '}
             <Link href="/signup" className="text-ink font-medium">
-              Sign up
+              Sign up as a developer
+            </Link>{' '}
+            or{' '}
+            <Link href="/contractor/signup" className="text-ink font-medium">
+              list your business
             </Link>
           </p>
         </div>

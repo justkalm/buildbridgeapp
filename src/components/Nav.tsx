@@ -157,7 +157,7 @@ export default function Nav() {
                 href="/signup"
                 className="inline-flex items-center justify-center text-sm px-5 py-2.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
               >
-                Get Started
+                Sign up as developer
               </Link>
             </>
           )}
@@ -245,7 +245,7 @@ export default function Nav() {
                   className="inline-flex items-center justify-center text-sm px-5 py-2.5 rounded-full bg-ink text-paper w-fit"
                   onClick={closeMobile}
                 >
-                  Get Started
+                  Sign up as developer
                 </Link>
               </>
             )}

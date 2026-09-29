@@ -64,8 +64,15 @@ export default function SignupPage() {
       <Nav />
       <main className="flex-1 flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-[420px]">
-          <h1 className="font-display font-light text-3xl mb-2">Create your account</h1>
-          <p className="text-stone text-sm mb-8">Sign up to browse contractors and request quotes.</p>
+          <h1 className="font-display font-light text-3xl mb-2">Sign up as a developer</h1>
+          <p className="text-stone text-sm mb-8">
+            Shortlist contractors, message them, visit their sites and request quotes.{' '}
+            Are you a contractor?{' '}
+            <Link href="/contractor/signup" className="text-ink underline underline-offset-2">
+              List your business instead
+            </Link>
+            .
+          </p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>

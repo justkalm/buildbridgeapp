@@ -34,7 +34,7 @@ export default function Home() {
               href="/signup"
               className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full border border-line text-ink hover:border-ink transition-colors"
             >
-              Get Started
+              Sign up as a developer
             </Link>
           </div>
           <p className="text-sm text-stone mt-6">
@@ -143,7 +143,7 @@ export default function Home() {
               href="/signup"
               className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full border border-line bg-paper text-ink hover:border-ink transition-colors"
             >
-              Create an account
+              Sign up as a developer
             </Link>
           </div>
         </div>

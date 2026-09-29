@@ -249,6 +249,12 @@ export default function ContractorSignupPage() {
               Sign in
             </Link>
           </p>
+          <p className="text-sm text-stone mt-2 text-center">
+            Looking to hire a contractor?{' '}
+            <Link href="/signup" className="text-ink font-medium">
+              Sign up as a developer
+            </Link>
+          </p>
         </div>
       </main>
       <Footer />
