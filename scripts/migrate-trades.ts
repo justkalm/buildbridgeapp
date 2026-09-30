@@ -16,7 +16,7 @@
 
 import 'dotenv/config';
 import { prisma } from '../src/lib/prisma';
-import { isValidTradeType } from '../src/lib/trade-types';
+import { ALL_SPECIALITIES, isValidTradeType } from '../src/lib/trade-types';
 
 const MAP: Record<string, string[]> = {
   // Old 8-category list
@@ -122,6 +122,12 @@ for (const [from, to] of Object.entries(MAP)) {
   }
 }
 
+// Old values are matched regardless of capitals and spacing ("RCC",
+// "rcc ", "Rcc" all find the same new home).
+const key = (v: string) => v.trim().replace(/\s+/g, ' ').toLowerCase();
+const MAP_BY_KEY = new Map<string, string[]>(Object.entries(MAP).map(([from, to]) => [key(from), to]));
+for (const sp of ALL_SPECIALITIES) if (!MAP_BY_KEY.has(key(sp))) MAP_BY_KEY.set(key(sp), [sp]);
+
 async function main() {
   const apply = process.argv.includes('--apply');
   const contractors = await prisma.contractor.findMany({
@@ -136,7 +142,7 @@ async function main() {
     const next: string[] = [];
     for (const value of c.tradeTypes) {
       if (isValidTradeType(value)) next.push(value);
-      else if (MAP[value]) next.push(...MAP[value]);
+      else if (MAP_BY_KEY.has(key(value))) next.push(...MAP_BY_KEY.get(key(value))!);
       else unmapped.set(value, (unmapped.get(value) ?? 0) + 1);
     }
     const deduped = Array.from(new Set(next));

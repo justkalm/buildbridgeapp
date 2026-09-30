@@ -76,8 +76,13 @@ export default function TradeTypePicker({ selected, onChange }: TradeTypePickerP
   function addOther(trade: string) {
     const text = (otherDrafts[trade] ?? '').trim();
     if (text.length < 2) return;
+    // May come back as a listed speciality (typed "sprinklers"), possibly
+    // under a different trade (typed "CCTV" under Fire): open that trade
+    // so the tick is visible where it belongs.
     const value = makeOtherSpeciality(trade, text);
-    if (!selected.includes(value)) onChange([...selected, value]);
+    const home = tradeOf(value);
+    if (home) setOpenTrades((prev) => new Set(prev).add(home));
+    if (!selected.some((v) => v.toLowerCase() === value.toLowerCase())) onChange([...selected, value]);
     setOtherDrafts((prev) => ({ ...prev, [trade]: '' }));
   }
 

@@ -362,8 +362,21 @@ const OTHER_PREFIX = 'Other|';
 export const MAX_OTHER_LENGTH = 60;
 export const MAX_OTHER_PER_CONTRACTOR = 5;
 
+const SPECIALITY_BY_LOWER = new Map<string, string>(ALL_SPECIALITIES.map((sp) => [sp.toLowerCase(), sp]));
+
+function tidyText(text: string): string {
+  const t = text.trim().replace(/\s+/g, ' ');
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+// What a contractor typed into "Something else?". If it's actually a listed
+// speciality in any capitals ("sprinklers", "SPRINKLERS"), the listed one is
+// used so they still show up under it; otherwise it's saved tidied (single
+// spaces, first letter capitalised).
 export function makeOtherSpeciality(trade: string, text: string): string {
-  return `${OTHER_PREFIX}${trade}|${text.trim().replace(/\s+/g, ' ')}`;
+  const listed = SPECIALITY_BY_LOWER.get(text.trim().replace(/\s+/g, ' ').toLowerCase());
+  if (listed) return listed;
+  return `${OTHER_PREFIX}${trade}|${tidyText(text)}`;
 }
 
 export function parseOtherSpeciality(value: string): { trade: string; text: string } | null {
@@ -376,6 +389,23 @@ export function parseOtherSpeciality(value: string): { trade: string; text: stri
 
 export function isOtherSpeciality(value: string): boolean {
   return parseOtherSpeciality(value) !== null;
+}
+
+// Tidies a whole list before it's saved (used by the API): typed-in
+// specialities go through makeOtherSpeciality again, and duplicates that
+// differ only in capitals ("Foam systems" / "foam Systems") are dropped.
+export function normalizeTradeTypes(values: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const other = parseOtherSpeciality(value);
+    const tidy = other ? makeOtherSpeciality(other.trade, other.text) : value;
+    const key = tidy.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(tidy);
+  }
+  return out;
 }
 
 // Server-side check for one stored value: a listed speciality, or a

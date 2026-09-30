@@ -12,7 +12,7 @@
 // Project.completedYear column still exists so older data isn't lost.
 
 import { z } from 'zod';
-import { isValidTradeType, isOtherSpeciality, MAX_OTHER_PER_CONTRACTOR } from '@/lib/trade-types';
+import { isValidTradeType, isOtherSpeciality, normalizeTradeTypes, MAX_OTHER_PER_CONTRACTOR } from '@/lib/trade-types';
 
 export function positiveWhole(field: string) {
   return z
@@ -79,7 +79,8 @@ export function teamSizeRangeError(
 // ---------------------------------------------------------------------------
 // Contractor trades (KALM-167): the speciality values TradeTypePicker
 // produces, shared by contractor signup, the self-service PATCH and the
-// admin add-contractor route. Duplicates are dropped; at most
+// admin add-contractor route. Tidied first (see normalizeTradeTypes:
+// typed-in specialities matched regardless of capitals, duplicates dropped); at most
 // MAX_OTHER_PER_CONTRACTOR typed-in ("Other") specialities.
 // ---------------------------------------------------------------------------
 
@@ -89,7 +90,7 @@ export function tradeTypesField() {
   return z
     .array(z.string().trim().min(1))
     .max(MAX_SPECIALITIES, `Pick up to ${MAX_SPECIALITIES} specialities`)
-    .transform((values) => Array.from(new Set(values)))
+    .transform(normalizeTradeTypes)
     .refine((values) => values.every(isValidTradeType), {
       message: 'One or more specialities are not in the list. Please pick again.',
     })
