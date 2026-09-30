@@ -50,6 +50,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { z } from 'zod';
+import { tradeTypesField } from '@/lib/project-validation';
 import { prisma } from '@/lib/prisma';
 import { sendVerificationEmail, sendClaimAccountEmail } from '@/lib/email';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
@@ -67,6 +68,12 @@ const signupSchema = z.object({
   // Required on both paths but only saved on FRESH; see file header.
   city: z.string().trim().min(1, 'City is required').max(100).transform(normalizeLocation),
   area: z.string().trim().min(1, 'Area is required').max(100).transform(normalizeLocation),
+  // KALM-167: trades are picked at signup so a new listing shows up under
+  // the right trade in Browse straight away. Like city/area, only saved on
+  // the FRESH path; a claimed profile keeps what admin entered.
+  tradeTypes: tradeTypesField().refine((types) => types.length > 0, {
+    message: 'Pick your trade and at least one speciality',
+  }),
 }).superRefine(refinePasswordNotEmail);
 
 const GENERIC_CLAIM_RESPONSE = {
@@ -99,7 +106,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, email, password, phone, city, area } = parsed.data;
+  const { name, email, password, phone, city, area, tradeTypes } = parsed.data;
   const normalizedEmail = email.toLowerCase();
 
   const existing = await prisma.contractor.findUnique({
@@ -165,7 +172,7 @@ export async function POST(req: NextRequest) {
       slug,
       city,
       area,
-      tradeTypes: [],
+      tradeTypes,
       licenseNumber: `PENDING-${crypto.randomBytes(6).toString('hex')}`,
       emailVerifyToken,
       emailVerifyTokenExpiresAt,

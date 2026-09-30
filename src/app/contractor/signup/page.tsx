@@ -30,6 +30,8 @@ import Footer from '@/components/Footer';
 import { PASSWORD_MIN_LENGTH, PASSWORD_HINT } from '@/lib/password-rules';
 import { normalizeLocation } from '@/lib/location';
 import PasswordInput from '@/components/PasswordInput';
+import TradeTypePicker from '@/components/TradeTypePicker';
+import { tradeOf } from '@/lib/trade-types';
 
 export default function ContractorSignupPage() {
   const router = useRouter();
@@ -38,6 +40,7 @@ export default function ContractorSignupPage() {
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
   const [area, setArea] = useState('');
+  const [tradeTypes, setTradeTypes] = useState<string[]>([]);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -46,6 +49,12 @@ export default function ContractorSignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // The picker has no native `required`, so check it here (the API
+    // checks again).
+    if (tradeTypes.filter((t) => tradeOf(t) !== null).length === 0) {
+      setError('Pick your trade and tick at least one speciality.');
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -61,6 +70,7 @@ export default function ContractorSignupPage() {
           // (e.g. pressing Enter in the field); the API does it again.
           city: normalizeLocation(city),
           area: normalizeLocation(area),
+          tradeTypes,
         }),
       });
 
@@ -206,6 +216,13 @@ export default function ContractorSignupPage() {
                 listing. If you&apos;re already listed, we&apos;ll keep the location on your
                 existing profile; you can change it from your dashboard later.
               </p>
+            </fieldset>
+            <fieldset>
+              <legend className="block text-sm font-medium mb-1.5">Your trade</legend>
+              <p className="text-xs text-stone mb-2">
+                Developers find you by trade, and see your specialities on your profile.
+              </p>
+              <TradeTypePicker selected={tradeTypes} onChange={setTradeTypes} />
             </fieldset>
             <div>
               <label className="block text-sm font-medium mb-1.5">Password</label>

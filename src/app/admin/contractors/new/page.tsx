@@ -38,6 +38,7 @@ export default function NewContractorPage() {
   const [city, setCity] = useState('Mumbai');
   const [area, setArea] = useState('');
   const [tradeTypes, setTradeTypes] = useState<string[]>([]);
+  const [pickerKey, setPickerKey] = useState(0);
   const [licenseNumber, setLicenseNumber] = useState('');
   const [verificationStatus, setVerificationStatus] = useState<'PENDING' | 'VERIFIED'>('PENDING');
   const [tier, setTier] = useState<'LISTED' | 'PLUS' | 'PRO'>('LISTED');
@@ -87,7 +88,7 @@ export default function NewContractorPage() {
     // input did — it's a button-based multi-select, not a form control
     // the browser validates on its own. Check explicitly instead.
     if (tradeTypes.length === 0) {
-      setError('Select at least one trade type');
+      setError('Pick at least one trade and speciality');
       return;
     }
 
@@ -164,6 +165,7 @@ export default function NewContractorPage() {
       setName('');
       setArea('');
       setTradeTypes([]);
+      setPickerKey((k) => k + 1);
       setLicenseNumber('');
       setVerificationStatus('PENDING');
       setYearsInBusiness('');
@@ -244,8 +246,10 @@ export default function NewContractorPage() {
             </Field>
           </div>
 
-          <Field label="Trade types">
-            <TradeTypePicker selected={tradeTypes} onChange={setTradeTypes} />
+          <Field label="Trade & specialities">
+            {/* Keyed so "add another" also closes the trades opened for the
+                previous contractor, not just clears their ticks. */}
+            <TradeTypePicker key={pickerKey} selected={tradeTypes} onChange={setTradeTypes} />
           </Field>
 
           <div className="grid grid-cols-2 gap-4">

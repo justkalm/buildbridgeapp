@@ -51,10 +51,9 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { computeLeadVisibility, getMonthStart, LISTED_MONTHLY_LEAD_CAP } from '@/lib/lead-limits';
-import { isValidTradeType } from '@/lib/trade-types';
 import { sendReverifyRequestEmail } from '@/lib/email';
 import { normalizeLocation } from '@/lib/location';
-import { insuranceCoverLakhField, teamSizeField, teamSizeRangeError } from '@/lib/project-validation';
+import { insuranceCoverLakhField, teamSizeField, teamSizeRangeError, tradeTypesField } from '@/lib/project-validation';
 
 async function requireContractor() {
   const session = await auth();
@@ -259,13 +258,7 @@ const profileSchema = z.object({
   // Normalized to consistent capitalisation — see src/lib/location.ts.
   city: z.string().trim().min(1).max(100).transform(normalizeLocation).optional(),
   area: z.string().trim().min(1).max(100).transform(normalizeLocation).optional(),
-  tradeTypes: z
-    .array(z.string().trim().min(1))
-    .max(10)
-    .refine((types) => types.every(isValidTradeType), {
-      message: 'One or more trade types are not in the allowed list',
-    })
-    .optional(),
+  tradeTypes: tradeTypesField().optional(),
   yearsInBusiness: z.number().int().min(0).max(100).nullable().optional(),
   // 'from' <= 'to' is checked in PATCH, where the stored value is available
   // for partial updates. Insurance cap: see MAX_INSURANCE_COVER_LAKH.

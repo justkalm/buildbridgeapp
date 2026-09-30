@@ -83,8 +83,9 @@ const AREAS: { city: string; area: string }[] = [
 ];
 
 const TRADES = [
-  'RCC & Structural', 'Electrical', 'Waterproofing', 'Interior Fit-out',
-  'Plumbing', 'Facade & Cladding',
+  // Specialities from src/lib/trade-types.ts (KALM-167).
+  'RCC work', 'Internal wiring', 'Terrace waterproofing', 'Full interior fit-out',
+  'Internal plumbing', 'ACP / aluminium cladding',
 ];
 
 const PROJECT_TYPES = ['Residential', 'Commercial', 'Industrial', 'Mixed-use'];

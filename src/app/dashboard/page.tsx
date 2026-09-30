@@ -28,6 +28,7 @@ import PushPrompt from '@/components/PushPrompt';
 import SiteVisitList from '@/components/SiteVisitList';
 import { developerStatusLabel, type QuoteStatus } from '@/lib/quote-status';
 import { announceNotificationsChanged, useUnreadMessages } from '@/lib/use-unread-messages';
+import { tradesOf } from '@/lib/trade-types';
 
 type QuoteRequestRow = {
   id: string;
@@ -233,7 +234,7 @@ export default function DashboardPage() {
                     </button>
                   </div>
                   <p className="text-xs text-stone mb-2">
-                    {s.contractor.area}, {s.contractor.city} · {s.contractor.tradeTypes.join(', ')}
+                    {s.contractor.area}, {s.contractor.city} · {tradesOf(s.contractor.tradeTypes).join(', ')}
                   </p>
                   {editingNoteFor === s.contractor.id ? (
                     <div className="flex gap-2 items-start">
@@ -298,7 +299,7 @@ export default function DashboardPage() {
                               {s.contractor.name}
                             </Link>
                           </td>
-                          <td className="px-4 py-3 text-stone">{s.contractor.tradeTypes.join(', ')}</td>
+                          <td className="px-4 py-3 text-stone">{tradesOf(s.contractor.tradeTypes).join(', ')}</td>
                           <td className="px-4 py-3 text-stone">{s.contractor.area}, {s.contractor.city}</td>
                           <td className="px-4 py-3 text-stone">
                             {s.contractor.yearsInBusiness ? `${s.contractor.yearsInBusiness}+ years` : 'N/A'}

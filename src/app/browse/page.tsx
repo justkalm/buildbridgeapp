@@ -8,7 +8,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
-import { TRADE_TYPE_CATEGORIES, HOMEPAGE_TRADE_CATEGORIES } from '@/lib/trade-types';
+import { ALL_TRADES, hasTrade, specialityLabel, tradesOf } from '@/lib/trade-types';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import ShortlistButton from '@/components/ShortlistButton';
 import BrowseFilterSheet from '@/components/BrowseFilterSheet';
@@ -40,6 +40,27 @@ type Contractor = {
 type SortOption = 'experience' | 'projects' | 'location';
 
 const MIN_EXPERIENCE_OPTIONS = [0, 5, 10, 20];
+
+// Specialities shown on a Browse card before "+N more".
+const CARD_SPECIALITY_LIMIT = 6;
+
+// Homepage category links made before the KALM-167 trade list used these
+// labels; map them to the nearest new trade so old links still filter.
+const LEGACY_CATEGORY_TO_TRADE: Record<string, string> = {
+  'RCC & Structural': 'Civil & RCC',
+  Electrical: 'Electrical',
+  Waterproofing: 'Waterproofing & Roofing',
+  'Interior Fit-out': 'Ceilings, Partitions & Interiors',
+  Plumbing: 'Plumbing & Sanitation',
+  'Facade & Cladding': 'Facade & Glazing',
+};
+
+function initialTrade(params: { get(name: string): string | null }): string {
+  const trade = params.get('trade');
+  if (trade && ALL_TRADES.includes(trade)) return trade;
+  const legacy = LEGACY_CATEGORY_TO_TRADE[params.get('category') ?? ''];
+  return legacy ?? 'all';
+}
 const MIN_PROJECTS_OPTIONS = [0, 1, 3, 5];
 
 function BrowsePageInner() {
@@ -47,21 +68,12 @@ function BrowsePageInner() {
   const router = useRouter();
   const [contractors, setContractors] = useState<Contractor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTrade, setSelectedTrade] = useState<string>(searchParams.get('trade') ?? 'all');
-  // Separate from selectedTrade: a homepage category link (e.g. "RCC &
-  // Structural") maps to SEVERAL real trade strings (see
-  // HOMEPAGE_TRADE_CATEGORIES in trade-types.ts), not one exact value the
-  // single-select trade dropdown can represent. Reading it as its own
-  // param and matching with .some() against the mapped list, rather than
-  // trying to force it through the same exact-match selectedTrade state,
-  // is what actually makes the homepage's category links work — they used
-  // to link to ?trade=<ad-hoc label that matched nothing in the real
-  // taxonomy>, so every homepage category returned zero results
-  // regardless of what was actually listed.
-  const categoryParam = searchParams.get('category');
-  const categoryTrades = categoryParam
-    ? HOMEPAGE_TRADE_CATEGORIES.find((c) => c.label === categoryParam)?.trades ?? null
-    : null;
+  // The trade filter (KALM-167): one of the 20 trades in
+  // src/lib/trade-types.ts. A contractor matches when any of their
+  // specialities belongs to it. Homepage shortcuts link with ?trade=;
+  // ?category= is still read for links made before the new list, mapped
+  // to the nearest new trade.
+  const [selectedTrade, setSelectedTrade] = useState<string>(() => initialTrade(searchParams));
   const [selectedCity, setSelectedCity] = useState<string>('all');
   // Area (neighbourhood, e.g. "Thane", "Andheri West") narrows within a
   // city rather than replacing it — see #12. Reset to 'all' whenever the
@@ -114,29 +126,16 @@ function BrowsePageInner() {
       });
   }, [isDeveloper]);
 
-  const availableTrades = useMemo(() => {
-    if (!contractors) return [];
-    const allTrades = contractors.flatMap((c) => c.tradeTypes);
-    return Array.from(new Set(allTrades)).sort();
-  }, [contractors]);
-
-  // Groups availableTrades by the same 8 categories used in
-  // src/lib/trade-types.ts, so the filter dropdown organizes trades the
-  // same way the contractor-side picker does. Previously this page just
-  // listed every distinct trade string as a flat row of pill buttons —
-  // fine when trades were a handful of loose free-text values, but once
-  // the 90-item closed taxonomy landed, even one contractor selecting
-  // several trades across categories produced a long, unsorted-feeling
-  // wrapping row of buttons. Category groups fix that; only categories
-  // with at least one trade actually in use are shown, so this never
-  // shows empty groups even though the full taxonomy has 8 categories.
-  const tradeOptgroups = useMemo(() => {
-    const availableSet = new Set(availableTrades);
-    return TRADE_TYPE_CATEGORIES.map((c) => ({
-      label: c.category,
-      options: c.trades.filter((t) => availableSet.has(t)).map((t) => ({ value: t, label: t })),
-    })).filter((group) => group.options.length > 0);
-  }, [availableTrades]);
+  // Every trade is offered, with how many contractors are listed in it,
+  // so a developer can see the whole range even where it's still empty.
+  const tradeOptions = useMemo(
+    () =>
+      ALL_TRADES.map((trade) => {
+        const count = contractors ? contractors.filter((c) => hasTrade(c.tradeTypes, trade)).length : 0;
+        return { value: trade, label: `${trade} (${count})` };
+      }),
+    [contractors]
+  );
 
   const availableCities = useMemo(() => {
     if (!contractors) return [];
@@ -162,10 +161,7 @@ function BrowsePageInner() {
 
     let result = contractors;
     if (selectedTrade !== 'all') {
-      result = result.filter((c) => c.tradeTypes.includes(selectedTrade));
-    }
-    if (categoryTrades) {
-      result = result.filter((c) => c.tradeTypes.some((t) => categoryTrades.includes(t)));
+      result = result.filter((c) => hasTrade(c.tradeTypes, selectedTrade));
     }
     if (selectedCity !== 'all') {
       result = result.filter((c) => c.city === selectedCity);
@@ -209,17 +205,13 @@ function BrowsePageInner() {
     });
 
     return result;
-    // categoryTrades is safe as a dependency: it's an array straight out of
-    // the HOMEPAGE_TRADE_CATEGORIES constant, so it keeps the same identity
-    // between renders until the ?category= param actually changes.
-  }, [contractors, selectedTrade, categoryTrades, selectedCity, selectedArea, minExperience, minProjects, sortBy]);
+  }, [contractors, selectedTrade, selectedCity, selectedArea, minExperience, minProjects, sortBy]);
 
   // One number for the phone "Filters" button badge. Sort isn't counted:
   // it reorders results rather than narrowing them, and it always has a
   // value, so counting it would make the badge never read zero.
   const activeFilterCount =
     (selectedTrade !== 'all' ? 1 : 0) +
-    (categoryParam ? 1 : 0) +
     (selectedCity !== 'all' ? 1 : 0) +
     (selectedArea !== 'all' ? 1 : 0) +
     (minExperience > 0 ? 1 : 0) +
@@ -235,7 +227,7 @@ function BrowsePageInner() {
     setSelectedArea('all');
     setMinExperience(0);
     setMinProjects(0);
-    // categoryParam (and the initial selectedTrade value) come from the
+    // ?trade= / ?category= (and so the initial selectedTrade value) come from the
     // URL, not component state. Clearing just the state above left a
     // homepage category link's ?category=... still applied after clicking
     // "Clear filters", since the filter logic reads it straight from
@@ -272,8 +264,7 @@ function BrowsePageInner() {
           label="Trade"
           value={selectedTrade}
           onChange={setSelectedTrade}
-          options={[{ value: 'all', label: 'All trades' }]}
-          optgroups={tradeOptgroups}
+          options={[{ value: 'all', label: 'All trades' }, ...tradeOptions]}
         />
         <FilterSelect
           stacked={stacked}
@@ -495,12 +486,23 @@ function BrowsePageInner() {
                           {formatLocation(c.area, c.city)}
                           {c.yearsInBusiness ? ` · ${c.yearsInBusiness}+ years` : ''}
                         </p>
+                        {/* Trades, then the first few specialities (KALM-167);
+                            the full list is on the profile. */}
+                        <p className="text-[13px] text-ink mb-1.5">
+                          <span className="sr-only">Trades: </span>
+                          {tradesOf(c.tradeTypes).join(' · ')}
+                        </p>
                         <div className="flex gap-1.5 flex-wrap mb-3">
-                          {c.tradeTypes.map((t) => (
+                          {c.tradeTypes.slice(0, CARD_SPECIALITY_LIMIT).map((t) => (
                             <span key={t} className="text-[11px] font-medium px-2.5 py-1 bg-paper-dim rounded-full text-stone">
-                              {t}
+                              {specialityLabel(t)}
                             </span>
                           ))}
+                          {c.tradeTypes.length > CARD_SPECIALITY_LIMIT && (
+                            <span className="text-[11px] px-2.5 py-1 text-stone">
+                              +{c.tradeTypes.length - CARD_SPECIALITY_LIMIT} more
+                            </span>
+                          )}
                         </div>
                         <div className="flex gap-6 text-sm">
                           <div>

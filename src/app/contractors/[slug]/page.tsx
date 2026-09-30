@@ -42,6 +42,14 @@ import ProfileSkeleton from '@/components/ProfileSkeleton';
 import ProfileQuoteBar, { ProfileQuoteBarSpacer } from '@/components/ProfileQuoteBar';
 import { isPlaceholderLicense } from '@/lib/license';
 import { formatLocation } from '@/lib/location';
+import { groupByTrade, tradesOf } from '@/lib/trade-types';
+
+// The quote form's "Project type" choices: the contractor's trades, or
+// their raw values for a profile still on the old list.
+function quoteOptionsFor(tradeTypes: string[]): string[] {
+  const trades = tradesOf(tradeTypes);
+  return trades.length > 0 ? trades : tradeTypes;
+}
 
 type Project = {
   id: string;
@@ -137,7 +145,7 @@ export default function ContractorProfilePage() {
       .then((data) => {
         if (data) {
           setContractor(data);
-          setProjectType(data.tradeTypes[0] ?? '');
+          setProjectType(quoteOptionsFor(data.tradeTypes)[0] ?? '');
         }
       })
       .catch(() => setNotFound(true));
@@ -300,7 +308,7 @@ export default function ContractorProfilePage() {
                   <span>
                     <span aria-hidden="true">🏗️ </span>
                     <span className="sr-only">Trades: </span>
-                    {contractor.tradeTypes.join(', ')}
+                    {tradesOf(contractor.tradeTypes).join(', ')}
                   </span>
                   {contractor.yearsInBusiness ? (
                     <span>
@@ -341,6 +349,27 @@ export default function ContractorProfilePage() {
       <div className="max-w-[1440px] mx-auto px-5 sm:px-8 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-11 py-12">
         <div>
           {contractor.bio && <p className="text-[15px] text-stone leading-relaxed mb-8">{contractor.bio}</p>}
+
+          {/* Specialities under each trade (KALM-167). */}
+          {contractor.tradeTypes.length > 0 && (
+            <section aria-labelledby="specialities-heading" className="mb-10">
+              <h2 id="specialities-heading" className="font-display text-xl mb-4">What they do</h2>
+              <div className="flex flex-col gap-4">
+                {groupByTrade(contractor.tradeTypes).map((g) => (
+                  <div key={g.trade}>
+                    <h3 className="text-[13px] font-medium text-ink mb-2">{g.trade}</h3>
+                    <ul className="flex gap-1.5 flex-wrap">
+                      {g.specialities.map((sp) => (
+                        <li key={sp} className="text-[12px] px-2.5 py-1 bg-paper-dim rounded-full text-stone">
+                          {sp}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <h2 className="font-display text-xl mb-5">Completed Projects</h2>
           {contractor.acceptsSiteVisits && contractor.projects.length > 0 && !isContractorViewer && status !== 'loading' && (
@@ -527,7 +556,7 @@ export default function ContractorProfilePage() {
                     onChange={(e) => setProjectType(e.target.value)}
                     className="w-full px-3 py-2.5 border border-line rounded-[4px] text-[13.5px] bg-paper"
                   >
-                    {contractor.tradeTypes.map((t) => (
+                    {quoteOptionsFor(contractor.tradeTypes).map((t) => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>

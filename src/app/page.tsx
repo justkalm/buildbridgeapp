@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
-import { HOMEPAGE_TRADE_CATEGORIES } from '@/lib/trade-types';
+import { ALL_TRADES, HOMEPAGE_TRADES } from '@/lib/trade-types';
 
 export default function Home() {
   return (
@@ -53,15 +53,23 @@ export default function Home() {
           </h2>
 
           <div className="flex flex-wrap justify-center gap-3">
-            {HOMEPAGE_TRADE_CATEGORIES.map((category) => (
+            {/* The trades almost every project hires (KALM-167); the rest
+                are one tap away in Browse's trade filter. */}
+            {HOMEPAGE_TRADES.map((trade) => (
               <Link
-                key={category.label}
-                href={`/browse?category=${encodeURIComponent(category.label)}`}
+                key={trade}
+                href={`/browse?trade=${encodeURIComponent(trade)}`}
                 className="text-sm px-5 py-2.5 rounded-full border border-line bg-paper text-ink hover:border-ink transition-colors"
               >
-                {category.label}
+                {trade}
               </Link>
             ))}
+            <Link
+              href="/browse"
+              className="text-sm px-5 py-2.5 rounded-full text-stone underline underline-offset-2 hover:text-ink transition-colors"
+            >
+              All {ALL_TRADES.length} trades
+            </Link>
           </div>
         </div>
       </section>

@@ -1,30 +1,32 @@
 // src/components/TradeTypePicker.tsx
 //
-// Two-step multi-select for Contractor.tradeTypes, constrained to the
-// fixed list in src/lib/trade-types.ts. Used on every form that sets
-// tradeTypes (admin new-contractor, contractor profile edit) — one shared
-// component so the picking experience and the underlying constraint stay
-// in sync everywhere.
+// Two-step picker for Contractor.tradeTypes (KALM-167), constrained to the
+// list in src/lib/trade-types.ts. Used everywhere trades are set: contractor
+// signup, the contractor's profile edit and admin's add-contractor form, so
+// all three pick trades the same way.
 //
-// Step 1: pick which of the 8 categories apply (a contractor can span
-// multiple — e.g. both Structural and MEP work). Step 2: only trades
-// belonging to a SELECTED category are shown to pick from, each under its
-// own labeled section. This avoids showing all 90 trades at once — you
-// only see the subset relevant to categories you've already said apply,
-// narrowing the choice at each step rather than one flat list/search.
+// Step 1: "What's your trade?" — tap one or more of the 20 trades.
+// Step 2: under each chosen trade, tick the specialities you do. If one's
+// missing, "Something else?" lets the contractor type their own (stored as
+// an Other|<trade>|<text> value, see trade-types.ts), so the list can grow
+// from what contractors actually do.
 //
-// Selecting a trade automatically implies its category is "active" (so
-// pre-filled data — e.g. loading an existing contractor's saved trades —
-// correctly shows the right category sections expanded without the user
-// having to re-click the category chip first). Removing the last selected
-// trade in a category does NOT auto-collapse that category — the person
-// explicitly chose it and might be about to pick a different trade within
-// it, so collapsing out from under them would be surprising.
+// A trade with a speciality already picked starts open, so an existing
+// profile loads showing what's saved. Closing a trade clears the
+// specialities inside it, rather than leaving them saved but hidden.
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import { TRADE_TYPE_CATEGORIES } from '@/lib/trade-types';
+import { useMemo, useState } from 'react';
+import {
+  TRADES,
+  MAX_OTHER_LENGTH,
+  MAX_OTHER_PER_CONTRACTOR,
+  isOtherSpeciality,
+  makeOtherSpeciality,
+  specialityLabel,
+  tradeOf,
+} from '@/lib/trade-types';
 
 type TradeTypePickerProps = {
   selected: string[];
@@ -32,122 +34,162 @@ type TradeTypePickerProps = {
 };
 
 export default function TradeTypePicker({ selected, onChange }: TradeTypePickerProps) {
-  // Categories that have at least one trade already selected start
-  // expanded — see file header comment on why this matters for
-  // pre-filled/existing data.
-  const initialActive = useMemo(() => {
-    const active = new Set<string>();
-    for (const c of TRADE_TYPE_CATEGORIES) {
-      if (c.trades.some((t) => selected.includes(t))) {
-        active.add(c.category);
-      }
+  const initialOpen = useMemo(() => {
+    const open = new Set<string>();
+    for (const value of selected) {
+      const trade = tradeOf(value);
+      if (trade) open.add(trade);
     }
-    return active;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only computed once, from initial `selected`; not meant to re-derive on every keystroke
+    return open;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only computed once, from the initial `selected`
   }, []);
 
-  const [activeCategories, setActiveCategories] = useState<Set<string>>(initialActive);
+  const [openTrades, setOpenTrades] = useState<Set<string>>(initialOpen);
+  const [otherDrafts, setOtherDrafts] = useState<Record<string, string>>({});
+  const otherCount = selected.filter(isOtherSpeciality).length;
 
-  function toggleCategory(category: string) {
-    setActiveCategories((prev) => {
+  // Values that aren't in the current list (old data not yet moved
+  // across). Shown so they can be removed; the server won't save them.
+  const unlisted = selected.filter((v) => tradeOf(v) === null);
+
+  function toggleTrade(trade: string) {
+    setOpenTrades((prev) => {
       const next = new Set(prev);
-      if (next.has(category)) {
-        next.delete(category);
-        // Deselecting a category also clears any trades already picked
-        // within it — leaving them selected-but-hidden would be
-        // confusing (the chip for that trade would vanish from view but
-        // still count toward the contractor's profile).
-        const categoryDef = TRADE_TYPE_CATEGORIES.find((c) => c.category === category);
-        if (categoryDef) {
-          const tradesInCategory: readonly string[] = categoryDef.trades;
-          onChange(selected.filter((t) => !tradesInCategory.includes(t)));
-        }
+      if (next.has(trade)) {
+        next.delete(trade);
+        onChange(selected.filter((v) => tradeOf(v) !== trade));
       } else {
-        next.add(category);
+        next.add(trade);
       }
       return next;
     });
   }
 
-  function toggleTrade(trade: string) {
-    if (selected.includes(trade)) {
-      onChange(selected.filter((t) => t !== trade));
-    } else {
-      onChange([...selected, trade]);
-    }
+  function toggleValue(value: string) {
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
+  }
+
+  function addOther(trade: string) {
+    const text = (otherDrafts[trade] ?? '').trim();
+    if (text.length < 2) return;
+    const value = makeOtherSpeciality(trade, text);
+    if (!selected.includes(value)) onChange([...selected, value]);
+    setOtherDrafts((prev) => ({ ...prev, [trade]: '' }));
   }
 
   return (
     <div>
-      {selected.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {selected.map((trade) => (
-            <button
-              key={trade}
-              type="button"
-              onClick={() => toggleTrade(trade)}
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
-            >
-              {trade}
-              <span aria-hidden>×</span>
-            </button>
-          ))}
+      {unlisted.length > 0 && (
+        <div className="mb-3">
+          <p className="text-xs text-stone mb-1.5">
+            These are from our old trade list. Remove them and pick from the new list below.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {unlisted.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => toggleValue(value)}
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-danger text-danger hover:bg-danger-soft transition-colors"
+              >
+                {value}
+                <span aria-hidden>×</span>
+                <span className="sr-only">(remove)</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       <p className="text-[11px] font-semibold text-stone uppercase tracking-wide mb-1.5">
-        Which of these apply?
+        What&apos;s your trade? Pick all that apply
       </p>
       <div className="flex flex-wrap gap-1.5 mb-3">
-        {TRADE_TYPE_CATEGORIES.map((c) => {
-          const isActive = activeCategories.has(c.category);
+        {TRADES.map(({ trade }) => {
+          const isOpen = openTrades.has(trade);
           return (
             <button
-              key={c.category}
+              key={trade}
               type="button"
-              onClick={() => toggleCategory(c.category)}
+              aria-pressed={isOpen}
+              onClick={() => toggleTrade(trade)}
               className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                isActive
-                  ? 'bg-sage-soft border-sage text-sage font-medium'
-                  : 'border-line text-stone hover:border-ink'
+                isOpen ? 'bg-sage-soft border-sage text-sage font-medium' : 'border-line text-stone hover:border-ink'
               }`}
             >
-              {c.category}
+              {trade}
             </button>
           );
         })}
       </div>
 
-      {activeCategories.size === 0 ? (
-        <p className="text-xs text-stone">Select a category above to see specific trades.</p>
+      {openTrades.size === 0 ? (
+        <p className="text-xs text-stone">Pick a trade above, then tick what you specialise in.</p>
       ) : (
-        <div className="border border-line rounded-[4px] p-3 max-h-[280px] overflow-y-auto">
-          {TRADE_TYPE_CATEGORIES.filter((c) => activeCategories.has(c.category)).map((c) => (
-            <div key={c.category} className="mb-3 last:mb-0">
-              <p className="text-[11px] font-semibold text-stone uppercase tracking-wide mb-1.5">
-                {c.category}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {c.trades.map((trade) => {
-                  const isSelected = selected.includes(trade);
-                  return (
+        <div className="border border-line rounded-[4px] p-3 flex flex-col gap-4">
+          {TRADES.filter(({ trade }) => openTrades.has(trade)).map(({ trade, specialities }) => {
+            const mine = selected.filter((v) => tradeOf(v) === trade);
+            const others = mine.filter(isOtherSpeciality);
+            const draft = otherDrafts[trade] ?? '';
+            return (
+              <div key={trade}>
+                <p className="text-[11px] font-semibold text-stone uppercase tracking-wide mb-1.5">
+                  {trade}: what do you do?
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[...specialities, ...others].map((value) => {
+                    const isSelected = selected.includes(value);
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => toggleValue(value)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          isSelected ? 'bg-ink text-paper border-ink' : 'border-line text-stone hover:border-ink'
+                        }`}
+                      >
+                        {isSelected && <span aria-hidden>✓ </span>}
+                        {specialityLabel(value)}
+                      </button>
+                    );
+                  })}
+                </div>
+                {mine.length === 0 && (
+                  <p className="text-[11px] text-danger mt-1.5">Tick at least one, or close this trade.</p>
+                )}
+                {otherCount < MAX_OTHER_PER_CONTRACTOR && (
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="text"
+                      value={draft}
+                      maxLength={MAX_OTHER_LENGTH}
+                      onChange={(e) =>
+                        setOtherDrafts((prev) => ({ ...prev, [trade]: e.target.value.replace(/\|/g, '') }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addOther(trade);
+                        }
+                      }}
+                      placeholder="Something else? Type it"
+                      aria-label={`Add your own ${trade} speciality`}
+                      className="flex-1 min-w-0 text-xs px-3 py-1.5 border border-line rounded-full bg-paper focus:outline-none focus:border-ink"
+                    />
                     <button
-                      key={trade}
                       type="button"
-                      onClick={() => toggleTrade(trade)}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                        isSelected
-                          ? 'bg-ink text-paper border-ink'
-                          : 'border-line text-stone hover:border-ink'
-                      }`}
+                      onClick={() => addOther(trade)}
+                      disabled={draft.trim().length < 2}
+                      className="text-xs px-3 py-1.5 rounded-full border border-line text-ink hover:border-ink transition-colors disabled:opacity-50"
                     >
-                      {trade}
+                      Add
                     </button>
-                  );
-                })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

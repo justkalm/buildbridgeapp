@@ -71,7 +71,7 @@ const contractors: SeedContractor[] = [
     name: 'Kunal Raut Constructions',
     city: 'Mumbai',
     area: 'Thane',
-    tradeTypes: ['RCC & Structural', 'Waterproofing'],
+    tradeTypes: ['RCC work', 'Terrace waterproofing'],
     licenseNumber: 'MH/RCC/08812',
     verificationStatus: 'VERIFIED', // change to VERIFIED once you've checked this
     yearsInBusiness: 15,

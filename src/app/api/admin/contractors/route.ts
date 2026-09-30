@@ -14,7 +14,6 @@ import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { ADMIN_SAFE_CONTRACTOR_SELECT } from '@/lib/admin-contractor-select';
 import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
-import { isValidTradeType } from '@/lib/trade-types';
 import { isPlaceholderLicense } from '@/lib/license';
 import { normalizeLocation } from '@/lib/location';
 import {
@@ -22,6 +21,7 @@ import {
   positiveWhole,
   teamSizeField,
   teamSizeRangeError,
+  tradeTypesField,
 } from '@/lib/project-validation';
 import { uniqueContractorSlug } from '@/lib/slugify';
 
@@ -47,12 +47,9 @@ const contractorSchema = z.object({
   // Normalized to consistent capitalisation — see src/lib/location.ts.
   city: z.string().trim().min(1).max(100).transform(normalizeLocation),
   area: z.string().trim().min(1).max(100).transform(normalizeLocation),
-  tradeTypes: z
-    .array(z.string().trim().min(1))
-    .min(1, 'At least one trade type is required')
-    .refine((types) => types.every(isValidTradeType), {
-      message: 'One or more trade types are not in the allowed list',
-    }),
+  tradeTypes: tradeTypesField().refine((types) => types.length > 0, {
+    message: 'Pick at least one trade and speciality',
+  }),
   licenseNumber: z.string().trim().min(1).max(100),
   verificationStatus: z.enum(['PENDING', 'VERIFIED', 'REJECTED']).default('PENDING'),
   // Manual override only — not tied to billing. Trial period means no

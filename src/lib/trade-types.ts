@@ -1,186 +1,427 @@
 // src/lib/trade-types.ts
 //
-// The fixed, closed list of allowed contractor trade types. This is a
-// hard constraint, not suggestions: Contractor.tradeTypes only ever
-// contains values from this list — see the zod .refine() calls in every
-// route that writes tradeTypes for where that's enforced server-side.
+// The fixed list of contractor trades and their specialities (KALM-167).
+// Two levels, as the owner specified on 1 Oct 2026:
 //
-// Before this existed, tradeTypes was pure free text (comma-separated
-// input, no validation at all) — which meant the same trade could be
-// entered as "Electrician", "electrical work", and "Electrical
-// Contractor" as three different strings, silently breaking the browse
-// filter dropdown (which just lists whatever distinct strings happen to
-// exist in the database) and making search/matching unreliable. A closed
-// list fixes that at the source.
+//   Trade (e.g. "Fire & Life Safety")
+//     └─ Specialities (e.g. "Fire hydrant", "Extinguishers & hose reels")
 //
-// Grouped into 8 categories matching how contractors actually think about
-// their trade, used to render the picker UI in grouped sections — the
-// grouping is presentational only, `ALL_TRADE_TYPES` (flattened) is what
-// validation actually checks against.
+//   - A contractor picks one or more trades, then ticks their specialities
+//     inside each (TradeTypePicker). If something's missing they can type
+//     their own ("Other, tell us"), which is how the list grows: see
+//     scripts/list-other-specialities.ts.
+//   - A developer filters Browse by TRADE only; a contractor matches when
+//     any of their specialities belongs to that trade.
+//   - Cards and profiles show the specialities.
+//
+// Storage: Contractor.tradeTypes holds speciality labels, so no database
+// change was needed; the trade is looked up from the speciality. That's
+// why every speciality label must be unique across the whole list and
+// read sensibly on its own on a card ("Basement waterproofing", not
+// "Basement"). A typed-in speciality is stored as
+// "Other|<trade>|<text>" so it still belongs to a trade for filtering.
+//
+// Replaces the older 8-category / ~90-item list; scripts/migrate-trades.ts
+// moves existing profiles across. The list came from the owner's research,
+// cleaned up (duplicates merged, Indian site terms such as Mivan, Trimix,
+// POP, UGT/OHT). `common` marks the trades almost every Mumbai residential
+// project hires; those are the homepage shortcuts.
 
-export const TRADE_TYPE_CATEGORIES = [
-  {
-    category: 'Pre-Construction',
-    trades: [
-      'Land survey contractor',
-      'Soil investigation/geotechnical contractor',
-      'Demolition contractor',
-      'Site clearing contractor',
-      'Excavation contractor',
-      'Earthwork/filling contractor',
-      'Dewatering contractor',
-      'Shoring contractor',
-      'Piling contractor',
-      'Anti-termite treatment contractor',
-    ],
-  },
-  {
-    category: 'Civil & Structural',
-    trades: [
-      'Foundation contractor',
-      'RCC contractor',
-      'Reinforcement/rebar contractor',
-      'Shuttering/formwork contractor',
-      'Concrete/RMC supplier',
-      'Structural steel contractor',
-      'Masonry contractor',
-      'Blockwork/AAC block contractor',
-      'Plastering contractor',
-      'Screeding contractor',
-      'Waterproofing contractor',
-      'Expansion-joint contractor',
-    ],
-  },
-  {
-    category: 'MEP',
-    trades: [
-      'Electrical contractor',
-      'Plumbing contractor',
-      'Sanitary contractor',
-      'Fire-fighting contractor',
-      'Fire-alarm contractor',
-      'HVAC/AC contractor',
-      'Lift/elevator contractor',
-      'DG/power-backup contractor',
-      'Solar contractor',
-      'ELV contractor',
-      'CCTV contractor',
-      'Access-control contractor',
-      'Networking/structured-cabling contractor',
-      'BMS contractor',
-    ],
-  },
-  {
-    category: 'Doors, Windows & Façade',
-    trades: [
-      'Aluminium-window contractor',
-      'uPVC-window contractor',
-      'Glazing contractor',
-      'Façade contractor',
-      'Structural-glazing contractor',
-      'ACP/cladding contractor',
-      'Metal-fabrication contractor',
-      'MS-grill/railing contractor',
-      'Fire-door contractor',
-      'Wooden-door contractor',
-      'Rolling-shutter contractor',
-    ],
-  },
-  {
-    category: 'Interior & Finishing',
-    trades: [
-      'Flooring contractor',
-      'Marble/granite contractor',
-      'Tile contractor',
-      'Painting contractor',
-      'Gypsum/POP contractor',
-      'False-ceiling contractor',
-      'Carpentry contractor',
-      'Joinery contractor',
-      'Modular-kitchen contractor',
-      'Wardrobe contractor',
-      'Glass/mirror contractor',
-      'Wallpaper/decorative-finish contractor',
-      'Sanitary-fitting contractor',
-    ],
-  },
-  {
-    category: 'External Development',
-    trades: [
-      'Road/paver contractor',
-      'Landscaping contractor',
-      'Compound-wall contractor',
-      'External drainage contractor',
-      'External plumbing contractor',
-      'External electrical contractor',
-      'Rainwater-harvesting contractor',
-      'STP contractor',
-      'Water-treatment contractor',
-      'Underground-tank contractor',
-    ],
-  },
-  {
-    category: 'Specialist Works',
-    trades: [
-      'Swimming-pool contractor',
-      'Gym/sports contractor',
-      'Waterproofing specialist',
-      'Acoustic contractor',
-      'Home-automation contractor',
-      'EV-charging contractor',
-      'Kitchen/exhaust contractor',
-      'Solar-water-heater contractor',
-      'Waste-management contractor',
-      'Pest-control contractor',
-    ],
-  },
-  {
-    category: 'Project Support',
-    trades: [
-      'Scaffolding contractor',
-      'Crane/equipment contractor',
-      'Construction-equipment rental contractor',
-      'Labour contractor',
-      'Material-handling contractor',
-      'Security contractor',
-      'Site-cleaning contractor',
-      'Final-cleaning contractor',
-      'Testing & commissioning contractor',
-      'Snagging/defect-rectification contractor',
-    ],
-  },
-] as const;
+export type TradeDef = { trade: string; common: boolean; specialities: readonly string[] };
 
-export const ALL_TRADE_TYPES: string[] = TRADE_TYPE_CATEGORIES.flatMap((c) => c.trades);
+export const TRADES: readonly TradeDef[] = [
+  {
+    trade: 'Site & Groundworks',
+    common: true,
+    specialities: [
+      'Demolition',
+      'Site clearance',
+      'Excavation & earthwork',
+      'Rock breaking / controlled blasting',
+      'Piling',
+      'Micro-piling',
+      'Diaphragm wall',
+      'Shoring & earth retention',
+      'Rock / soil anchoring',
+      'Dewatering',
+      'Ground improvement & grouting',
+      'Underpinning',
+      'Anti-termite treatment',
+      'Surveying & setting-out',
+    ],
+  },
+  {
+    trade: 'Civil & RCC',
+    common: true,
+    specialities: [
+      'RCC work',
+      'PCC work',
+      'Foundations',
+      'Rebar / steel fixing',
+      'Shuttering / formwork',
+      'Mivan (aluminium) formwork',
+      'Jump-form / climbing form',
+      'Post-tensioning',
+      'Brickwork & masonry',
+      'AAC / blockwork',
+      'Internal plaster',
+      'External plaster',
+      'Structural repair & strengthening',
+      'Expansion joints',
+    ],
+  },
+  {
+    trade: 'Structural Steel & Fabrication',
+    common: false,
+    specialities: [
+      'Structural steel fabrication',
+      'Steel erection',
+      'PEB (pre-engineered buildings)',
+      'MS fabrication',
+      'Steel staircases',
+      'Canopies & pergolas',
+    ],
+  },
+  {
+    trade: 'Waterproofing & Roofing',
+    common: true,
+    specialities: [
+      'Basement waterproofing',
+      'Terrace waterproofing',
+      'Toilet & wet-area waterproofing',
+      'Podium waterproofing',
+      'External wall waterproofing',
+      'Injection grouting',
+      'Joint sealing',
+      'PU / epoxy coatings',
+      'Thermal insulation',
+      'Metal / PUF roofing',
+      'Standing-seam roofing',
+    ],
+  },
+  {
+    trade: 'Facade & Glazing',
+    common: false,
+    specialities: [
+      'Curtain wall',
+      'Unitised facade',
+      'Structural glazing',
+      'Spider glazing',
+      'ACP / aluminium cladding',
+      'Stone cladding',
+      'DGU glass',
+      'Louvres & fins',
+      'Skylights',
+      'Facade access (gondola / BMU)',
+      'GRC / GRP / FRP elements',
+    ],
+  },
+  {
+    trade: 'Doors & Windows',
+    common: true,
+    specialities: [
+      'Aluminium windows',
+      'UPVC windows & doors',
+      'Wooden doors',
+      'Fire-rated doors',
+      'Door & window hardware',
+      'Rolling shutters',
+    ],
+  },
+  {
+    trade: 'Flooring & Tiling',
+    common: true,
+    specialities: [
+      'Vitrified / ceramic tiles',
+      'Marble flooring',
+      'Granite flooring',
+      'Natural stone flooring',
+      'Wooden flooring',
+      'Epoxy flooring',
+      'Trimix / industrial flooring',
+      'Screeding',
+    ],
+  },
+  {
+    trade: 'Painting & Coatings',
+    common: true,
+    specialities: [
+      'Internal painting',
+      'External painting',
+      'Texture painting',
+      'Putty work',
+      'Fire-retardant coatings',
+      'Industrial / anti-corrosion coatings',
+    ],
+  },
+  {
+    trade: 'Ceilings, Partitions & Interiors',
+    common: true,
+    specialities: [
+      'Gypsum / POP false ceiling',
+      'Grid / metal ceiling',
+      'Acoustic ceilings & panels',
+      'Drywall partitions',
+      'Glass partitions',
+      'Carpentry & joinery',
+      'Modular kitchens',
+      'Wardrobes & cabinetry',
+      'Full interior fit-out',
+    ],
+  },
+  {
+    trade: 'Electrical',
+    common: true,
+    specialities: [
+      'HT works & substation',
+      'Transformers',
+      'LT panels & distribution',
+      'Internal wiring',
+      'Busduct',
+      'Cable tray & cabling',
+      'DG sets',
+      'Lighting',
+      'Facade & landscape lighting',
+      'Earthing & lightning protection',
+      'Solar PV',
+      'EV charging',
+      'Electrical testing & commissioning',
+    ],
+  },
+  {
+    trade: 'Plumbing & Sanitation',
+    common: true,
+    specialities: [
+      'Internal plumbing',
+      'Sanitary fixtures',
+      'Water supply lines',
+      'Drainage & sewerage',
+      'Storm-water drainage',
+      'Rainwater harvesting',
+      'Water tanks (UGT / OHT)',
+      'Hydro-pneumatic systems & pumps',
+      'Hot water & solar water heating',
+    ],
+  },
+  {
+    trade: 'Fire & Life Safety',
+    common: true,
+    specialities: [
+      'Fire hydrant',
+      'Sprinklers',
+      'Fire pumps',
+      'Fire water tanks',
+      'Fire alarm & detection',
+      'Extinguishers & hose reels',
+      'Gas suppression',
+      'Fire stopping & sealing',
+      'Smoke management / stair pressurisation',
+      'Fire system testing & commissioning',
+    ],
+  },
+  {
+    trade: 'HVAC & Ventilation',
+    common: false,
+    specialities: [
+      'Split & VRF / VRV AC',
+      'Central AC & chillers',
+      'Cooling towers',
+      'AHU / FCU',
+      'Ducting',
+      'Basement ventilation',
+      'Smoke extraction',
+      'Kitchen exhaust',
+      'Fresh air systems',
+      'HVAC insulation',
+      'HVAC testing & balancing',
+    ],
+  },
+  {
+    trade: 'Lifts & Parking Systems',
+    common: true,
+    specialities: [
+      'Passenger lifts',
+      'High-speed lifts',
+      'Service / goods lifts',
+      'Fire lifts',
+      'Stretcher lifts',
+      'Escalators',
+      'Car lifts',
+      'Stack / puzzle parking',
+      'Automated parking',
+      'Lift modernisation',
+    ],
+  },
+  {
+    trade: 'ELV, Security & Automation',
+    common: false,
+    specialities: [
+      'CCTV',
+      'Access control',
+      'Video door phone & intercom',
+      'Structured cabling & networking',
+      'Wi-Fi infrastructure',
+      'MATV / IPTV',
+      'Public address system',
+      'Audio-visual',
+      'BMS / IBMS',
+      'Home automation',
+      'Boom barriers, bollards & turnstiles',
+      'ANPR / parking management',
+      'Perimeter security',
+      'Digital signage',
+    ],
+  },
+  {
+    trade: 'Utilities & Treatment',
+    common: false,
+    specialities: [
+      'STP (sewage treatment)',
+      'WTP (water treatment)',
+      'RO / filtration',
+      'ETP (effluent treatment)',
+      'Water recycling',
+      'Organic waste converter',
+      'Garbage chute & compactor',
+      'LPG bank / PNG gas piping',
+      'Diesel (HSD) storage',
+    ],
+  },
+  {
+    trade: 'External Development',
+    common: false,
+    specialities: [
+      'Internal roads',
+      'Paver blocks',
+      'Kerbs & footpaths',
+      'Compound wall & gates',
+      'External drainage & utilities',
+      'Street lighting',
+      'Line marking & parking accessories',
+    ],
+  },
+  {
+    trade: 'Landscape & Irrigation',
+    common: false,
+    specialities: [
+      'Softscape / planting',
+      'Hardscape',
+      'Horticulture',
+      'Irrigation systems',
+      'Green walls',
+      'Terrace & podium gardens',
+      'Tree transplantation',
+    ],
+  },
+  {
+    trade: 'Amenities',
+    common: false,
+    specialities: [
+      'Swimming pools & filtration',
+      'Fountains & water features',
+      'Jacuzzi, sauna & steam',
+      'Gym equipment',
+      'Sports flooring & courts',
+      "Kids' play area",
+      'Clubhouse fit-out',
+      'Amphitheatre',
+    ],
+  },
+  {
+    trade: 'Metalwork, Railings & Signage',
+    common: true,
+    specialities: [
+      'MS / SS railings',
+      'Glass railings & balustrades',
+      'Decorative metalwork',
+      'Grills',
+      'Building signage',
+      'Wayfinding & statutory signage',
+      'Illuminated signage',
+    ],
+  },
+];
 
-const ALL_TRADE_TYPES_SET = new Set(ALL_TRADE_TYPES);
+export const ALL_TRADES: string[] = TRADES.map((t) => t.trade);
 
-export function isValidTradeType(value: string): boolean {
-  return ALL_TRADE_TYPES_SET.has(value);
+export const ALL_SPECIALITIES: string[] = TRADES.flatMap((t) => [...t.specialities]);
+
+// Homepage shortcuts: the trades nearly every project hires.
+export const HOMEPAGE_TRADES: string[] = TRADES.filter((t) => t.common).map((t) => t.trade);
+
+const TRADE_BY_SPECIALITY = new Map<string, string>(
+  TRADES.flatMap((t) => t.specialities.map((s) => [s, t.trade] as const))
+);
+const TRADE_SET = new Set(ALL_TRADES);
+
+// ---------------------------------------------------------------------------
+// "Other, tell us": a speciality the contractor typed themselves.
+// ---------------------------------------------------------------------------
+
+const OTHER_PREFIX = 'Other|';
+export const MAX_OTHER_LENGTH = 60;
+export const MAX_OTHER_PER_CONTRACTOR = 5;
+
+export function makeOtherSpeciality(trade: string, text: string): string {
+  return `${OTHER_PREFIX}${trade}|${text.trim().replace(/\s+/g, ' ')}`;
 }
 
-// Simplified category set for the homepage's "Every trade, one directory"
-// section — 6 broad, recognizable categories rather than the full 8-group/
-// 90-item taxonomy, since a landing page needs quick, scannable entries,
-// not the complete detailed list. Each maps to the actual taxonomy trades
-// it covers.
-//
-// Previously the homepage hardcoded its own ad-hoc category labels
-// ('RCC & Structural', 'Facade & Cladding', etc.) that didn't match ANY
-// real trade string — 'RCC & Structural' isn't in the 90-item list at
-// all, and 'Facade' (no cedilla) doesn't match the taxonomy's 'Façade
-// contractor'. /browse's filter did (and still does, for the single-trade
-// case) an exact string match, so every one of the six homepage category
-// links landed on "no contractors match these filters" regardless of what
-// was actually listed. This is what a real category → multiple real
-// trades mapping looks like, and /browse now accepts a `category=` param
-// that matches ANY trade in the mapped list (see the browse page's use of
-// this), instead of only supporting a single exact trade string.
-export const HOMEPAGE_TRADE_CATEGORIES: { label: string; trades: string[] }[] = [
-  { label: 'RCC & Structural', trades: ['Foundation contractor', 'RCC contractor', 'Structural steel contractor', 'Reinforcement/rebar contractor'] },
-  { label: 'Electrical', trades: ['Electrical contractor', 'External electrical contractor'] },
-  { label: 'Waterproofing', trades: ['Waterproofing contractor', 'Waterproofing specialist'] },
-  { label: 'Interior Fit-out', trades: ['Flooring contractor', 'Tile contractor', 'Painting contractor', 'Carpentry contractor', 'False-ceiling contractor'] },
-  { label: 'Plumbing', trades: ['Plumbing contractor', 'External plumbing contractor', 'Sanitary contractor'] },
-  { label: 'Facade & Cladding', trades: ['Façade contractor', 'ACP/cladding contractor', 'Structural-glazing contractor'] },
-];
+export function parseOtherSpeciality(value: string): { trade: string; text: string } | null {
+  if (!value.startsWith(OTHER_PREFIX)) return null;
+  const rest = value.slice(OTHER_PREFIX.length);
+  const bar = rest.indexOf('|');
+  if (bar === -1) return null;
+  return { trade: rest.slice(0, bar), text: rest.slice(bar + 1) };
+}
+
+export function isOtherSpeciality(value: string): boolean {
+  return parseOtherSpeciality(value) !== null;
+}
+
+// Server-side check for one stored value: a listed speciality, or a
+// well-formed typed-in one under a real trade.
+export function isValidTradeType(value: string): boolean {
+  if (TRADE_BY_SPECIALITY.has(value)) return true;
+  const other = parseOtherSpeciality(value);
+  if (!other) return false;
+  return (
+    TRADE_SET.has(other.trade) &&
+    other.text.length >= 2 &&
+    other.text.length <= MAX_OTHER_LENGTH &&
+    !other.text.includes('|')
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Display helpers. Values that aren't in the list (e.g. old data not yet
+// migrated) are shown as-is rather than hidden.
+// ---------------------------------------------------------------------------
+
+export function specialityLabel(value: string): string {
+  return parseOtherSpeciality(value)?.text ?? value;
+}
+
+export function tradeOf(value: string): string | null {
+  return TRADE_BY_SPECIALITY.get(value) ?? parseOtherSpeciality(value)?.trade ?? null;
+}
+
+// The contractor's trades, in list order.
+export function tradesOf(values: readonly string[]): string[] {
+  const mine = new Set(values.map(tradeOf).filter((t): t is string => t !== null));
+  return ALL_TRADES.filter((t) => mine.has(t));
+}
+
+export function hasTrade(values: readonly string[], trade: string): boolean {
+  return values.some((v) => tradeOf(v) === trade);
+}
+
+// Specialities grouped under their trade, in list order, for profiles.
+export function groupByTrade(values: readonly string[]): { trade: string; specialities: string[] }[] {
+  const groups = tradesOf(values).map((trade) => ({
+    trade,
+    specialities: values.filter((v) => tradeOf(v) === trade).map(specialityLabel),
+  }));
+  const unknown = values.filter((v) => tradeOf(v) === null);
+  if (unknown.length > 0) groups.push({ trade: 'Other', specialities: unknown });
+  return groups;
+}

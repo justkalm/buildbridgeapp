@@ -297,7 +297,7 @@ export default function ContractorProfilePage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">Trade types</label>
+              <label className="block text-sm font-medium mb-1.5">Trade &amp; specialities</label>
               <TradeTypePicker
                 selected={me.tradeTypes}
                 onChange={(next) => update({ tradeTypes: next })}
