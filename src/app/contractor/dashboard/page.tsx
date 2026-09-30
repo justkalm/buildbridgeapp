@@ -230,77 +230,11 @@ export default function ContractorDashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-9">
-          <div className="border border-line rounded-[6px] p-5">
-            <p className="text-xs text-stone mb-2">Listing status</p>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${verification.style}`}>
-              {verification.label}
-            </span>
-            {me.verificationStatus !== 'PENDING' && (
-              <p className="text-xs text-stone mt-2">
-                Your listing always stays live when you edit. Changing your location, phone, GST
-                status or trades adds &quot;update in review&quot; to your badge until we check it.
-                Editing your bio, team details or projects doesn&apos;t.
-              </p>
-            )}
-          </div>
-          <div className="border border-line rounded-[6px] p-5">
-            <p className="text-xs text-stone mb-2">Current tier</p>
-            <p className="text-lg font-medium">{tierLabel[me.tier]}</p>
-            <p className="text-xs text-stone mt-2">
-              Free during the current trial period. Paid tiers coming later.
-            </p>
-          </div>
-        </div>
-
-        <InstallAppPrompt />
-        <PushPrompt />
-
-        <SiteVisitList viewerRole="CONTRACTOR" />
-
-        {me.projectAlerts.length > 0 && (
-          <>
-            <h2 className="font-display font-light text-xl mb-1">Project alerts</h2>
-            <p className="text-stone text-xs mb-4">
-              Projects our team has personally matched to your profile.
-            </p>
-            <div className="flex flex-col gap-3 mb-10">
-              {me.projectAlerts.map((a) => (
-                <div key={a.id} className="border border-ink rounded-[6px] p-4">
-                  <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
-                    <div>
-                      <p className="font-medium text-sm">{a.projectPost.developer.name}</p>
-                      <p className="text-stone text-xs mt-0.5">
-                        {a.projectPost.projectType} · {a.projectPost.location} · {a.projectPost.budgetRangeLabel}
-                      </p>
-                    </div>
-                    <span className="flex items-center gap-2 text-xs text-stone">
-                      {a.isNew && <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-ink text-paper">New</span>}
-                      {new Date(a.alertedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <p className="text-sm mb-3">{a.projectPost.details}</p>
-                  <div className="flex gap-4 text-xs text-stone border-t border-line pt-2.5">
-                    <a href={`mailto:${a.projectPost.developer.email}`} className="hover:text-ink underline underline-offset-2">
-                      {a.projectPost.developer.email}
-                    </a>
-                    <a href={`tel:${a.projectPost.contactPhone}`} className="hover:text-ink underline underline-offset-2">
-                      {a.projectPost.contactPhone}
-                    </a>
-                  </div>
-                  <div className="mt-3">
-                    <AlertMessageButton
-                      alertId={a.id}
-                      developerName={a.projectPost.developer.name}
-                      conversationId={a.conversationId}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
+        {/* Order set by the owner (KALM-173): new enquiries first, then
+            site visits, then project alerts, and listing status / tier
+            last. The notification prompts sit just below the enquiries
+            so they don't push them down. */}
+        <div className="mb-10">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div>
             <h2 className="font-display font-light text-xl">Quote requests received</h2>
@@ -442,6 +376,79 @@ export default function ContractorDashboardPage() {
             )}
           </div>
         )}
+        </div>
+
+        <InstallAppPrompt />
+        <PushPrompt />
+
+        <SiteVisitList viewerRole="CONTRACTOR" />
+
+        {me.projectAlerts.length > 0 && (
+          <>
+            <h2 className="font-display font-light text-xl mb-1">Project alerts</h2>
+            <p className="text-stone text-xs mb-4">
+              Projects our team has personally matched to your profile.
+            </p>
+            <div className="flex flex-col gap-3 mb-10">
+              {me.projectAlerts.map((a) => (
+                <div key={a.id} className="border border-ink rounded-[6px] p-4">
+                  <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
+                    <div>
+                      <p className="font-medium text-sm">{a.projectPost.developer.name}</p>
+                      <p className="text-stone text-xs mt-0.5">
+                        {a.projectPost.projectType} · {a.projectPost.location} · {a.projectPost.budgetRangeLabel}
+                      </p>
+                    </div>
+                    <span className="flex items-center gap-2 text-xs text-stone">
+                      {a.isNew && <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-ink text-paper">New</span>}
+                      {new Date(a.alertedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-sm mb-3">{a.projectPost.details}</p>
+                  <div className="flex gap-4 text-xs text-stone border-t border-line pt-2.5">
+                    <a href={`mailto:${a.projectPost.developer.email}`} className="hover:text-ink underline underline-offset-2">
+                      {a.projectPost.developer.email}
+                    </a>
+                    <a href={`tel:${a.projectPost.contactPhone}`} className="hover:text-ink underline underline-offset-2">
+                      {a.projectPost.contactPhone}
+                    </a>
+                  </div>
+                  <div className="mt-3">
+                    <AlertMessageButton
+                      alertId={a.id}
+                      developerName={a.projectPost.developer.name}
+                      conversationId={a.conversationId}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2 mb-4">
+          <div className="border border-line rounded-[6px] p-5">
+            <p className="text-xs text-stone mb-2">Listing status</p>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${verification.style}`}>
+              {verification.label}
+            </span>
+            {me.verificationStatus !== 'PENDING' && (
+              <p className="text-xs text-stone mt-2">
+                Your listing always stays live when you edit. Changing your location, phone, GST
+                status or trades adds &quot;update in review&quot; to your badge until we check it.
+                Editing your bio, team details or projects doesn&apos;t.
+              </p>
+            )}
+          </div>
+          <div className="border border-line rounded-[6px] p-5">
+            <p className="text-xs text-stone mb-2">Current tier</p>
+            <p className="text-lg font-medium">{tierLabel[me.tier]}</p>
+            <p className="text-xs text-stone mt-2">
+              Free during the current trial period. Paid tiers coming later.
+            </p>
+          </div>
+        </div>
+
       </main>
       <Footer />
     </>
