@@ -49,7 +49,9 @@ export default function SignupPage() {
       // `ok` alone isn't enough in NextAuth v5 beta — a failed credentials
       // sign-in still resolves ok:true with `error` set (see login page).
       if (signInResult?.ok && !signInResult.error) {
-        router.push('/browse');
+        // Straight to their own dashboard (owner, 1 Oct), not Browse, so
+        // it's clear the account now exists and they're signed in.
+        router.push('/dashboard');
       } else {
         router.push('/login');
       }

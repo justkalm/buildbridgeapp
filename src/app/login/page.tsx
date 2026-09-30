@@ -58,10 +58,13 @@ export default function LoginPage() {
       // route to the right home page. A contractor visiting /browse post-
       // login would just see the developer-facing marketplace with no
       // obvious way back to their own dashboard, so this matters.
+      // Developers go to their own dashboard too (owner, 1 Oct): landing on
+      // Browse, the page a signed-out visitor sees, made it unclear they
+      // were signed in at all.
       const sessionRes = await fetch('/api/auth/session');
       const session = await sessionRes.json();
       const role = session?.user?.role;
-      router.push(role === 'contractor' ? '/contractor/dashboard' : '/browse');
+      router.push(role === 'contractor' ? '/contractor/dashboard' : role === 'developer' ? '/dashboard' : '/browse');
     } else if (result?.code === LOGIN_RATE_LIMITED_CODE) {
       setError(
         'Too many sign-in attempts. Please wait 15 minutes and try again, or use “Forgot password?” below to reset it now.'
