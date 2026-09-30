@@ -21,23 +21,24 @@
 
 import { useEffect, useState } from 'react';
 
-const DISMISS_KEY = 'kalm-install-prompt-dismissed';
+export const INSTALL_DISMISS_KEY = 'kalm-install-prompt-dismissed';
+const DISMISS_KEY = INSTALL_DISMISS_KEY;
 
-type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> };
+export type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> };
 type Mode = 'hidden' | 'android' | 'ios';
 
-function isStandalone(): boolean {
+export function isStandalone(): boolean {
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true
   );
 }
 
-function isIos(): boolean {
+export function isIos(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-function isPhoneOrTablet(): boolean {
+export function isPhoneOrTablet(): boolean {
   return window.matchMedia('(pointer: coarse)').matches;
 }
 

@@ -132,6 +132,10 @@ export default function ContractorProjectsPage() {
                 <div className="flex justify-between items-start gap-3">
                   <div>
                     <p className="font-medium text-sm">{p.title}</p>
+                    {/* KALM-181: subtle hint for projects with no photos. */}
+                    {p.imageUrls.length === 0 && (
+                      <p className="text-xs text-stone mt-0.5">No photos yet</p>
+                    )}
                     <p className="text-xs text-stone mt-1">
                       {p.projectType}
                     </p>
@@ -156,7 +160,11 @@ export default function ContractorProjectsPage() {
         )}
 
         <div className="border-t border-line pt-8">
-          <h2 className="font-display font-light text-xl mb-4">Add a project</h2>
+          <h2 className="font-display font-light text-xl mb-2">Add a project</h2>
+          {/* KALM-181: nudge towards adding photos. */}
+          <p className="text-xs text-stone mb-4">
+            Projects with photos get more enquiries. Add at least one photo to each.
+          </p>
           <form onSubmit={handleAdd} className="flex flex-col gap-3">
             <input
               placeholder="Project title"

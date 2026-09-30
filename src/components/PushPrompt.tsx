@@ -23,7 +23,8 @@
 import { useEffect, useState } from 'react';
 import { disablePush, enablePush, getPushState, syncPush, type PushState } from '@/lib/push-client';
 
-const DISMISS_KEY = 'kalm-push-prompt-dismissed';
+export const PUSH_DISMISS_KEY = 'kalm-push-prompt-dismissed';
+const DISMISS_KEY = PUSH_DISMISS_KEY;
 
 export default function PushPrompt({ persistent = false }: { persistent?: boolean }) {
   const [state, setState] = useState<PushState | null>(null);

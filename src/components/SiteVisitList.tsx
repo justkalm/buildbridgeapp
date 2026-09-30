@@ -67,7 +67,16 @@ const statusStyle: Record<SiteVisitStatus, string> = {
 const inputCls =
   'w-full text-sm px-3 py-2 border border-line rounded-[4px] bg-paper focus:outline-none focus:ring-2 focus:ring-ink';
 
-export default function SiteVisitList({ viewerRole }: { viewerRole: 'DEVELOPER' | 'CONTRACTOR' }) {
+// `inTab`: rendered inside the contractor dashboard's "Site visits" tab,
+// where the tab is the heading, so the section title is dropped and an
+// empty list says so instead of the section disappearing.
+export default function SiteVisitList({
+  viewerRole,
+  inTab = false,
+}: {
+  viewerRole: 'DEVELOPER' | 'CONTRACTOR';
+  inTab?: boolean;
+}) {
   const [visits, setVisits] = useState<Visit[] | null>(null);
   // "Now" as of the last load, used to tell upcoming visits from past
   // ones. Captured when data arrives rather than read during render, so
@@ -95,11 +104,23 @@ export default function SiteVisitList({ viewerRole }: { viewerRole: 'DEVELOPER' 
   }, [load]);
 
   if (!visits) return null;
-  if (visits.length === 0 && isContractor) return null;
+  if (visits.length === 0 && isContractor && !inTab) return null;
+
+  // KALM-178: visits still in play (waiting for an answer, or confirmed
+  // and still ahead) come first; declined, cancelled and already-happened
+  // ones fold into "Past visits" so they stop taking up the list. Anything
+  // the viewer hasn't seen yet (e.g. just cancelled by the other side)
+  // stays up top until they have.
+  const isCurrent = (v: Visit) =>
+    v.isNew ||
+    v.status === 'REQUESTED' ||
+    (v.status === 'CONFIRMED' && !!v.confirmedSlot && new Date(v.confirmedSlot).getTime() > loadedAt);
+  const current = visits.filter(isCurrent);
+  const past = visits.filter((v) => !isCurrent(v));
 
   return (
-    <section id="site-visits" className="mb-10 scroll-mt-24">
-      <h2 className="font-display font-light text-xl mb-1">Site visits</h2>
+    <section id="site-visits" className={`${inTab ? '' : 'mb-10'} scroll-mt-24`}>
+      {!inTab && <h2 className="font-display font-light text-xl mb-1">Site visits</h2>}
       <p className="text-stone text-xs mb-4">
         {isContractor
           ? 'Developers who want to see your completed projects in person.'
@@ -107,15 +128,34 @@ export default function SiteVisitList({ viewerRole }: { viewerRole: 'DEVELOPER' 
       </p>
       {visits.length === 0 ? (
         <p className="text-sm text-stone border border-line rounded-md p-5 bg-paper">
-          No site visits yet. Open a contractor&apos;s profile and choose &quot;Schedule a site visit&quot; to see their
-          work in person.
+          {isContractor
+            ? 'No site visits yet. When a developer asks to see your projects, it shows up here.'
+            : <>No site visits yet. Open a contractor&apos;s profile and choose &quot;Schedule a site visit&quot; to see their work in person.</>}
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {visits.map((v) => (
-            <VisitCard key={v.id} visit={v} isContractor={isContractor} now={loadedAt} onChanged={load} />
-          ))}
-        </div>
+        <>
+          {current.length === 0 ? (
+            <p className="text-sm text-stone">No upcoming site visits.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {current.map((v) => (
+                <VisitCard key={v.id} visit={v} isContractor={isContractor} now={loadedAt} onChanged={load} />
+              ))}
+            </div>
+          )}
+          {past.length > 0 && (
+            <details className="mt-4 group">
+              <summary className="text-sm text-stone cursor-pointer hover:text-ink select-none">
+                Past visits ({past.length})
+              </summary>
+              <div className="flex flex-col gap-3 mt-3">
+                {past.map((v) => (
+                  <VisitCard key={v.id} visit={v} isContractor={isContractor} now={loadedAt} onChanged={load} />
+                ))}
+              </div>
+            </details>
+          )}
+        </>
       )}
     </section>
   );

@@ -23,8 +23,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import Skeleton from '@/components/Skeleton';
-import InstallAppPrompt from '@/components/InstallAppPrompt';
-import PushPrompt from '@/components/PushPrompt';
+import AlertsStrip from '@/components/AlertsStrip';
 import SiteVisitList from '@/components/SiteVisitList';
 import { developerStatusLabel, type QuoteStatus } from '@/lib/quote-status';
 import { announceNotificationsChanged, useUnreadMessages } from '@/lib/use-unread-messages';
@@ -319,8 +318,8 @@ export default function DashboardPage() {
           </>
         )}
 
-        <InstallAppPrompt />
-        <PushPrompt />
+        {/* One slim line instead of two cards, as on the contractor dashboard. */}
+        <AlertsStrip audience="developer" />
 
         <SiteVisitList viewerRole="DEVELOPER" />
 

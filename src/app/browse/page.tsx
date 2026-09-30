@@ -181,7 +181,9 @@ function BrowsePageInner() {
     // silently reorder the original fetched list too.
     result = [...result];
 
-    // Tier always wins first — paying contractors (PRO, then PLUS) show
+    // KALM-172: profiles with no projects always go to the bottom (owner
+    // decision 1 Oct: empty promoted profiles at the top looked bad to
+    // developers). Among the rest, tier comes next — paying contractors (PRO, then PLUS) show
     // above free (LISTED) ones regardless of which sort option is picked.
     // This used to be undone entirely: the backend fetch already ordered
     // by tier, but this client-side sort ran on top of it and only looked
@@ -192,6 +194,9 @@ function BrowsePageInner() {
     const TIER_RANK: Record<Contractor['tier'], number> = { PRO: 0, PLUS: 1, LISTED: 2 };
 
     result.sort((a, b) => {
+      const emptyDiff = Number(a._count.projects === 0) - Number(b._count.projects === 0);
+      if (emptyDiff !== 0) return emptyDiff;
+
       const tierDiff = TIER_RANK[a.tier] - TIER_RANK[b.tier];
       if (tierDiff !== 0) return tierDiff;
 

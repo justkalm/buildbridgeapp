@@ -27,18 +27,20 @@ export function canTransition(from: QuoteStatus, to: QuoteStatus): boolean {
 }
 
 // Button text on the contractor's dashboard for moving TO each status.
+// Plain words since KALM-175: in the persona review, a contractor read
+// "Accept" as "I've won the job" and was afraid to tap the wrong button.
 export const contractorActionLabel: Record<Exclude<QuoteStatus, 'PENDING'>, string> = {
-  CONTACTED: 'Accept',
-  QUOTED: 'Mark quote sent',
-  DECLINED: 'Decline',
+  CONTACTED: 'Talking to them',
+  QUOTED: 'Quote sent',
+  DECLINED: 'Not interested',
 };
 
 // How the current status reads on the contractor's own dashboard.
 export const contractorStatusLabel: Record<QuoteStatus, string> = {
   PENDING: 'New',
-  CONTACTED: 'Accepted',
+  CONTACTED: 'Talking to them',
   QUOTED: 'Quote sent',
-  DECLINED: 'Declined',
+  DECLINED: 'Not interested',
 };
 
 // How the current status reads to the developer, on their dashboard and in

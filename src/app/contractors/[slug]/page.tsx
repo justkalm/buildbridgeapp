@@ -449,6 +449,11 @@ export default function ContractorProfilePage() {
           <div className="bg-paper border border-line rounded-md p-6 mb-5">
             <h4 className="font-display text-[15.5px] mb-4">Business Details</h4>
             <dl className="text-[13.5px]">
+              {/* KALM-171: a Verified contractor with only a placeholder
+                  licence hides the row entirely, so "pending" never sits
+                  next to a Verified badge. Non-verified ones keep the
+                  "License details pending" text. */}
+              {!(contractor.verificationStatus === 'VERIFIED' && isPlaceholderLicense(contractor.licenseNumber)) && (
               <div className="flex justify-between py-2.5 border-b border-line">
                 <dt className="text-stone">License Number</dt>
                 {/* Self-signed-up contractors get a placeholder
@@ -464,6 +469,7 @@ export default function ContractorProfilePage() {
                   <dd className="text-xs font-medium">{contractor.licenseNumber}</dd>
                 )}
               </div>
+              )}
               {(contractor.teamSizeMin || contractor.teamSizeMax) && (
                 <div className="flex justify-between py-2.5 border-b border-line">
                   <dt className="text-stone">Team Size</dt>
@@ -482,6 +488,15 @@ export default function ContractorProfilePage() {
               )}
             </dl>
           </div>
+
+          {/* KALM-180: one line explaining the contact options. The site
+              visit part only shows when that option is really available. */}
+          {showMessage && (
+            <p className="text-xs text-stone mb-2">
+              Message to ask a question · Request a quote for pricing
+              {contractor.acceptsSiteVisits && contractor.projects.length > 0 && ' · Site visit to see their work'}
+            </p>
+          )}
 
           {showMessage && (
             <div className="bg-paper border border-line rounded-md p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -547,7 +562,9 @@ export default function ContractorProfilePage() {
               <form onSubmit={handleQuoteSubmit} className="flex flex-col gap-3.5">
                 <div>
                   <label htmlFor="quote-project-type" className="block text-xs font-medium text-stone mb-1.5">
-                    Project type
+                    {/* KALM-179: label reads "Work needed"; the field, state and API
+                        name stay projectType. */}
+                    Work needed
                   </label>
                   <select
                     id="quote-project-type"
