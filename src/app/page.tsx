@@ -1,11 +1,23 @@
 // src/app/page.tsx — Landing page.
+//
+// Signed-in people never see it (owner, 1 Oct 2026): opening (kalm), the
+// logo link, or the Home Screen app (its start_url is "/", see
+// manifest.ts) takes a developer to /dashboard and a contractor to
+// /contractor/dashboard. Only signed-out visitors get the landing page.
 
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { auth } from '@/lib/auth';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { ALL_TRADES, HOMEPAGE_TRADES } from '@/lib/trade-types';
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  if (role === 'contractor') redirect('/contractor/dashboard');
+  if (role === 'developer') redirect('/dashboard');
+
   return (
     <>
       <Nav />

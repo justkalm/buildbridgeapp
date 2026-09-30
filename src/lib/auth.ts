@@ -121,7 +121,13 @@ async function verifyCredentials(normalizedEmail: string, password: string) {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  session: { strategy: 'jwt' },
+  // Developers and contractors stay signed in like in a phone app, so
+  // notifications and the Home Screen app keep working. A login lasts 30
+  // days from the last visit (refreshed at most once a day while used);
+  // after 30 days without opening (kalm) they're signed out. These are
+  // NextAuth's defaults, written out so the rule is visible. Admin has its
+  // own, much shorter 4-hour session (src/lib/admin-auth.ts).
+  session: { strategy: 'jwt', maxAge: 30 * 24 * 60 * 60, updateAge: 24 * 60 * 60 },
   pages: {
     signIn: '/login',
   },
