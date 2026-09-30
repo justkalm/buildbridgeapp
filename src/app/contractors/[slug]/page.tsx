@@ -449,11 +449,6 @@ export default function ContractorProfilePage() {
           <div className="bg-paper border border-line rounded-md p-6 mb-5">
             <h4 className="font-display text-[15.5px] mb-4">Business Details</h4>
             <dl className="text-[13.5px]">
-              {/* KALM-171: a Verified contractor with only a placeholder
-                  licence hides the row entirely, so "pending" never sits
-                  next to a Verified badge. Non-verified ones keep the
-                  "License details pending" text. */}
-              {!(contractor.verificationStatus === 'VERIFIED' && isPlaceholderLicense(contractor.licenseNumber)) && (
               <div className="flex justify-between py-2.5 border-b border-line">
                 <dt className="text-stone">License Number</dt>
                 {/* Self-signed-up contractors get a placeholder
@@ -469,7 +464,6 @@ export default function ContractorProfilePage() {
                   <dd className="text-xs font-medium">{contractor.licenseNumber}</dd>
                 )}
               </div>
-              )}
               {(contractor.teamSizeMin || contractor.teamSizeMax) && (
                 <div className="flex justify-between py-2.5 border-b border-line">
                   <dt className="text-stone">Team Size</dt>
