@@ -9,12 +9,49 @@
 
 import { Resend } from 'resend';
 import { formatVisitTime } from '@/lib/site-visits';
+import { prisma } from '@/lib/prisma';
 
 function getResendClient() {
   if (!process.env.RESEND_API_KEY) {
     throw new Error('RESEND_API_KEY is not set');
   }
   return new Resend(process.env.RESEND_API_KEY);
+}
+
+// Every sender below reports a failure through here, both when Resend hands
+// back { error } (the usual case) and when the call throws. It logs, and
+// also saves a short row (EmailFailure) so admin can see dropped emails at
+// Admin > Failed emails instead of digging through server logs. Only the
+// email's label, recipient and a short error string are stored, never the
+// body or any link/token. It must never throw: a broken log table should not
+// turn a failed email into a failed signup or quote request.
+export async function recordEmailFailure(
+  label: string,
+  to: string | string[],
+  error: unknown
+): Promise<void> {
+  console.error(`Email failed (${label}):`, error);
+  try {
+    let message: string;
+    if (error instanceof Error) message = error.message;
+    else if (typeof error === 'string') message = error;
+    else {
+      try {
+        message = JSON.stringify(error) ?? String(error);
+      } catch {
+        message = String(error);
+      }
+    }
+    await prisma.emailFailure.create({
+      data: {
+        label: label.slice(0, 100),
+        to: (Array.isArray(to) ? to.join(', ') : String(to)).slice(0, 500),
+        error: message.slice(0, 500),
+      },
+    });
+  } catch (dbErr) {
+    console.error('Could not save email failure row:', dbErr);
+  }
 }
 
 type QuoteRequestEmailInput = {
@@ -69,13 +106,13 @@ export async function sendQuoteRequestEmail(input: QuoteRequestEmailInput): Prom
     });
 
     if (error) {
-      console.error('Resend returned an error sending quote request email:', error);
+      await recordEmailFailure('quote request', notifyAddress, error);
       return false;
     }
 
     return true;
   } catch (err) {
-    console.error('Failed to send quote request email:', err);
+    await recordEmailFailure('quote request', notifyAddress, err);
     return false;
   }
 }
@@ -130,13 +167,13 @@ export async function sendProjectPostAdminEmail(input: ProjectPostEmailInput): P
     });
 
     if (error) {
-      console.error('Resend returned an error sending project post admin email:', error);
+      await recordEmailFailure('project post admin', notifyAddress, error);
       return false;
     }
 
     return true;
   } catch (err) {
-    console.error('Failed to send project post admin email:', err);
+    await recordEmailFailure('project post admin', notifyAddress, err);
     return false;
   }
 }
@@ -184,13 +221,13 @@ export async function sendProjectPostAlertEmail(input: ProjectPostAlertEmailInpu
     });
 
     if (error) {
-      console.error('Resend returned an error sending project post alert email:', error);
+      await recordEmailFailure('project post alert', input.toEmail, error);
       return false;
     }
 
     return true;
   } catch (err) {
-    console.error('Failed to send project post alert email:', err);
+    await recordEmailFailure('project post alert', input.toEmail, err);
     return false;
   }
 }
@@ -250,12 +287,12 @@ export async function sendVerificationEmail(input: {
       `,
     });
     if (error) {
-      console.error('Resend error sending verification email:', error);
+      await recordEmailFailure('verification', input.toEmail, error);
       return false;
     }
     return true;
   } catch (err) {
-    console.error('Failed to send verification email:', err);
+    await recordEmailFailure('verification', input.toEmail, err);
     return false;
   }
 }
@@ -280,12 +317,12 @@ export async function sendPasswordResetEmail(input: {
       `,
     });
     if (error) {
-      console.error('Resend error sending password reset email:', error);
+      await recordEmailFailure('password reset', input.toEmail, error);
       return false;
     }
     return true;
   } catch (err) {
-    console.error('Failed to send password reset email:', err);
+    await recordEmailFailure('password reset', input.toEmail, err);
     return false;
   }
 }
@@ -321,12 +358,12 @@ export async function sendClaimAccountEmail(input: {
       `,
     });
     if (error) {
-      console.error('Resend error sending claim-account email:', error);
+      await recordEmailFailure('claim account', input.toEmail, error);
       return false;
     }
     return true;
   } catch (err) {
-    console.error('Failed to send claim-account email:', err);
+    await recordEmailFailure('claim account', input.toEmail, err);
     return false;
   }
 }
@@ -362,12 +399,12 @@ export async function sendContactFormEmail(input: {
       `,
     });
     if (error) {
-      console.error('Resend error sending contact form email:', error);
+      await recordEmailFailure('contact form', notifyAddress, error);
       return false;
     }
     return true;
   } catch (err) {
-    console.error('Failed to send contact form email:', err);
+    await recordEmailFailure('contact form', notifyAddress, err);
     return false;
   }
 }
@@ -403,12 +440,12 @@ export async function sendQuoteStatusEmail(input: {
       `,
     });
     if (error) {
-      console.error('Resend error sending quote status email:', error);
+      await recordEmailFailure('quote status', input.toEmail, error);
       return false;
     }
     return true;
   } catch (err) {
-    console.error('Failed to send quote status email:', err);
+    await recordEmailFailure('quote status', input.toEmail, err);
     return false;
   }
 }
@@ -443,12 +480,12 @@ export async function sendNewMessageEmail(input: {
       `,
     });
     if (error) {
-      console.error('Resend error sending new message email:', error);
+      await recordEmailFailure('new message', input.toEmail, error);
       return false;
     }
     return true;
   } catch (err) {
-    console.error('Failed to send new message email:', err);
+    await recordEmailFailure('new message', input.toEmail, err);
     return false;
   }
 }
@@ -473,12 +510,12 @@ async function sendSimple(label: string, payload: Parameters<ReturnType<typeof g
   try {
     const { error } = await getResendClient().emails.send(payload);
     if (error) {
-      console.error(`Resend error sending ${label} email:`, error);
+      await recordEmailFailure(label, payload.to, error);
       return false;
     }
     return true;
   } catch (err) {
-    console.error(`Failed to send ${label} email:`, err);
+    await recordEmailFailure(label, payload.to, err);
     return false;
   }
 }

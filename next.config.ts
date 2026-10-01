@@ -40,47 +40,9 @@ const securityHeaders = [
     key: 'Referrer-Policy',
     value: 'strict-origin-when-cross-origin',
   },
-  {
-    // Content-Security-Policy: restricts where scripts, styles, images,
-    // and frames can load from. frame-ancestors 'none' is the modern,
-    // CSP-level equivalent of X-Frame-Options DENY (kept both since older
-    // browsers only respect the header).
-    //
-    // script-src MUST include 'unsafe-inline': Next.js hydrates every page
-    // using inline <script> tags it injects into the server-rendered HTML
-    // (serialized page data + the bootstrap script that mounts React).
-    // Without 'unsafe-inline' here, the browser silently blocks those
-    // scripts from running at all — the page renders as blank white,
-    // because the HTML shell loads fine but nothing ever hydrates or
-    // executes. This shipped broken once already; don't remove
-    // 'unsafe-inline' from script-src without switching to Next.js's
-    // nonce-based CSP support first, which is more setup than this slice
-    // needs right now. 'unsafe-inline' does weaken XSS protection
-    // somewhat, but the app has no dangerouslySetInnerHTML and no
-    // unsanitized user-content rendering, so the realistic exposure is
-    // low — trading a fully broken site for a moderately-relaxed script
-    // policy is the right call here.
-    //
-    // 'unsafe-eval' is added ONLY in development: React's dev-mode
-    // debugging tools (reconstructing component stacks, Fast Refresh) use
-    // eval() internally, and without 'unsafe-eval' `npm run dev` throws
-    // "eval() is not supported in this environment" and breaks local
-    // development entirely. React's own docs confirm it never uses eval()
-    // in production, so this only needs to (and only does) apply when
-    // iterating locally — the deployed site never gets 'unsafe-eval'.
-    key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https:",
-      "connect-src 'self'",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join('; '),
-  },
+  // Content-Security-Policy is NOT set here any more. It needs a fresh
+  // nonce on every page view, so proxy.ts builds it per request (task
+  // sheet F6; see the header comment there).
 ];
 
 const nextConfig: NextConfig = {

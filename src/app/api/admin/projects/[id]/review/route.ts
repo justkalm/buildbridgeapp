@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { recomputeContractorRating } from '@/lib/recompute-rating';
+import { rejectCrossOrigin } from '@/lib/same-origin';
 
 const reviewSchema = z.object({
   rating: z.number().int().min(1).max(5).nullable(),
@@ -24,6 +25,9 @@ const reviewSchema = z.object({
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const blocked = rejectCrossOrigin(req);
+  if (blocked) return blocked;
+
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }

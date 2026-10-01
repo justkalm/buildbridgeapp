@@ -24,6 +24,7 @@ import {
   tradeTypesField,
 } from '@/lib/project-validation';
 import { uniqueContractorSlug } from '@/lib/slugify';
+import { rejectCrossOrigin } from '@/lib/same-origin';
 
 const projectSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -97,6 +98,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = rejectCrossOrigin(req);
+  if (blocked) return blocked;
+
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }

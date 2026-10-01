@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   // Same per-developer limit and reasoning as quote-requests — this is a
   // separate bucket (different key prefix), so posting projects and
   // requesting quotes don't share one combined limit.
-  if (!checkRateLimit(`project-post:${session.user.id}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`project-post:${session.user.id}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },
       { status: 429 }

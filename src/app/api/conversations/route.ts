@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
       'Please verify your email before messaging contractors. Check your inbox, or resend the link from your dashboard.'
     );
     if (unverified) return unverified;
-    if (!checkRateLimit(`message-send:${developerId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 })) {
+    if (!(await checkRateLimit(`message-send:${developerId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 }))) {
       return NextResponse.json({ error: 'Too many messages. Please try again later.' }, { status: 429 });
     }
   }
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ id: existing.id, existing: true });
   }
 
-  if (!checkRateLimit(`enquiry-start:${developerId}`, { maxAttempts: 10, windowMs: 24 * 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`enquiry-start:${developerId}`, { maxAttempts: 10, windowMs: 24 * 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'You have started a lot of new conversations today. Please try again tomorrow.' },
       { status: 429 }

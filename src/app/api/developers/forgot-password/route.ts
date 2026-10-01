@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   // account, and the response is identical either way — otherwise an
   // attacker could distinguish "real account, rate-limited" from "no such
   // account" by which response they get.
-  if (!checkRateLimit(`developer-forgot-password:${normalizedEmail}`, { maxAttempts: 3, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`developer-forgot-password:${normalizedEmail}`, { maxAttempts: 3, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(GENERIC_RESPONSE);
   }
 

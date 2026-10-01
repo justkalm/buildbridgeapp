@@ -19,11 +19,15 @@ import { put } from '@vercel/blob';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { verifyImageFileType } from '@/lib/verify-image';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { rejectCrossOrigin } from '@/lib/same-origin';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 export async function POST(req: NextRequest) {
+  const blocked = rejectCrossOrigin(req);
+  if (blocked) return blocked;
+
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
@@ -34,7 +38,7 @@ export async function POST(req: NextRequest) {
   // admin password+2FA can reach this at all, but consistent protection
   // is simple to add and costs nothing.
   const ip = getClientIp(req);
-  if (!checkRateLimit(`admin-upload:${ip}`, { maxAttempts: 30, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`admin-upload:${ip}`, { maxAttempts: 30, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'Too many uploads. Please try again later.' },
       { status: 429 }

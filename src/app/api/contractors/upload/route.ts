@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   // contractor could script unlimited uploads. 30/hour is generous for
   // genuine use (a handful of project photos at a time) while capping a
   // scripted burst.
-  if (!checkRateLimit(`contractor-upload:${session.user.id}`, { maxAttempts: 30, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`contractor-upload:${session.user.id}`, { maxAttempts: 30, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'Too many uploads. Please try again later.' },
       { status: 429 }

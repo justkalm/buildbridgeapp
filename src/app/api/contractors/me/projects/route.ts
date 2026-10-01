@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   // project creation (each with up to 20 image URLs). 20/hour is generous
   // for genuine use — nobody legitimately adds more than a handful of
   // projects in one sitting.
-  if (!checkRateLimit(`project-create:${contractorId}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`project-create:${contractorId}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },
       { status: 429 }

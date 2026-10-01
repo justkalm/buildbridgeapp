@@ -71,7 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // Rate limited per sender — a real-time-feeling chat is exactly the
   // kind of feature that invites rapid-fire scripted spam if uncapped.
-  if (!checkRateLimit(`message-send:${party.userId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`message-send:${party.userId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'Too many messages. Please try again later.' },
       { status: 429 }

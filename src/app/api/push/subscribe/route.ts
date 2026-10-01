@@ -35,7 +35,7 @@ async function currentOwner() {
 export async function POST(req: Request) {
   const owner = await currentOwner();
   if (!owner) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
-  if (!checkRateLimit(`push-subscribe:${owner.ownerId}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`push-subscribe:${owner.ownerId}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 429 });
   }
 

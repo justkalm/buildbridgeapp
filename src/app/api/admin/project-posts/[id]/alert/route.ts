@@ -17,12 +17,16 @@ import { prisma } from '@/lib/prisma';
 import { sendProjectPostAlertEmail } from '@/lib/email';
 import { sendPush } from '@/lib/push';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { rejectCrossOrigin } from '@/lib/same-origin';
 
 const alertSchema = z.object({
   contractorIds: z.array(z.string().min(1)).min(1).max(20),
 });
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const blocked = rejectCrossOrigin(req);
+  if (blocked) return blocked;
+
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
@@ -30,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Each alert sends real emails via Resend — rate limiting this also
   // protects against burning email-sending quota, not just general abuse.
   const ip = getClientIp(req);
-  if (!checkRateLimit(`admin-project-alert:${ip}`, { maxAttempts: 30, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`admin-project-alert:${ip}`, { maxAttempts: 30, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },
       { status: 429 }

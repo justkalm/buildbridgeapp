@@ -55,6 +55,38 @@ import { sendReverifyRequestEmail } from '@/lib/email';
 import { normalizeLocation } from '@/lib/location';
 import { insuranceCoverLakhField, teamSizeField, teamSizeRangeError, tradeTypesField } from '@/lib/project-validation';
 
+// The ONLY contractor columns this endpoint ever returns, for both GET and
+// PATCH. An explicit select (instead of returning the whole row) means a
+// column added to the schema later, such as another token or an internal
+// counter, can never leak to the browser by accident. Each field is here
+// because a page reads it:
+//   - dashboard: id, name, verificationStatus, tier, emailVerified
+//   - profile edit form (and its credential-change check): name, bio, city,
+//     area, tradeTypes, yearsInBusiness, teamSizeMin/Max, gstRegistered,
+//     insuranceCoverLakh, phone, verificationStatus
+//   - consent page: dataSharingConsent, dataSharingConsentAt
+// Deliberately NOT here: passwordHash, email*/passwordReset* tokens and
+// expiries, sessionVersion, reverify internals, licenseNumber, slug, email.
+const CONTRACTOR_SELF_SELECT = {
+  id: true,
+  name: true,
+  bio: true,
+  city: true,
+  area: true,
+  tradeTypes: true,
+  yearsInBusiness: true,
+  teamSizeMin: true,
+  teamSizeMax: true,
+  gstRegistered: true,
+  insuranceCoverLakh: true,
+  phone: true,
+  verificationStatus: true,
+  tier: true,
+  emailVerified: true,
+  dataSharingConsent: true,
+  dataSharingConsentAt: true,
+} as const;
+
 async function requireContractor() {
   const session = await auth();
   if (!session?.user || (session.user as { role?: string }).role !== 'contractor') {
@@ -71,18 +103,29 @@ export async function GET() {
 
   const contractor = await prisma.contractor.findUnique({
     where: { id: contractorId },
-    include: {
-      projects: { orderBy: { createdAt: 'desc' } },
+    select: {
+      ...CONTRACTOR_SELF_SELECT,
       // Previously omitted `developer` entirely here, while the dashboard
       // page reads `r.developer.name` on every quote request row — any
       // contractor with at least one real quote request crashed the whole
       // dashboard on load. Also including email/phone now, not just name:
       // the point of a contractor seeing their quote requests at all is so
       // they can reach out directly, not just see that someone asked.
+      // Explicit fields only (the dashboard's row type); contractorSeenAt
+      // and kind are needed here on the server but stripped before sending.
       quoteRequests: {
         orderBy: { createdAt: 'desc' },
         take: 50,
-        include: {
+        select: {
+          id: true,
+          kind: true,
+          projectType: true,
+          location: true,
+          budgetRangeLabel: true,
+          details: true,
+          status: true,
+          createdAt: true,
+          contractorSeenAt: true,
           developer: { select: { name: true, email: true, phone: true } },
         },
       },
@@ -99,7 +142,10 @@ export async function GET() {
       projectAlerts: {
         orderBy: { alertedAt: 'desc' },
         take: 50,
-        include: {
+        select: {
+          id: true,
+          alertedAt: true,
+          seenAt: true,
           projectPost: {
             select: {
               id: true,
@@ -145,36 +191,30 @@ export async function GET() {
       return { ...r, leadVisibility: 'full' as const };
     }
 
-    // Blurred: strip contactPhone entirely and truncate details, not just
-    // the developer object. Previously `...rest` kept every other field
-    // on the QuoteRequest — including contactPhone (the developer's own
-    // phone number, captured at request time even before any contractor
-    // relationship exists) and the full, untruncated details text, which
+    // Blurred: truncate details and strip the developer's contact info.
+    // Previously `...rest` kept every other field on the QuoteRequest,
+    // including contactPhone (the developer's own phone number, captured
+    // at request time even before any contractor relationship exists; the
+    // select above no longer fetches it at all) and the full, untruncated
+    // details text, which
     // frequently contains a site address or a second number. A LISTED
     // contractor at their cap could open devtools, read this response
     // directly, and get full contact information for a "blurred" lead —
     // the blur was cosmetic on the frontend while the real data still
     // shipped in the JSON. Stripping it here, not just hiding it in the
     // UI, is what actually enforces the cap.
-    const { developer, contactPhone: _contactPhone, details, ...rest } = r;
+    const { developer, details, ...rest } = r;
     return {
       ...rest,
       details: details.length > 80 ? `${details.slice(0, 80)}…` : details,
-      contactPhone: null,
       developer: { name: developer.name, email: null, phone: null },
       leadVisibility: 'blurred' as const,
     };
   });
 
-  // Never return passwordHash or reset/verify tokens to the client.
-  const {
-    passwordHash: _passwordHash,
-    emailVerifyToken: _evt,
-    passwordResetToken: _prt,
-    quoteRequests: _rawQuoteRequests,
-    projectAlerts: rawProjectAlerts,
-    ...safe
-  } = contractor;
+  // Pull the profile fields out of the row; the quote requests and alerts
+  // are rebuilt below with only what the dashboard shows.
+  const { quoteRequests: _rawQuoteRequests, projectAlerts: rawProjectAlerts, ...safe } = contractor;
 
   // In-app notifications (see file header): anything not yet seen is
   // flagged isNew for this response, then marked seen.
@@ -214,7 +254,7 @@ export async function GET() {
   const projectAlerts =
     contractor.tier === 'LISTED'
       ? []
-      : rawProjectAlerts.map((a) => ({
+      : rawProjectAlerts.map(({ seenAt: _seenAt, ...a }) => ({
           ...a,
           isNew: newAlertSet.has(a.id),
           conversationId: conversationByPost.get(a.projectPost.id) ?? null,
@@ -227,7 +267,8 @@ export async function GET() {
     // the lead cap above, since every kind is a lead.)
     quoteRequests: quoteRequestsWithVisibility
       .filter((r) => r.kind === 'QUOTE')
-      .map((r) => ({ ...r, isNew: newQuoteSet.has(r.id) })),
+      // contractorSeenAt and kind are server-side bookkeeping only.
+      .map(({ contractorSeenAt: _seen, kind: _kind, ...r }) => ({ ...r, isNew: newQuoteSet.has(r.id) })),
     projectAlerts,
     leadLimit:
       contractor.tier === 'LISTED'
@@ -372,6 +413,9 @@ export async function PATCH(req: Request) {
           }
         : {}),
     },
+    // Same explicit field list as GET, so the profile page can drop the
+    // response straight into its state without ever seeing hashes/tokens.
+    select: CONTRACTOR_SELF_SELECT,
   });
 
   if (flagForReverify) {
@@ -385,12 +429,5 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const {
-    passwordHash: _passwordHash,
-    emailVerifyToken: _evt,
-    passwordResetToken: _prt,
-    ...safe
-  } = updated;
-
-  return NextResponse.json(safe);
+  return NextResponse.json(updated);
 }

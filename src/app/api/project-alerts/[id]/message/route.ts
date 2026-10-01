@@ -51,7 +51,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  if (!checkRateLimit(`message-send:${contractorId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`message-send:${contractorId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json({ error: 'Too many messages. Please try again later.' }, { status: 429 });
   }
 

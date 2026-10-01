@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   );
   if (unverified) return unverified;
 
-  if (!checkRateLimit(`site-visit:${developerId}`, { maxAttempts: 10, windowMs: 24 * 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`site-visit:${developerId}`, { maxAttempts: 10, windowMs: 24 * 60 * 60 * 1000 }))) {
     return NextResponse.json({ error: 'You have sent a lot of visit requests today. Please try again tomorrow.' }, { status: 429 });
   }
 

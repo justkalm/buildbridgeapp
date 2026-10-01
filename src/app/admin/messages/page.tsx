@@ -48,6 +48,15 @@ type ThreadDetail = {
   messages: ThreadMessage[];
 };
 
+// Accepts either the bare ID or a whole pasted web address (anything with
+// /messages/<id> in it), so nobody has to trim the URL by hand. Query
+// strings, hashes and trailing slashes after the ID are ignored.
+function extractConversationId(input: string): string {
+  const trimmed = input.trim();
+  const match = trimmed.match(/\/messages\/([^/?#\s]+)/);
+  return match ? match[1] : trimmed;
+}
+
 export default function AdminMessagesPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +85,7 @@ export default function AdminMessagesPage() {
     if (res.ok) {
       setThread(await res.json());
     } else {
-      setThreadError('Could not find a quote request with that ID.');
+      setThreadError('Could not find a conversation with that ID.');
     }
     setLoadingThread(false);
   }
@@ -196,24 +205,25 @@ export default function AdminMessagesPage() {
         )}
 
         <div className="border-t border-line pt-8">
-          <h2 className="font-display text-lg mb-2">View a conversation</h2>
+          <h2 className="font-display text-lg mb-2">Open a specific conversation</h2>
           <p className="text-stone text-sm mb-4">
-            For dispute resolution, paste a quote request ID to read that specific thread.
+            Every conversation has an ID. It&apos;s the code at the end of the conversation&apos;s
+            web address, after /messages/. Paste it here to open it directly.
           </p>
           <div className="flex gap-2 mb-4">
             <input
               type="text"
               value={quoteRequestIdInput}
               onChange={(e) => setQuoteRequestIdInput(e.target.value)}
-              placeholder="Quote request ID"
+              placeholder="Conversation ID or web address"
               className="flex-1 text-sm px-3.5 py-2.5 border border-line rounded-[4px] bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
             />
             <button
-              onClick={() => openThread(quoteRequestIdInput.trim())}
-              disabled={!quoteRequestIdInput.trim() || loadingThread}
+              onClick={() => openThread(extractConversationId(quoteRequestIdInput))}
+              disabled={!extractConversationId(quoteRequestIdInput) || loadingThread}
               className="text-sm font-medium px-5 py-2.5 rounded-full bg-ink text-paper disabled:opacity-60"
             >
-              {loadingThread ? 'Loading…' : 'View conversation'}
+              {loadingThread ? 'Loading…' : 'Open conversation'}
             </button>
           </div>
 

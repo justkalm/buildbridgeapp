@@ -23,7 +23,7 @@ export async function POST() {
     return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   }
 
-  if (!checkRateLimit(`resend-verification:${session.user.id}`, { maxAttempts: 3, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`resend-verification:${session.user.id}`, { maxAttempts: 3, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'We already sent a few links recently. Check your inbox and spam folder, or try again in an hour.' },
       { status: 429 }

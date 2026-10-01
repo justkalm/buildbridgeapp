@@ -92,7 +92,7 @@ export async function POST(req: Request) {
   // Rate limited per developer — this is a lightweight write, but nothing
   // stops a logged-in account from scripting rapid add/remove calls
   // without a limit, and every other mutating route in the app has one.
-  if (!checkRateLimit(`shortlist-add:${developerId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`shortlist-add:${developerId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },
       { status: 429 }

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
@@ -39,7 +40,11 @@ export const metadata: Metadata = {
     "(kalm) connects developers with licensed, verified contractors. See project history with photos, timelines and sizes, and schedule site visits.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+// Every page renders per request so it can carry this request's CSP nonce
+// (see proxy.ts). Pages pre-built at deploy time have no request, so no
+// nonce, and the browser would block all their scripts.
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  await connection();
   return (
     <html lang="en" className={`${fraunces.variable} ${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-paper text-ink">

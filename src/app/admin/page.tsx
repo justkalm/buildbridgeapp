@@ -8,6 +8,7 @@
 import Link from 'next/link';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import AdminLoginForm from './login-form';
+import AdminSignOutButtons from './sign-out-buttons';
 
 export default async function AdminPage() {
   const authenticated = await isAdminAuthenticated();
@@ -79,7 +80,19 @@ export default async function AdminPage() {
               See how many leads turn into real conversations, and open a thread if needed.
             </p>
           </Link>
+
+          <Link
+            href="/admin/emails"
+            className="block bg-white border border-line rounded-md p-6 hover:border-ink transition-colors"
+          >
+            <h2 className="font-display font-semibold text-lg mb-1">Failed emails</h2>
+            <p className="text-stone text-sm">
+              See which emails the site could not send, and to whom.
+            </p>
+          </Link>
         </div>
+
+        <AdminSignOutButtons />
       </div>
     </main>
   );

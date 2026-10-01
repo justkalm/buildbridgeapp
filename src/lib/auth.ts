@@ -48,12 +48,12 @@
 // refunds its OWN reservation, never earlier failures — so an attacker
 // can't "wash" a bucket by interleaving logins to their own account.
 //
-// Same in-memory limiter as admin login, with the same honest caveat
-// (see src/lib/rate-limit.ts header): per server instance, resets on
-// deploy, so on Vercel the true ceiling is "these limits × number of warm
-// instances". It blunts scripted guessing; the password policy is what
-// actually makes guessing hopeless. Move to Upstash/Vercel WAF if this
-// ever needs to be airtight.
+// Same shared limiter as admin login (src/lib/rate-limit.ts): the counts
+// live in Upstash Redis, so the limits hold across every server instance
+// and survive deploys. If Redis is unreachable or not configured, it falls
+// back to a per-instance in-memory counter (and logs once), so a Redis
+// outage degrades the limit rather than breaking login. The password
+// policy is still what actually makes guessing hopeless.
 //
 // When blocked, authorize() throws LoginRateLimited (a CredentialsSignin
 // subclass with code 'rate_limited'). NextAuth passes that code through to
@@ -95,6 +95,7 @@ async function verifyCredentials(normalizedEmail: string, password: string) {
       name: developer.name,
       email: developer.email,
       role: 'developer' as const,
+      sessionVersion: developer.sessionVersion,
     };
   }
 
@@ -114,6 +115,7 @@ async function verifyCredentials(normalizedEmail: string, password: string) {
       name: contractor.name,
       email: contractor.email,
       role: 'contractor' as const,
+      sessionVersion: contractor.sessionVersion,
     };
   }
 
@@ -160,10 +162,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const ipKey = ip === 'unknown' ? null : `login-ip:${ip}`;
         const emailKey = `login-email:${normalizedEmail}`;
         const opts = { windowMs: LOGIN_WINDOW_MS };
-        if (ipKey && !checkRateLimit(ipKey, { ...opts, maxAttempts: LOGIN_MAX_FAILURES_PER_IP })) {
+        if (ipKey && !(await checkRateLimit(ipKey, { ...opts, maxAttempts: LOGIN_MAX_FAILURES_PER_IP }))) {
           throw new LoginRateLimited();
         }
-        if (!checkRateLimit(emailKey, { ...opts, maxAttempts: LOGIN_MAX_FAILURES_PER_EMAIL })) {
+        if (!(await checkRateLimit(emailKey, { ...opts, maxAttempts: LOGIN_MAX_FAILURES_PER_EMAIL }))) {
           // The IP reservation above stays charged: a request aimed at a
           // locked-out account is itself a signal worth counting.
           throw new LoginRateLimited();
@@ -173,18 +175,43 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (user) {
           // Success — give both reservations back so only failures count.
-          refundRateLimit(emailKey);
-          if (ipKey) refundRateLimit(ipKey);
+          await refundRateLimit(emailKey);
+          if (ipKey) await refundRateLimit(ipKey);
         }
         return user;
       },
     }),
   ],
   callbacks: {
+    // PASSWORD RESET SIGNS OUT OTHER DEVICES (task sheet F5, KALM-186).
+    // Each account has a sessionVersion number, bumped by every password
+    // reset. A login remembers the number it saw (token.sv). On every
+    // later session check we compare it with the account's current number;
+    // if the password has been reset since, the numbers differ and
+    // returning null makes NextAuth delete that device's login cookie, so
+    // it's signed out. One small database read per check, by primary key.
+    // Logins from before this existed carry no number and count as 0,
+    // which matches the default, so deploying this signs nobody out.
+    // A deleted account also fails the check and is signed out.
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
+        token.sv = (user as { sessionVersion?: number }).sessionVersion ?? 0;
+        return token;
+      }
+
+      if (typeof token.id !== 'string') return null;
+      const where = { id: token.id };
+      const select = { sessionVersion: true } as const;
+      const account =
+        token.role === 'developer'
+          ? await prisma.developer.findUnique({ where, select })
+          : token.role === 'contractor'
+            ? await prisma.contractor.findUnique({ where, select })
+            : null;
+      if (!account || account.sessionVersion !== ((token.sv as number | undefined) ?? 0)) {
+        return null;
       }
       return token;
     },

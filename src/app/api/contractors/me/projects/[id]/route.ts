@@ -50,7 +50,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Same reasoning and limit as project creation — see the POST route in
   // ../route.ts. Separate bucket (different key prefix) so create and
   // edit don't share one combined limit.
-  if (!checkRateLimit(`project-edit:${contractorId}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`project-edit:${contractorId}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },
       { status: 429 }
@@ -96,7 +96,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   }
 
   // Same limit as create/edit — see the POST route in ../route.ts.
-  if (!checkRateLimit(`project-delete:${contractorId}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`project-delete:${contractorId}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },
       { status: 429 }

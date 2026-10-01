@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   // burning email-sending cost. 20/hour is generous for a genuine
   // developer shortlisting contractors, while still capping a scripted or
   // malicious burst.
-  if (!checkRateLimit(`quote-request:${session.user.id}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`quote-request:${session.user.id}`, { maxAttempts: 20, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },
       { status: 429 }

@@ -40,7 +40,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   // Each change sends an email, so cap it. 60/hour is far more than any
   // contractor working through their leads by hand would need.
-  if (!checkRateLimit(`quote-status:${party.userId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`quote-status:${party.userId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json({ error: 'Too many updates. Please try again later.' }, { status: 429 });
   }
 

@@ -133,6 +133,11 @@ model Contractor {
   // Developer, kept as separate token fields so a live reset link can't
   // also be replayed to verify an email.
   emailVerified               Boolean   @default(false)
+  // Bumped every time the password is reset (or changed). Each login
+  // records the value it saw; the session check in src/lib/auth.ts signs
+  // out any device whose number is older, so a password reset logs out
+  // every other device. See KALM-186 / task sheet F5.
+  sessionVersion Int @default(0)
   emailVerifyToken            String?   @unique
   emailVerifyTokenExpiresAt   DateTime?
   passwordResetToken          String?   @unique
@@ -233,6 +238,11 @@ model Developer {
   // Those are the actions that email contractors or admin on the
   // developer's behalf, so they need a real, reachable address.
   emailVerified              Boolean   @default(false)
+  // Bumped every time the password is reset (or changed). Each login
+  // records the value it saw; the session check in src/lib/auth.ts signs
+  // out any device whose number is older, so a password reset logs out
+  // every other device. See KALM-186 / task sheet F5.
+  sessionVersion Int @default(0)
   emailVerifyToken           String?   @unique
   emailVerifyTokenExpiresAt  DateTime?
 
@@ -611,4 +621,31 @@ model PushSubscription {
   lastUsedAt DateTime?
 
   @@index([ownerRole, ownerId])
+}
+
+
+// One row per admin login. The admin cookie carries this row's id (signed
+// with ADMIN_SESSION_SECRET); every admin API call checks the row still
+// exists, is not revoked and has not expired. That's what makes admin
+// sessions revocable: "Sign out everywhere" sets revokedAt on every row.
+// See src/lib/admin-auth.ts.
+model AdminSession {
+  id        String    @id
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  ip        String?
+  userAgent String?
+}
+
+// Every email Resend refused or failed to send, so failures are visible
+// in Admin instead of disappearing into server logs (task sheet F7).
+model EmailFailure {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  label     String // which email, e.g. "password reset"
+  to        String
+  error     String
+
+  @@index([createdAt])
 }

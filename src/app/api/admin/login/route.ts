@@ -30,10 +30,14 @@ import crypto from 'crypto';
 import { setAdminSession } from '@/lib/admin-auth';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { verifyAdminTotp } from '@/lib/admin-totp';
+import { rejectCrossOrigin } from '@/lib/same-origin';
 
 export async function POST(req: NextRequest) {
+  const blocked = rejectCrossOrigin(req);
+  if (blocked) return blocked;
+
   const ip = getClientIp(req);
-  const allowed = checkRateLimit(`admin-login:${ip}`, {
+  const allowed = await checkRateLimit(`admin-login:${ip}`, {
     maxAttempts: 10,
     windowMs: 15 * 60 * 1000, // 15 minutes
   });

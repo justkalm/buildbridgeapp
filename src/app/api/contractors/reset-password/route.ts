@@ -66,6 +66,10 @@ export async function POST(req: NextRequest) {
     where: { id: contractor.id },
     data: {
       passwordHash,
+      // Signs this account out on every other device (see the jwt
+      // callback in src/lib/auth.ts). The person resetting isn't signed in
+      // here; they log in fresh with the new password afterwards.
+      sessionVersion: { increment: 1 },
       passwordResetToken: null,
       passwordResetTokenExpiresAt: null,
       // Using a reset link proves inbox ownership just as well as the

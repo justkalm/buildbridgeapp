@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   const normalizedEmail = parsed.data.email.toLowerCase();
 
-  if (!checkRateLimit(`contractor-forgot-password:${normalizedEmail}`, { maxAttempts: 3, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`contractor-forgot-password:${normalizedEmail}`, { maxAttempts: 3, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json(GENERIC_RESPONSE);
   }
 

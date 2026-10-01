@@ -61,7 +61,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { visit, party } = loaded;
   const userId = party === 'DEVELOPER' ? visit.developerId : visit.contractorId;
 
-  if (!checkRateLimit(`site-visit-update:${userId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 })) {
+  if (!(await checkRateLimit(`site-visit-update:${userId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json({ error: 'Too many updates. Please try again later.' }, { status: 429 });
   }
 
