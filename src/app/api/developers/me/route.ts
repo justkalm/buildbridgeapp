@@ -19,7 +19,7 @@ export async function GET() {
 
   const developer = await prisma.developer.findUnique({
     where: { id: session.user.id },
-    select: { name: true, email: true, emailVerified: true },
+    select: { name: true, email: true, emailVerified: true, phone: true }, // phone pre-fills quote forms
   });
   if (!developer) {
     return NextResponse.json({ error: 'Account not found' }, { status: 401 });

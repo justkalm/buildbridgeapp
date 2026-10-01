@@ -255,6 +255,7 @@ model Developer {
   quoteRequests QuoteRequest[]
   projectPosts  ProjectPost[]
   shortlist     ShortlistedContractor[]
+  savedProjects SavedProject[]
   siteVisits    SiteVisit[]
 
   createdAt DateTime @default(now())
@@ -648,4 +649,30 @@ model EmailFailure {
   error     String
 
   @@index([createdAt])
+}
+
+// A developer's reusable project details ("Andheri tower, Rs. 2 crore,
+// 18 floors..."), saved once and picked on the quote form so they never
+// retype them. Private to the developer; contractors only ever see the
+// copy that goes into each QuoteRequest. Saved from the quote form ("Save
+// these details as a project") or from the dashboard. See
+// src/lib/saved-projects.ts.
+model SavedProject {
+  id String @id @default(cuid())
+
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  name       String // the developer's own label, e.g. "Andheri tower"
+  workNeeded String? // a trade, e.g. "Electrical"; optional
+  location   String
+  // Whole rupees, optional. BigInt because crore-scale amounts overflow a
+  // 32-bit Int (max about Rs. 214 crore).
+  budgetRupees BigInt?
+  details      String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([developerId])
 }

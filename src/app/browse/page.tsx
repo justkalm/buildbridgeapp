@@ -2,6 +2,7 @@
 
 'use client';
 
+import { SHOW_RATINGS } from '@/lib/ratings';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -514,7 +515,7 @@ function BrowsePageInner() {
                             <span className="font-medium block">{c._count.projects}</span>
                             <span className="text-xs text-stone">Projects listed</span>
                           </div>
-                          {c.reviewCount > 0 && (
+                          {SHOW_RATINGS && c.reviewCount > 0 && (
                             // KALM-067: the visual "4.5 ★ / 12 reviews"
                             // pair is hidden from screen readers, which
                             // would read it as "4.5 black star 12

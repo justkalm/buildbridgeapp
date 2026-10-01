@@ -38,7 +38,17 @@ import ProfileMessageLoginLink from '@/components/ProfileMessageLoginLink';
 import ProfileImage from '@/components/ProfileImage';
 import ProfileStars from '@/components/ProfileStars';
 import ProfileReview from '@/components/ProfileReview';
+import { SHOW_RATINGS } from '@/lib/ratings';
 import ProfileSkeleton from '@/components/ProfileSkeleton';
+import {
+  EMPTY_QUOTE_DETAILS,
+  QuoteDetailsFields,
+  SavedProjectPicker,
+  detailsFromProject,
+  quoteDetailsBody,
+  useQuoteFormData,
+  type QuoteDetails,
+} from '@/components/QuoteFormParts';
 import ProfileQuoteBar, { ProfileQuoteBarSpacer } from '@/components/ProfileQuoteBar';
 import { isPlaceholderLicense } from '@/lib/license';
 import { formatLocation } from '@/lib/location';
@@ -115,10 +125,10 @@ export default function ContractorProfilePage() {
   const cardButtons = useRef(new Map<string, HTMLButtonElement>());
 
   const [projectType, setProjectType] = useState('');
-  const [location, setLocation] = useState('');
-  const [budgetRangeLabel, setBudgetRangeLabel] = useState('Under ₹50 L');
-  const [details, setDetails] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
+  // Location, optional budget, details, phone and "save as a project";
+  // see src/components/QuoteFormParts.
+  const [quoteDetails, setQuoteDetails] = useState<QuoteDetails>(EMPTY_QUOTE_DETAILS);
+  const [projectSavedNote, setProjectSavedNote] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<'success' | 'error' | null>(null);
   // Holds the API's own error message (and, for a known error code, that
@@ -130,6 +140,12 @@ export default function ContractorProfilePage() {
   const role = (session?.user as { role?: string } | undefined)?.role;
   const isDeveloper = status === 'authenticated' && role === 'developer';
   const isContractorViewer = status === 'authenticated' && role === 'contractor';
+
+  // Saved projects for the picker, and the account phone pre-filled (only
+  // if the developer hasn't already typed one).
+  const { projects: savedProjects } = useQuoteFormData(isDeveloper, (phone) =>
+    setQuoteDetails((d) => (d.contactPhone ? d : { ...d, contactPhone: phone }))
+  );
 
   useEffect(() => {
     if (!params.slug) return;
@@ -204,18 +220,22 @@ export default function ContractorProfilePage() {
         body: JSON.stringify({
           contractorId: contractor.id,
           projectType,
-          location,
-          budgetRangeLabel,
-          details,
-          contactPhone,
+          ...quoteDetailsBody(quoteDetails),
         }),
       });
 
       if (res.ok) {
+        const data: { projectSaved?: boolean } = await res.json().catch(() => ({}));
+        setProjectSavedNote(
+          data.projectSaved === true
+            ? `Saved as "${quoteDetails.projectName.trim()}". Pick it from "Use a saved project" next time.`
+            : data.projectSaved === false
+              ? 'Your request was sent, but the project could not be saved. You can add it from your dashboard.'
+              : null
+        );
         setSubmitResult('success');
-        setDetails('');
-        setLocation('');
-        setContactPhone('');
+        // Keep the phone for the next request; clear the rest.
+        setQuoteDetails((d) => ({ ...EMPTY_QUOTE_DETAILS, contactPhone: d.contactPhone }));
       } else {
         setSubmitResult('error');
         // Show the API's own explanation (e.g. "You've already sent a
@@ -317,7 +337,7 @@ export default function ContractorProfilePage() {
                     </span>
                   ) : null}
                 </div>
-                {contractor.reviewCount > 0 && (
+                {SHOW_RATINGS && contractor.reviewCount > 0 && (
                   <div className="flex items-center gap-2.5">
                     <ProfileStars rating={contractor.rating} className="text-ink text-base tracking-wide" />
                     {/* Visible number repeats the screen-reader sentence above. */}
@@ -419,7 +439,7 @@ export default function ContractorProfilePage() {
                         ].filter(Boolean).join(' · ')}
                       </p>
                     )}
-                    {p.reviewRating ? (
+                    {SHOW_RATINGS && p.reviewRating ? (
                       <div className="border-t border-line pt-3 mt-1">
                         <ProfileReview rating={p.reviewRating} text={p.reviewText} developerName={p.developerName} />
                       </div>
@@ -551,9 +571,20 @@ export default function ContractorProfilePage() {
                 <p className="text-stone">
                   {contractor.name} will be notified and can reach out to discuss your project.
                 </p>
+                {projectSavedNote && <p className="text-stone mt-2">{projectSavedNote}</p>}
               </div>
             ) : (
               <form onSubmit={handleQuoteSubmit} className="flex flex-col gap-3.5">
+                <SavedProjectPicker
+                  projects={savedProjects}
+                  onPick={(p) => {
+                    setQuoteDetails((d) => detailsFromProject(d, p));
+                    // Use the project's work needed if this contractor does it.
+                    if (p.workNeeded && quoteOptionsFor(contractor.tradeTypes).includes(p.workNeeded)) {
+                      setProjectType(p.workNeeded);
+                    }
+                  }}
+                />
                 <div>
                   <label htmlFor="quote-project-type" className="block text-xs font-medium text-stone mb-1.5">
                     {/* KALM-179: label reads "Work needed"; the field, state and API
@@ -572,52 +603,7 @@ export default function ContractorProfilePage() {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone mb-1.5">Location</label>
-                  <input
-                    type="text"
-                    required
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Area, City"
-                    className="w-full px-3 py-2.5 border border-line rounded-[4px] text-[13.5px] bg-paper"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone mb-1.5">Estimated budget</label>
-                  <select
-                    value={budgetRangeLabel}
-                    onChange={(e) => setBudgetRangeLabel(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-line rounded-[4px] text-[13.5px] bg-paper"
-                  >
-                    <option>Under ₹50 L</option>
-                    <option>₹50 L – ₹1 Cr</option>
-                    <option>₹1 Cr – ₹3 Cr</option>
-                    <option>₹3 Cr+</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone mb-1.5">Project details</label>
-                  <textarea
-                    required
-                    value={details}
-                    onChange={(e) => setDetails(e.target.value)}
-                    placeholder="Timeline, scope..."
-                    rows={3}
-                    className="w-full px-3 py-2.5 border border-line rounded-[4px] text-[13.5px] bg-paper resize-y"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone mb-1.5">Phone number</label>
-                  <input
-                    type="tel"
-                    required
-                    value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                    placeholder="+91 00000 00000"
-                    className="w-full px-3 py-2.5 border border-line rounded-[4px] text-[13.5px] bg-paper"
-                  />
-                </div>
+                <QuoteDetailsFields value={quoteDetails} onChange={setQuoteDetails} />
 
                 {submitResult === 'error' && submitError && (
                   <div role="alert" className="text-sm text-danger">

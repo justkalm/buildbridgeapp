@@ -96,7 +96,7 @@ export async function sendQuoteRequestEmail(input: QuoteRequestEmailInput): Prom
             <tr><td style="padding: 8px 0; color: #666;">Phone</td><td style="padding: 8px 0;">${escapeHtml(input.contactPhone)}</td></tr>
             <tr><td style="padding: 8px 0; color: #666;">Project type</td><td style="padding: 8px 0;">${escapeHtml(input.projectType)}</td></tr>
             <tr><td style="padding: 8px 0; color: #666;">Location</td><td style="padding: 8px 0;">${escapeHtml(input.location)}</td></tr>
-            <tr><td style="padding: 8px 0; color: #666;">Budget range</td><td style="padding: 8px 0;">${escapeHtml(input.budgetRangeLabel)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Budget</td><td style="padding: 8px 0;">${escapeHtml(input.budgetRangeLabel)}</td></tr>
           </table>
 
           <p style="color: #666; margin-bottom: 4px;">Details</p>
@@ -157,7 +157,7 @@ export async function sendProjectPostAdminEmail(input: ProjectPostEmailInput): P
             <tr><td style="padding: 8px 0; color: #666;">Phone</td><td style="padding: 8px 0;">${escapeHtml(input.contactPhone)}</td></tr>
             <tr><td style="padding: 8px 0; color: #666;">Project type</td><td style="padding: 8px 0;">${escapeHtml(input.projectType)}</td></tr>
             <tr><td style="padding: 8px 0; color: #666;">Location</td><td style="padding: 8px 0;">${escapeHtml(input.location)}</td></tr>
-            <tr><td style="padding: 8px 0; color: #666;">Budget range</td><td style="padding: 8px 0;">${escapeHtml(input.budgetRangeLabel)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Budget</td><td style="padding: 8px 0;">${escapeHtml(input.budgetRangeLabel)}</td></tr>
           </table>
 
           <p style="color: #666; margin-bottom: 4px;">Details</p>
@@ -209,7 +209,7 @@ export async function sendProjectPostAlertEmail(input: ProjectPostAlertEmailInpu
           <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
             <tr><td style="padding: 8px 0; color: #666; width: 140px;">Project type</td><td style="padding: 8px 0;">${escapeHtml(input.projectType)}</td></tr>
             <tr><td style="padding: 8px 0; color: #666;">Location</td><td style="padding: 8px 0;">${escapeHtml(input.location)}</td></tr>
-            <tr><td style="padding: 8px 0; color: #666;">Budget range</td><td style="padding: 8px 0;">${escapeHtml(input.budgetRangeLabel)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Budget</td><td style="padding: 8px 0;">${escapeHtml(input.budgetRangeLabel)}</td></tr>
           </table>
 
           <p style="color: #666; margin-bottom: 4px;">Details</p>

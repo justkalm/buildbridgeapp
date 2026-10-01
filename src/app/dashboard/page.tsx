@@ -17,6 +17,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import SavedProjectsSection from '@/components/SavedProjectsSection';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -71,12 +72,45 @@ const statusStyle: Record<QuoteStatus, string> = {
 
 type Me = { name: string; email: string; emailVerified: boolean; verificationRequired: boolean };
 
+type TabId = 'requests' | 'shortlist' | 'projects' | 'visits';
+
+// Same tab style as the contractor dashboard: one section at a time, each
+// with a count of new items, instead of one long page to scroll.
+const TABS: { id: TabId; label: string; hash: string }[] = [
+  { id: 'requests', label: 'Quote requests', hash: '' },
+  { id: 'shortlist', label: 'Shortlist', hash: '#shortlist' },
+  { id: 'projects', label: 'Your projects', hash: '#projects' },
+  { id: 'visits', label: 'Site visits', hash: '#site-visits' },
+];
+
+// Site-visit emails and pop-ups link to /dashboard#site-visits; the other
+// tabs have their own address too, so a refresh stays on the same tab.
+function tabFromHash(): TabId {
+  if (typeof window === 'undefined') return 'requests';
+  return TABS.find((t) => t.hash && t.hash === window.location.hash)?.id ?? 'requests';
+}
+
 export default function DashboardPage() {
   const { status, data: session } = useSession();
   const router = useRouter();
   const [requests, setRequests] = useState<QuoteRequestRow[] | null>(null);
   const [shortlist, setShortlist] = useState<ShortlistedRow[] | null>(null);
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null);
+  // The page renders nothing until the session has loaded (below), so
+  // reading the address bar here can't cause a hydration mismatch.
+  const [tab, setTab] = useState<TabId>(tabFromHash);
+
+  function selectTab(id: TabId) {
+    setTab(id);
+    const hash = TABS.find((t) => t.id === id)?.hash ?? '';
+    history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`);
+  }
+
+  useEffect(() => {
+    const onHash = () => setTab(tabFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   const [noteDraft, setNoteDraft] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [me, setMe] = useState<Me | null>(null);
@@ -170,6 +204,13 @@ export default function DashboardPage() {
     return null;
   }
 
+  const tabCounts: Record<TabId, number> = {
+    requests: (requests ?? []).filter((r) => r.isNew || (unread.byQuoteRequest[r.id] ?? 0) > 0).length,
+    shortlist: 0,
+    projects: 0,
+    visits: unread.siteVisits,
+  };
+
   return (
     <>
       <Nav />
@@ -212,117 +253,170 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {shortlist !== null && shortlist.length > 0 && (
-          <>
-            <h2 className="font-display font-light text-xl mb-4">Your shortlist</h2>
-            <div className="flex flex-col gap-3 mb-6">
-              {shortlist.map((s) => (
-                <div key={s.id} className="border border-line rounded-[6px] p-4 bg-paper">
-                  <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
-                    <Link
-                      href={`/contractors/${s.contractor.slug}`}
-                      className="font-medium text-sm hover:text-stone transition-colors"
-                    >
-                      {s.contractor.name}
-                    </Link>
-                    <button
-                      onClick={() => removeFromShortlist(s.contractor.id)}
-                      className="text-xs text-stone hover:text-danger transition-colors"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <p className="text-xs text-stone mb-2">
-                    {s.contractor.area}, {s.contractor.city} · {tradesOf(s.contractor.tradeTypes).join(', ')}
-                  </p>
-                  {editingNoteFor === s.contractor.id ? (
-                    <div className="flex gap-2 items-start">
-                      <textarea
-                        value={noteDraft}
-                        onChange={(e) => setNoteDraft(e.target.value)}
-                        rows={2}
-                        placeholder="Private note (only you can see this)"
-                        className="flex-1 text-sm px-3 py-2 border border-line rounded-[4px] bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
-                      />
-                      <button
-                        onClick={() => saveNote(s.contractor.id)}
-                        disabled={savingNote}
-                        className="text-xs font-medium px-3 py-2 rounded-full bg-ink text-paper disabled:opacity-60"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  ) : s.note ? (
-                    <button
-                      onClick={() => startEditingNote(s)}
-                      className="text-xs text-stone text-left hover:text-ink transition-colors"
-                    >
-                      &quot;{s.note}&quot; <span className="underline underline-offset-2">Edit</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => startEditingNote(s)}
-                      className="text-xs text-stone underline underline-offset-2 hover:text-ink transition-colors"
-                    >
-                      + Add a private note
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {shortlist.length >= 2 && (
-              <>
-                <h3 className="font-display text-lg mb-3">Compare</h3>
-                {/* Outer box owns the rounded border and clips the corners; the
-                    inner box scrolls sideways on phones. One element doing both
-                    overflow-hidden and overflow-x-auto was redundant. */}
-                <div className="bg-paper border border-line rounded-md overflow-hidden mb-10">
-                  <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-[11px] tracking-wider uppercase text-stone">
-                        <th className="px-4 py-3 border-b border-line">Contractor</th>
-                        <th className="px-4 py-3 border-b border-line">Trades</th>
-                        <th className="px-4 py-3 border-b border-line">Location</th>
-                        <th className="px-4 py-3 border-b border-line">Experience</th>
-                        <th className="px-4 py-3 border-b border-line">Projects</th>
-                        <th className="px-4 py-3 border-b border-line">Rating</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {shortlist.map((s) => (
-                        <tr key={s.id} className="border-b border-line last:border-b-0">
-                          <td className="px-4 py-3">
-                            <Link href={`/contractors/${s.contractor.slug}`} className="font-medium hover:text-stone transition-colors">
-                              {s.contractor.name}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-3 text-stone">{tradesOf(s.contractor.tradeTypes).join(', ')}</td>
-                          <td className="px-4 py-3 text-stone">{s.contractor.area}, {s.contractor.city}</td>
-                          <td className="px-4 py-3 text-stone">
-                            {s.contractor.yearsInBusiness ? `${s.contractor.yearsInBusiness}+ years` : 'N/A'}
-                          </td>
-                          <td className="px-4 py-3 text-stone">{s.contractor._count.projects}</td>
-                          <td className="px-4 py-3 text-stone">
-                            {s.contractor.reviewCount > 0 ? `${s.contractor.rating.toFixed(1)} (${s.contractor.reviewCount})` : 'N/A'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  </div>
-                </div>
-              </>
-            )}
-          </>
-        )}
-
         {/* One slim line instead of two cards, as on the contractor dashboard. */}
         <AlertsStrip audience="developer" />
 
-        <SiteVisitList viewerRole="DEVELOPER" />
+        <div role="tablist" aria-label="Dashboard sections" className="flex gap-1 border-b border-line mb-6 overflow-x-auto">
+          {TABS.map((t) => {
+            const count = tabCounts[t.id];
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                id={`tab-${t.id}`}
+                aria-selected={active}
+                aria-controls={`panel-${t.id}`}
+                onClick={() => selectTab(t.id)}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2.5 text-sm border-b-2 -mb-px transition-colors ${
+                  active ? 'border-ink text-ink font-medium' : 'border-transparent text-stone hover:text-ink'
+                }`}
+              >
+                {t.label}
+                {count > 0 && (
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-paper text-[11px] font-semibold inline-flex items-center justify-center">
+                    {count}
+                    <span className="sr-only"> new</span>
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
+        <div role="tabpanel" id="panel-shortlist" aria-labelledby="tab-shortlist" hidden={tab !== 'shortlist'}>
+        {shortlist !== null && shortlist.length === 0 && (
+          <p className="text-sm text-stone">
+            No contractors shortlisted yet. Save contractors from{' '}
+            <Link href="/browse" className="underline underline-offset-2 hover:text-ink">Browse</Link> to compare them
+            side by side.
+          </p>
+        )}
+        {shortlist !== null && shortlist.length > 0 && (
+          <>
+            <h2 className="font-display font-light text-xl mb-1">Your shortlist</h2>
+            <p className="text-sm text-stone mb-4">
+              Every contractor you save is compared here side by side. Notes are private: only you can see them.
+            </p>
+            {/* One table is the whole shortlist (owner, 2 Oct): saving a
+                contractor puts them straight into the comparison, notes are
+                written in the table, and with only one saved a second row
+                invites adding more. The outer box owns the rounded border and
+                clips the corners; the inner box scrolls sideways on phones. */}
+            <div className="bg-paper border border-line rounded-md overflow-hidden mb-10">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] tracking-wider uppercase text-stone">
+                    <th className="px-4 py-3 border-b border-line">Contractor</th>
+                    <th className="px-4 py-3 border-b border-line">Your note</th>
+                    <th className="px-4 py-3 border-b border-line">Trades</th>
+                    <th className="px-4 py-3 border-b border-line">Location</th>
+                    <th className="px-4 py-3 border-b border-line">Experience</th>
+                    <th className="px-4 py-3 border-b border-line">Projects</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shortlist.map((s) => (
+                    <tr key={s.id} className="border-b border-line last:border-b-0 align-top">
+                      <td className="px-4 py-3 min-w-[160px]">
+                        <Link href={`/contractors/${s.contractor.slug}`} className="font-medium hover:text-stone transition-colors">
+                          {s.contractor.name}
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => removeFromShortlist(s.contractor.id)}
+                          className="block text-xs text-stone hover:text-danger transition-colors mt-1"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 min-w-[200px]">
+                        {editingNoteFor === s.contractor.id ? (
+                          <div className="flex flex-col gap-2">
+                            <textarea
+                              value={noteDraft}
+                              onChange={(e) => setNoteDraft(e.target.value)}
+                              rows={2}
+                              autoFocus
+                              aria-label={`Private note about ${s.contractor.name}`}
+                              placeholder="Only you can see this"
+                              className="text-sm px-3 py-2 border border-line rounded-[4px] bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => saveNote(s.contractor.id)}
+                                disabled={savingNote}
+                                className="text-xs font-medium px-3 py-1.5 rounded-full bg-ink text-paper disabled:opacity-60"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingNoteFor(null)}
+                                className="text-xs px-3 py-1.5 rounded-full border border-line hover:border-ink"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : s.note ? (
+                          <button
+                            type="button"
+                            onClick={() => startEditingNote(s)}
+                            className="text-xs text-stone text-left hover:text-ink transition-colors"
+                          >
+                            &quot;{s.note}&quot; <span className="underline underline-offset-2">Edit</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startEditingNote(s)}
+                            className="text-xs text-stone underline underline-offset-2 hover:text-ink transition-colors"
+                          >
+                            + Add a note
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-stone min-w-[160px]">{tradesOf(s.contractor.tradeTypes).join(', ')}</td>
+                      <td className="px-4 py-3 text-stone min-w-[120px]">{s.contractor.area}, {s.contractor.city}</td>
+                      <td className="px-4 py-3 text-stone whitespace-nowrap">
+                        {s.contractor.yearsInBusiness ? `${s.contractor.yearsInBusiness}+ years` : 'N/A'}
+                      </td>
+                      <td className="px-4 py-3 text-stone">{s.contractor._count.projects}</td>
+                    </tr>
+                  ))}
+                  {shortlist.length === 1 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-4 text-stone">
+                        Add more contractors to compare.{' '}
+                        <Link href="/browse" className="underline underline-offset-2 hover:text-ink">
+                          Browse contractors
+                        </Link>{' '}
+                        and tap save on the ones you like.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </>
+        )}
+
+        </div>
+
+        <div role="tabpanel" id="panel-projects" aria-labelledby="tab-projects" hidden={tab !== 'projects'}>
+          <SavedProjectsSection />
+        </div>
+
+        <div role="tabpanel" id="panel-visits" aria-labelledby="tab-visits" hidden={tab !== 'visits'}>
+          <SiteVisitList viewerRole="DEVELOPER" />
+        </div>
+
+        <div role="tabpanel" id="panel-requests" aria-labelledby="tab-requests" hidden={tab !== 'requests'}>
         <h2 className="font-display font-light text-xl mb-4">Your quote requests</h2>
         {requests === null ? (
           <div role="status" className="flex flex-col gap-3">
@@ -367,9 +461,6 @@ export default function DashboardPage() {
                     <p className="text-[11px] text-stone mt-0.5">
                       Updated {new Date(r.statusUpdatedAt).toLocaleDateString()}
                     </p>
-                  )}
-                  {!r.emailSentAt && (
-                    <p className="text-[11px] text-danger mt-1">Notification may not have been delivered</p>
                   )}
                   <div className="mt-3">
                     <ConversationLink id={r.id} count={unread.byQuoteRequest[r.id]} block />
@@ -419,11 +510,6 @@ export default function DashboardPage() {
                             Updated {new Date(r.statusUpdatedAt).toLocaleDateString()}
                           </p>
                         )}
-                        {!r.emailSentAt && (
-                          <p className="text-[11px] text-danger mt-1">
-                            Notification may not have been delivered
-                          </p>
-                        )}
                       </td>
                       <td className="px-4 py-4 text-right whitespace-nowrap">
                         <ConversationLink id={r.id} count={unread.byQuoteRequest[r.id]} />
@@ -435,6 +521,7 @@ export default function DashboardPage() {
             </div>
           </>
         )}
+        </div>
       </main>
       <Footer />
     </>

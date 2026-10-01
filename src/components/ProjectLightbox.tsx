@@ -30,6 +30,7 @@
 import { useEffect, useRef, useState } from 'react';
 import ProfileImage from '@/components/ProfileImage';
 import ProfileReview from '@/components/ProfileReview';
+import { SHOW_RATINGS } from '@/lib/ratings';
 
 type ProjectLightboxProps = {
   project: {
@@ -223,7 +224,7 @@ export default function ProjectLightbox({ project, onClose }: ProjectLightboxPro
             {durationText && <DetailRow label="Timeline" value={durationText} />}
           </div>
 
-          {project.reviewRating ? (
+          {SHOW_RATINGS && project.reviewRating ? (
             <div className="mt-5 pt-5 border-t border-line">
               <ProfileReview
                 rating={project.reviewRating}

@@ -27,22 +27,28 @@
 // and BEFORE the rate limiter, so a blocked attempt doesn't also eat one
 // of the developer's 20/hour.
 
-import { NextRequest, NextResponse, after } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendNewQuoteToContractorEmail, sendQuoteRequestEmail } from '@/lib/email';
-import { sendPush } from '@/lib/push';
+import { createQuoteRequest } from '@/lib/create-quote-request';
+import { createSavedProject } from '@/lib/saved-projects';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { requireVerifiedDeveloperEmail } from '@/lib/require-verified-email';
+import { MAX_BUDGET_RUPEES, formatBudgetLabel } from '@/lib/budget';
 
 const quoteRequestSchema = z.object({
   contractorId: z.string().min(1),
   projectType: z.string().trim().min(1).max(200),
   location: z.string().trim().min(1).max(200),
-  budgetRangeLabel: z.string().trim().min(1).max(100),
+  // Optional typed-in rupee amount (whole rupees). The stored and emailed
+  // text ("Rs. 12,50,000" or "Not specified") is built here, not sent by
+  // the browser, so its format is always the same. See src/lib/budget.ts.
+  budgetAmount: z.number().int().min(1).max(MAX_BUDGET_RUPEES).nullish(),
   details: z.string().trim().min(1).max(2000),
   contactPhone: z.string().trim().min(6).max(20),
+  // Optional: also keep these details as a saved project under this name.
+  saveAsProject: z.object({ name: z.string().trim().min(1).max(80) }).nullish(),
 });
 
 export async function POST(req: NextRequest) {
@@ -95,7 +101,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { contractorId, projectType, location, budgetRangeLabel, details, contactPhone } = parsed.data;
+  const { contractorId, projectType, location, budgetAmount, details, contactPhone, saveAsProject } = parsed.data;
+  const budgetRangeLabel = formatBudgetLabel(budgetAmount);
 
   const contractor = await prisma.contractor.findUnique({
     where: { id: contractorId },
@@ -108,79 +115,38 @@ export async function POST(req: NextRequest) {
 
   const developer = await prisma.developer.findUnique({
     where: { id: session.user.id },
-    select: { name: true, email: true },
+    select: { id: true, name: true, email: true },
   });
 
   if (!developer) {
-    // Session refers to a developer that no longer exists in the DB —
+    // Session refers to a developer that no longer exists in the DB;
     // shouldn't normally happen, but fail clearly rather than proceeding
     // with missing data.
     return NextResponse.json({ error: 'Account not found' }, { status: 401 });
   }
 
-  // Write the request FIRST — see file header comment on why this ordering
-  // matters.
-  const quoteRequest = await prisma.quoteRequest.create({
-    data: {
-      contractorId,
-      developerId: session.user.id,
-      projectType,
+  // Writes the request, then notifies contractor and admin. See
+  // src/lib/create-quote-request.ts.
+  const result = await createQuoteRequest({
+    developer,
+    contractor,
+    fields: { projectType, location, budgetRangeLabel, details, contactPhone },
+  });
+
+  // "Save these details as a project" on the form. Saving is a bonus: if it
+  // fails (e.g. the 50-project cap), the request has still been sent, so
+  // report it softly instead of failing the whole request.
+  let projectSaved: boolean | undefined;
+  if (saveAsProject) {
+    const saved = await createSavedProject(developer.id, {
+      name: saveAsProject.name,
+      workNeeded: projectType,
       location,
-      budgetRangeLabel,
+      budgetAmount,
       details,
-      contactPhone,
-    },
-  });
-
-  // Also tell the contractor, by email (here) and in the app (the request
-  // shows as "New" on their dashboard and counts toward the Nav badge; see
-  // QuoteRequest.contractorSeenAt). Only contractors who have claimed their
-  // account: an admin-entered placeholder has nobody to read it and often a
-  // placeholder address. Sent after the response so it never slows the
-  // developer down. The email carries no contact details (see the function
-  // for why), so the free-plan lead cap still holds.
-  if (contractor.passwordHash) {
-    const baseUrl = process.env.NEXTAUTH_URL ?? '';
-    after(() =>
-      Promise.all([
-        sendNewQuoteToContractorEmail({
-          toEmail: contractor.email,
-          contractorName: contractor.name,
-          projectType,
-          location,
-          dashboardUrl: `${baseUrl}/contractor/dashboard`,
-        }),
-        // Same rule as the email: no developer details, so the lead cap holds.
-        sendPush('CONTRACTOR', contractor.id, {
-          title: 'New quote request',
-          body: `${projectType} in ${location}`,
-          url: '/contractor/dashboard',
-          tag: `quote-${quoteRequest.id}`,
-        }),
-      ])
-    );
+    }).catch(() => null);
+    projectSaved = !!saved;
   }
 
-  const emailSent = await sendQuoteRequestEmail({
-    contractorName: contractor.name,
-    developerName: developer.name,
-    developerEmail: developer.email,
-    contactPhone,
-    projectType,
-    location,
-    budgetRangeLabel,
-    details,
-  });
-
-  if (emailSent) {
-    await prisma.quoteRequest.update({
-      where: { id: quoteRequest.id },
-      data: { emailSentAt: new Date() },
-    });
-  }
-
-  return NextResponse.json({
-    id: quoteRequest.id,
-    emailSent,
-  });
+  return NextResponse.json({ ...result, projectSaved });
 }
