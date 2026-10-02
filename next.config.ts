@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { SEARCH_ENGINES_ALLOWED } from "./src/lib/site";
 
 // Security headers applied to every response. Next.js had none configured
 // before this — meaning no clickjacking protection on login pages (an
@@ -40,6 +41,10 @@ const securityHeaders = [
     key: 'Referrer-Policy',
     value: 'strict-origin-when-cross-origin',
   },
+  // Until launch, every response also says "don't list this" to search
+  // engines, alongside the robots meta tag (see SEARCH_ENGINES_ALLOWED in
+  // src/lib/site.ts). The header covers non-HTML responses too.
+  ...(SEARCH_ENGINES_ALLOWED ? [] : [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }]),
   // Content-Security-Policy is NOT set here any more. It needs a fresh
   // nonce on every page view, so proxy.ts builds it per request (task
   // sheet F6; see the header comment there).

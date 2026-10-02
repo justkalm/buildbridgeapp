@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
+import { SEARCH_ENGINES_ALLOWED, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
@@ -30,14 +31,28 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+// Site-wide titles and link previews. Each page sets its own title, shown
+// as "<page> | (kalm)"; contractor profiles also set their own preview
+// (src/app/contractors/[slug]/layout.tsx). The preview image is the (kalm)
+// app icon. robots: see SEARCH_ENGINES_ALLOWED in src/lib/site.ts.
 export const metadata: Metadata = {
-  title: "(kalm) | Kaam. Connected.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: "(kalm) | Kaam. Connected.", template: "%s | (kalm)" },
+  description: SITE_DESCRIPTION,
   // Home Screen icon and name on iPhone (see src/app/manifest.ts for why
   // Home Screen support matters: it's what allows notifications on iOS).
   icons: { apple: "/apple-touch-icon.png" },
   appleWebApp: { capable: true, title: "(kalm)", statusBarStyle: "default" },
-  description:
-    "(kalm) connects developers with licensed, verified contractors. See project history with photos, timelines and sizes, and schedule site visits.",
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "en_IN",
+    title: "(kalm) | Kaam. Connected.",
+    description: SITE_DESCRIPTION,
+    images: [{ url: "/icon-512.png", width: 512, height: 512, alt: "(kalm)" }],
+  },
+  twitter: { card: "summary", title: "(kalm) | Kaam. Connected.", description: SITE_DESCRIPTION, images: ["/icon-512.png"] },
+  robots: SEARCH_ENGINES_ALLOWED ? { index: true, follow: true } : { index: false, follow: false },
 };
 
 // Every page renders per request so it can carry this request's CSP nonce
