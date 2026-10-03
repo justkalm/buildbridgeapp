@@ -24,3 +24,12 @@ export const SITE_NAME = '(kalm)';
 
 export const SITE_DESCRIPTION =
   'Find licensed, verified contractors for your project. See their completed work with photos, timelines and sizes, then request a quote or schedule a site visit.';
+
+// Where a Pending contractor sends their licence, GST and registration
+// papers (shown on the contractor dashboard, src/components/OnboardingPanel.tsx).
+// Email is the work inbox (owner, 4 Oct 2026). WhatsApp stays EMPTY until the
+// company number exists; fill it in and the dashboard offers it automatically.
+// With both empty the dashboard says nothing about where to send papers.
+// WhatsApp: digits with country code, no plus or spaces, e.g. '919800000000'.
+export const VERIFICATION_WHATSAPP = '';
+export const VERIFICATION_EMAIL = 'justkalm26@gmail.com';

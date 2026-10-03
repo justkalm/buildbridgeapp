@@ -13,6 +13,7 @@
 // today) and data-sharing consent (optional, so we never nudge it).
 
 import Link from 'next/link';
+import { VERIFICATION_EMAIL, VERIFICATION_WHATSAPP } from '@/lib/site';
 
 export type OnboardingData = {
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
@@ -22,6 +23,9 @@ export type OnboardingData = {
   teamSizeMin: number | null;
   teamSizeMax: number | null;
   projectCount: number;
+  checkDocumentsAt: string | null;
+  checkGstinAt: string | null;
+  checkContactAt: string | null;
 };
 
 type Step = { label: string; done: boolean; href?: string; action?: string };
@@ -57,6 +61,12 @@ export default function OnboardingPanel({ data }: { data: OnboardingData }) {
       action: 'Add project',
     },
   ];
+  const checks = [
+    { label: 'We review copies of your licence, GST and registration documents', done: !!data.checkDocumentsAt },
+    { label: 'We check your GSTIN on the GST portal', done: !!data.checkGstinAt },
+    { label: 'We speak with you directly, by phone or in person', done: !!data.checkContactAt },
+  ];
+  const checksDone = checks.filter((c) => c.done).length;
   const doneCount = steps.filter((s) => s.done).length;
   const allDone = doneCount === steps.length;
   const isLive = data.verificationStatus === 'VERIFIED';
@@ -78,13 +88,55 @@ export default function OnboardingPanel({ data }: { data: OnboardingData }) {
           {data.verificationStatus === 'PENDING' ? (
             <>
               <p className="text-stone mb-1.5">
-                Developers can only find contractors who are Verified. Before we mark you Verified, our team:
+                Developers can only find contractors who are Verified. Before we mark you Verified, our team does
+                three checks ({checksDone} of 3 done):
               </p>
-              <ul className="list-disc pl-5 text-stone space-y-0.5 mb-1.5">
-                <li>reviews copies of your licence, GST and registration documents</li>
-                <li>checks your GSTIN on the GST portal</li>
-                <li>speaks with you directly, by phone or in person</li>
+              <ul className="text-stone space-y-0.5 mb-1.5">
+                {checks.map((c) => (
+                  <li key={c.label} className="flex items-start gap-2">
+                    <span
+                      aria-hidden
+                      className={`mt-0.5 inline-flex w-4 h-4 rounded-full items-center justify-center text-[10px] shrink-0 ${
+                        c.done ? 'bg-sage-soft text-sage' : 'border border-line text-transparent'
+                      }`}
+                    >
+                      ✓
+                    </span>
+                    <span>
+                      {c.label}
+                      <span className="sr-only">{c.done ? ' (done)' : ' (not done yet)'}</span>
+                    </span>
+                  </li>
+                ))}
               </ul>
+              {(VERIFICATION_WHATSAPP || VERIFICATION_EMAIL) && (
+                <p className="mb-1.5">
+                  Send clear photos of these documents to us
+                  {VERIFICATION_WHATSAPP && (
+                    <>
+                      {' '}on{' '}
+                      <a
+                        href={`https://wa.me/${VERIFICATION_WHATSAPP}`}
+                        className="underline underline-offset-2"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        WhatsApp
+                      </a>
+                    </>
+                  )}
+                  {VERIFICATION_WHATSAPP && VERIFICATION_EMAIL && ' or'}
+                  {VERIFICATION_EMAIL && (
+                    <>
+                      {' '}by email to{' '}
+                      <a href={`mailto:${VERIFICATION_EMAIL}`} className="underline underline-offset-2">
+                        {VERIFICATION_EMAIL}
+                      </a>
+                    </>
+                  )}
+                  .
+                </p>
+              )}
               <p className="text-stone">
                 There is nothing to tick here to go live. Keep your phone reachable and your profile below complete, and
                 we will be in touch.

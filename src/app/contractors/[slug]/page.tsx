@@ -571,6 +571,25 @@ export default function ContractorProfilePage() {
                 <p className="text-stone">
                   {contractor.name} will be notified and can reach out to discuss your project.
                 </p>
+                {/* KALM-210: say what happens next. No promised reply time:
+                    we have no real response data yet. */}
+                <ul className="text-stone mt-3 list-disc pl-5 space-y-1">
+                  <li>You will get an email each time {contractor.name} updates your request.</li>
+                  <li>
+                    You can write to them any time in{' '}
+                    <Link href="/messages" className="underline underline-offset-2 hover:text-ink">
+                      Messages
+                    </Link>
+                    .
+                  </li>
+                  <li>
+                    Nothing yet after a few days? You can request a quote from another contractor on{' '}
+                    <Link href="/browse" className="underline underline-offset-2 hover:text-ink">
+                      Browse
+                    </Link>
+                    .
+                  </li>
+                </ul>
                 {projectSavedNote && <p className="text-stone mt-2">{projectSavedNote}</p>}
               </div>
             ) : (

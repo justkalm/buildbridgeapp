@@ -85,6 +85,10 @@ const CONTRACTOR_SELF_SELECT = {
   emailVerified: true,
   dataSharingConsent: true,
   dataSharingConsentAt: true,
+  // Verification progress shown on the dashboard strip (KALM-211).
+  checkDocumentsAt: true,
+  checkGstinAt: true,
+  checkContactAt: true,
 } as const;
 
 async function requireContractor() {

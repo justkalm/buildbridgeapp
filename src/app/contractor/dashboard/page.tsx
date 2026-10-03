@@ -80,6 +80,9 @@ type ContractorMe = {
   teamSizeMin: number | null;
   teamSizeMax: number | null;
   projectCount: number;
+  checkDocumentsAt: string | null;
+  checkGstinAt: string | null;
+  checkContactAt: string | null;
   quoteRequests: QuoteRequestRow[];
   projectAlerts: ProjectAlertRow[];
   leadLimit: { cap: number; usedThisMonth: number } | null;

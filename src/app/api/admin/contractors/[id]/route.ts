@@ -102,8 +102,12 @@ export async function PATCH(
   const hasTier = 'tier' in body;
   const hasLicense = 'licenseNumber' in body;
   const confirmReverify = body.confirmReverification === true;
+  // Verification progress (KALM-211): { checks: { documents?, gstin?, contact? } }
+  // with true = stamp now, false = clear. Informational only; it never
+  // changes verificationStatus.
+  const hasChecks = body.checks !== null && typeof body.checks === 'object' && !Array.isArray(body.checks);
 
-  if (!hasStatus && !hasTier && !hasLicense && !confirmReverify) {
+  if (!hasStatus && !hasTier && !hasLicense && !confirmReverify && !hasChecks) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
   }
 
@@ -200,9 +204,22 @@ export async function PATCH(
     );
   }
 
+  const checkData: Record<string, Date | null> = {};
+  if (hasChecks) {
+    const now = new Date();
+    for (const [key, column] of [
+      ['documents', 'checkDocumentsAt'],
+      ['gstin', 'checkGstinAt'],
+      ['contact', 'checkContactAt'],
+    ] as const) {
+      if (typeof body.checks[key] === 'boolean') checkData[column] = body.checks[key] ? now : null;
+    }
+  }
+
   const updated = await prisma.contractor.update({
     where: { id },
     data: {
+      ...checkData,
       ...(nextStatus
         ? {
             verificationStatus: nextStatus,

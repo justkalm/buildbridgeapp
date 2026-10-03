@@ -145,6 +145,14 @@ model Contractor {
 
   bio String? // short "about" text for the profile page
 
+  // Verification progress (KALM-211). Admin stamps each of the three checks
+  // the homepage promises as it is done, so a Pending contractor can see
+  // "1 of 3 checks done". Purely informational: VERIFIED is still set by
+  // hand (verificationStatus). Null = not done yet.
+  checkDocumentsAt DateTime? // licence, GST and registration papers reviewed
+  checkGstinAt     DateTime? // GSTIN checked on the GST portal
+  checkContactAt   DateTime? // spoken with directly, by phone or in person
+
   projects      Project[]
   quoteRequests QuoteRequest[]
   projectAlerts ProjectPostAlert[]
@@ -155,8 +163,9 @@ model Contractor {
   updatedAt DateTime @updatedAt
 
   @@index([city, area])
-  @@index([tradeTypes])
+  @@index([tradeTypes], type: Gin)
   @@index([verificationStatus])
+  @@index([tier])
 }
 
 // ---------------------------------------------------------------------------
@@ -336,6 +345,14 @@ model QuoteRequest {
   statusUpdatedAt DateTime? // when the contractor last changed `status` — null while still PENDING
 
   emailSentAt DateTime? // null if the notification email failed — lets you spot silently-dropped requests
+
+  // Nudges for requests nobody has acted on (KALM-209; see
+  // src/app/api/cron/quote-reminders/route.ts). reminderSentAt: the one
+  // reminder to the contractor after 2 days. noReplyNoticeSentAt: the one
+  // note to the developer after 10 days. Each is set once, so nobody is
+  // emailed twice about the same request.
+  reminderSentAt      DateTime?
+  noReplyNoticeSentAt DateTime?
 
   messages Message[]
 

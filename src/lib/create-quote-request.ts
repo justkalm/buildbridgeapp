@@ -29,7 +29,7 @@ export type QuoteRequestFields = {
 // Uses the dashboard's own rule (computeLeadVisibility over every request of
 // every kind this calendar month, oldest first) so the email can never show
 // more than the dashboard does. Fails closed: any error means "not visible".
-async function isFullyVisibleLead(contractorId: string, quoteRequestId: string): Promise<boolean> {
+export async function isFullyVisibleLead(contractorId: string, quoteRequestId: string): Promise<boolean> {
   try {
     const [contractor, thisMonth] = await Promise.all([
       prisma.contractor.findUnique({ where: { id: contractorId }, select: { tier: true } }),

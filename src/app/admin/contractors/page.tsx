@@ -35,6 +35,10 @@ type ContractorRow = {
   // re-check (they stay listed as "Verified · update in review").
   reverifyPending: boolean;
   reverifyFields: string[];
+  // Verification progress (KALM-211): when each check was ticked, or null.
+  checkDocumentsAt: string | null;
+  checkGstinAt: string | null;
+  checkContactAt: string | null;
   _count: { projects: number; quoteRequests: number };
 };
 
@@ -265,6 +269,30 @@ export default function AdminContractorsPage() {
     }
   }
 
+  // KALM-211: tick or untick one of the three checks. Informational only; it
+  // never changes the Verified status.
+  async function handleCheckToggle(
+    contractor: ContractorRow,
+    key: 'documents' | 'gstin' | 'contact',
+    column: 'checkDocumentsAt' | 'checkGstinAt' | 'checkContactAt',
+    done: boolean
+  ) {
+    const previous = contractor[column];
+    const stamp = done ? new Date().toISOString() : null;
+    setContractors((prev) => (prev ? prev.map((c) => (c.id === contractor.id ? { ...c, [column]: stamp } : c)) : prev));
+    try {
+      const res = await fetch(`/api/admin/contractors/${contractor.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checks: { [key]: done } }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      alert('Failed to update the check. Please try again.');
+      setContractors((prev) => (prev ? prev.map((c) => (c.id === contractor.id ? { ...c, [column]: previous } : c)) : prev));
+    }
+  }
+
   async function handleTierChange(contractor: ContractorRow, tier: ContractorRow['tier']) {
     const previous = contractor.tier;
     setContractors((prev) =>
@@ -415,6 +443,26 @@ export default function AdminContractorsPage() {
                         </option>
                         <option value="REJECTED">REJECTED</option>
                       </select>
+                      {c.verificationStatus === 'PENDING' && (
+                        <div className="mt-1.5 flex flex-col gap-0.5 text-[11px] text-stone">
+                          {(
+                            [
+                              ['documents', 'checkDocumentsAt', 'Documents'],
+                              ['gstin', 'checkGstinAt', 'GSTIN'],
+                              ['contact', 'checkContactAt', 'Spoke to them'],
+                            ] as const
+                          ).map(([key, column, label]) => (
+                            <label key={key} className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={!!c[column]}
+                                onChange={(e) => handleCheckToggle(c, key, column, e.target.checked)}
+                              />
+                              {label}
+                            </label>
+                          ))}
+                        </div>
+                      )}
                       {c.reverifyPending && (
                         <div className="mt-1.5 text-[11px] leading-snug">
                           <p className="text-danger font-medium">

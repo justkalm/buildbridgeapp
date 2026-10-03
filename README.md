@@ -69,11 +69,15 @@ during development. If it reports a schema problem, stop and fix that before
 continuing; everything downstream assumes this passes.
 
 ```bash
-npx prisma db push
+npx prisma migrate deploy
 ```
 
-This creates all the tables (Contractor, Developer, QuoteRequest, Project)
-in your Neon database, based on `prisma/schema.prisma`.
+This applies every migration in `prisma/migrations`, in order, to your Neon
+database: it creates the tables on a fresh database and brings an existing one
+up to date. It never deletes data on its own. Do **not** use `prisma db push`
+any more: it skips the migration history, so the database and the migration
+files drift apart. When the schema changes, a new numbered folder is added
+under `prisma/migrations` and you run the same `migrate deploy` command.
 
 ### 5. Add your first real contractor
 

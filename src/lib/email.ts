@@ -723,3 +723,55 @@ export async function sendNewQuoteToContractorEmail(input: {
     `,
   });
 }
+
+// KALM-209: one reminder to a contractor about a request nobody has acted on.
+// Like the first notification, it carries no developer details; the contractor
+// logs in to see them (and the lead cap stays enforced there).
+export async function sendQuoteReminderEmail(input: {
+  toEmail: string;
+  contractorName: string;
+  projectType: string;
+  location: string;
+  dashboardUrl: string;
+}): Promise<boolean> {
+  return sendSimple('quote reminder (contractor)', {
+    from: '(kalm) <onboarding@resend.dev>',
+    to: input.toEmail,
+    subject: `Reminder: a developer is waiting for your reply (${sanitizeSubject(input.projectType)})`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px;">
+        <h2 style="margin-bottom: 4px;">A quote request is waiting</h2>
+        <p>Hi ${escapeHtml(input.contractorName)},</p>
+        <p>A developer asked you for a quote two days ago and hasn't heard back yet:</p>
+        <p style="font-size: 16px;"><strong>${escapeHtml(input.projectType)}</strong> in ${escapeHtml(input.location)}</p>
+        <p>A quick reply, even "not interested", lets them move on.</p>
+        <p><a href="${input.dashboardUrl}" style="${btn}">Open your dashboard</a></p>
+      </div>
+    `,
+  });
+}
+
+// KALM-209: one note to a developer whose request has had no reply for ~10 days.
+export async function sendNoReplyNoticeEmail(input: {
+  toEmail: string;
+  toName: string;
+  contractorName: string;
+  projectType: string;
+  browseUrl: string;
+}): Promise<boolean> {
+  return sendSimple('no reply notice (developer)', {
+    from: '(kalm) <onboarding@resend.dev>',
+    to: input.toEmail,
+    subject: `No reply yet from ${sanitizeSubject(input.contractorName)}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px;">
+        <h2 style="margin-bottom: 4px;">Still waiting to hear back?</h2>
+        <p>Hi ${escapeHtml(input.toName)},</p>
+        <p><strong>${escapeHtml(input.contractorName)}</strong> hasn't replied to your request for
+        <em>${escapeHtml(input.projectType)}</em> yet. Contractors are often busy on site, so you may want to
+        ask another one as well.</p>
+        <p><a href="${input.browseUrl}" style="${btn}">Browse other contractors</a></p>
+      </div>
+    `,
+  });
+}
