@@ -8,13 +8,15 @@
 // The row is written FIRST, before any email: if an email fails, the
 // request is still recorded (the developer's intent isn't lost) and
 // emailSentAt stays null. Failed sends also show at Admin > Failed emails.
-// The contractor's email and push carry no developer contact details, so
-// the free-plan lead cap still holds (see sendNewQuoteToContractorEmail).
+// The contractor's push carries no developer contact details. Their email
+// carries them only for a lead that is fully visible under the free-plan cap
+// (see isFullyVisibleLead and sendNewQuoteToContractorEmail).
 
 import { after } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendNewQuoteToContractorEmail, sendQuoteRequestEmail } from '@/lib/email';
 import { sendPush } from '@/lib/push';
+import { computeLeadVisibility, getMonthStart } from '@/lib/lead-limits';
 
 export type QuoteRequestFields = {
   projectType: string;
@@ -23,6 +25,26 @@ export type QuoteRequestFields = {
   details: string;
   contactPhone: string;
 };
+
+// Uses the dashboard's own rule (computeLeadVisibility over every request of
+// every kind this calendar month, oldest first) so the email can never show
+// more than the dashboard does. Fails closed: any error means "not visible".
+async function isFullyVisibleLead(contractorId: string, quoteRequestId: string): Promise<boolean> {
+  try {
+    const [contractor, thisMonth] = await Promise.all([
+      prisma.contractor.findUnique({ where: { id: contractorId }, select: { tier: true } }),
+      prisma.quoteRequest.findMany({
+        where: { contractorId, createdAt: { gte: getMonthStart() } },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      }),
+    ]);
+    if (!contractor) return false;
+    return computeLeadVisibility(contractor.tier, thisMonth).get(quoteRequestId) === 'full';
+  } catch {
+    return false;
+  }
+}
 
 export async function createQuoteRequest({
   developer,
@@ -39,6 +61,9 @@ export async function createQuoteRequest({
 
   if (contractor.passwordHash) {
     const baseUrl = process.env.NEXTAUTH_URL ?? '';
+    // Same rule as the dashboard: is this lead fully visible to the
+    // contractor? Only then does the email carry the details and a reply-to.
+    const fullyVisible = await isFullyVisibleLead(contractor.id, quoteRequest.id);
     after(() =>
       Promise.all([
         sendNewQuoteToContractorEmail({
@@ -47,6 +72,15 @@ export async function createQuoteRequest({
           projectType: fields.projectType,
           location: fields.location,
           dashboardUrl: `${baseUrl}/contractor/dashboard`,
+          lead: fullyVisible
+            ? {
+                developerName: developer.name,
+                developerEmail: developer.email,
+                developerPhone: fields.contactPhone,
+                budgetRangeLabel: fields.budgetRangeLabel,
+                details: fields.details,
+              }
+            : undefined,
         }),
         sendPush('CONTRACTOR', contractor.id, {
           title: 'New quote request',

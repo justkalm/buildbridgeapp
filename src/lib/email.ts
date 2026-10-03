@@ -669,28 +669,55 @@ export async function sendReverifyRequestEmail(input: {
   });
 }
 
-// Tells a contractor a developer has sent them a quote request. Deliberately
-// carries NO developer contact details or project description: a LISTED
-// contractor over their monthly lead cap sees the lead blurred on their
-// dashboard, and an email with the details would bypass that cap. The
-// email is a prompt to log in, where the lead cap is enforced.
+// Tells a contractor a developer has sent them a quote request.
+//
+// By default this carries NO developer contact details or project
+// description: a LISTED contractor over their monthly lead cap sees the lead
+// blurred on their dashboard, and an email with the details would bypass that
+// cap. The email is then just a prompt to log in, where the cap is enforced.
+//
+// `lead` is passed ONLY when the caller has checked that this request is
+// fully visible to the contractor (inside the cap, or PLUS/PRO). Then the
+// email shows what the dashboard shows and replyTo is the developer's own
+// address, so the contractor can answer straight from their inbox. (kalm)
+// is deliberately not copied: quotes are private between the two parties.
 export async function sendNewQuoteToContractorEmail(input: {
   toEmail: string;
   contractorName: string;
   projectType: string;
   location: string;
   dashboardUrl: string;
+  lead?: {
+    developerName: string;
+    developerEmail: string;
+    developerPhone: string;
+    budgetRangeLabel: string;
+    details: string;
+  };
 }): Promise<boolean> {
+  const lead = input.lead;
   return sendSimple('new quote request (contractor)', {
     from: '(kalm) <onboarding@resend.dev>',
     to: input.toEmail,
+    ...(lead ? { replyTo: lead.developerEmail } : {}),
     subject: `New quote request: ${sanitizeSubject(input.projectType)} in ${sanitizeSubject(input.location)}`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px;">
         <h2 style="margin-bottom: 4px;">You have a new quote request</h2>
         <p>Hi ${escapeHtml(input.contractorName)}, a developer on (kalm) has asked you for a quote:</p>
         <p style="font-size: 16px;"><strong>${escapeHtml(input.projectType)}</strong> in ${escapeHtml(input.location)}</p>
-        <p>Log in to see the details and respond.</p>
+        ${
+          lead
+            ? `<table style="width: 100%; border-collapse: collapse; margin: 12px 0;">
+          <tr><td style="padding: 6px 0; color: #666; width: 110px;">From</td><td style="padding: 6px 0;">${escapeHtml(lead.developerName)} (${escapeHtml(lead.developerEmail)})</td></tr>
+          <tr><td style="padding: 6px 0; color: #666;">Phone</td><td style="padding: 6px 0;">${escapeHtml(lead.developerPhone)}</td></tr>
+          <tr><td style="padding: 6px 0; color: #666;">Budget</td><td style="padding: 6px 0;">${escapeHtml(lead.budgetRangeLabel)}</td></tr>
+        </table>
+        <p style="color: #666; margin-bottom: 4px;">Details</p>
+        <p style="white-space: pre-wrap; margin-top: 0;">${escapeHtml(lead.details)}</p>
+        <p style="color: #666; font-size: 13px;">Reply to this email to write to the developer directly.</p>`
+            : '<p>Log in to see the details and respond.</p>'
+        }
         <p><a href="${input.dashboardUrl}" style="${btn}">Open your dashboard</a></p>
       </div>
     `,

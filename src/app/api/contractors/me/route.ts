@@ -105,6 +105,8 @@ export async function GET() {
     where: { id: contractorId },
     select: {
       ...CONTRACTOR_SELF_SELECT,
+      // Count only, for the dashboard's profile checklist.
+      _count: { select: { projects: true } },
       // Previously omitted `developer` entirely here, while the dashboard
       // page reads `r.developer.name` on every quote request row — any
       // contractor with at least one real quote request crashed the whole
@@ -214,7 +216,7 @@ export async function GET() {
 
   // Pull the profile fields out of the row; the quote requests and alerts
   // are rebuilt below with only what the dashboard shows.
-  const { quoteRequests: _rawQuoteRequests, projectAlerts: rawProjectAlerts, ...safe } = contractor;
+  const { quoteRequests: _rawQuoteRequests, projectAlerts: rawProjectAlerts, _count, ...safe } = contractor;
 
   // In-app notifications (see file header): anything not yet seen is
   // flagged isNew for this response, then marked seen.
@@ -262,6 +264,7 @@ export async function GET() {
 
   return NextResponse.json({
     ...safe,
+    projectCount: _count.projects,
     // Only real quote requests are listed on the dashboard; enquiries and
     // project conversations live in Messages. (They still counted toward
     // the lead cap above, since every kind is a lead.)

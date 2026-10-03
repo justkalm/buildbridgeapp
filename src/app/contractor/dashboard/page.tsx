@@ -27,6 +27,7 @@ import AlertMessageButton from '@/components/AlertMessageButton';
 import AlertsStrip from '@/components/AlertsStrip';
 import SiteVisitList from '@/components/SiteVisitList';
 import Nav from '@/components/Nav';
+import OnboardingPanel from '@/components/OnboardingPanel';
 import Footer from '@/components/Footer';
 import Skeleton from '@/components/Skeleton';
 import {
@@ -74,6 +75,11 @@ type ContractorMe = {
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
   tier: 'LISTED' | 'PLUS' | 'PRO';
   emailVerified: boolean;
+  bio: string | null;
+  yearsInBusiness: number | null;
+  teamSizeMin: number | null;
+  teamSizeMax: number | null;
+  projectCount: number;
   quoteRequests: QuoteRequestRow[];
   projectAlerts: ProjectAlertRow[];
   leadLimit: { cap: number; usedThisMonth: number } | null;
@@ -274,11 +280,9 @@ export default function ContractorDashboardPage() {
           </nav>
         </div>
 
-        {!me.emailVerified && (
-          <div className="mb-5 px-4 py-2.5 rounded-[6px] bg-paper-dim text-stone text-[13px]">
-            Your email isn&apos;t verified yet. Check your inbox for a verification link.
-          </div>
-        )}
+        {/* Task sheet H: live-or-not strip plus profile checklist. Replaces
+            the old one-line "email isn't verified" banner (now step 1). */}
+        <OnboardingPanel data={me} />
 
         <AlertsStrip audience="contractor" />
 
