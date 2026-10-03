@@ -19,5 +19,8 @@ jobs:
       - run: npm ci
       - run: npx prisma validate
       - run: npx prisma generate
+      # Next.js writes its LayoutProps/PageProps types during a build; a fresh
+      # machine has none, so generate them before type-checking.
+      - run: npx next typegen
       - run: npx tsc --noEmit
       - run: npx eslint
