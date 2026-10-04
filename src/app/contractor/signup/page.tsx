@@ -29,6 +29,8 @@ import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { PASSWORD_MIN_LENGTH, PASSWORD_HINT } from '@/lib/password-rules';
 import { normalizeLocation } from '@/lib/location';
+import { MUMBAI_CITY } from '@/lib/mumbai-areas';
+import AreaPicker from '@/components/AreaPicker';
 import PasswordInput from '@/components/PasswordInput';
 import TradeTypePicker from '@/components/TradeTypePicker';
 import { tradeOf } from '@/lib/trade-types';
@@ -38,7 +40,7 @@ export default function ContractorSignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [city, setCity] = useState('');
+  const city = MUMBAI_CITY; // Mumbai only for now (src/lib/mumbai-areas.ts)
   const [area, setArea] = useState('');
   const [tradeTypes, setTradeTypes] = useState<string[]>([]);
   const [password, setPassword] = useState('');
@@ -185,28 +187,19 @@ export default function ContractorSignupPage() {
                   <input
                     id="signup-city"
                     type="text"
-                    required
-                    maxLength={100}
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    onBlur={(e) => setCity(normalizeLocation(e.target.value))}
-                    placeholder="e.g. Mumbai"
-                    className="w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
+                    value={MUMBAI_CITY}
+                    readOnly
+                    className="w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper-dim text-stone focus:outline-none"
                   />
                 </div>
                 <div>
                   <label htmlFor="signup-area" className="block text-xs text-stone mb-1">
                     Area
                   </label>
-                  <input
+                  <AreaPicker
                     id="signup-area"
-                    type="text"
-                    required
-                    maxLength={100}
                     value={area}
-                    onChange={(e) => setArea(e.target.value)}
-                    onBlur={(e) => setArea(normalizeLocation(e.target.value))}
-                    placeholder="e.g. Andheri West"
+                    onChange={setArea}
                     className="w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink"
                   />
                 </div>

@@ -20,7 +20,7 @@
 //              contractors" line on Browse, so it updates by itself as
 //              contractors are verified
 //   nextOffset where the next batch starts, or null when there is no more
-//   facets     the dropdown options (cities, areas by city, trade counts),
+//   facets     the dropdown options (cities, areas with counts, trade counts),
 //              only sent with the first batch (offset 0)
 //
 // Only ever returns VERIFIED contractors — no query param can change this.
@@ -38,6 +38,7 @@ import { prisma } from '@/lib/prisma';
 import { isDemoLicense } from '@/lib/license';
 import { normalizeLocation } from '@/lib/location';
 import { hasTrade, ALL_TRADES } from '@/lib/trade-types';
+import { MUMBAI_AREAS } from '@/lib/mumbai-areas';
 
 const PAGE_SIZE = 20;
 
@@ -96,18 +97,18 @@ export async function GET(req: NextRequest) {
   for (const t of ALL_TRADES) {
     tradeCounts[t] = light.filter((r) => hasTrade(r.tradeTypes, t)).length;
   }
-  const areasByCity: Record<string, string[]> = {};
+  // Every listed Mumbai area is offered, with how many contractors are in it
+  // (so a developer sees the whole range even where it's still empty), plus
+  // any other area a contractor has typed in ("Other area").
+  const areaCounts = new Map<string, number>(MUMBAI_AREAS.map((a) => [a, 0]));
   for (const r of light) {
-    if (!r.city) continue;
-    const list = (areasByCity[r.city] ??= []);
-    if (r.area && !list.includes(r.area)) list.push(r.area);
+    if (r.area) areaCounts.set(r.area, (areaCounts.get(r.area) ?? 0) + 1);
   }
-  for (const k of Object.keys(areasByCity)) areasByCity[k].sort();
   const facets = {
-    cities: Object.keys(areasByCity).sort(),
-    areasByCity,
-    // Areas for contractors with no city yet still show when no city is picked.
-    allAreas: Array.from(new Set(light.map((r) => r.area).filter(Boolean))).sort(),
+    cities: Array.from(new Set(light.map((r) => r.city).filter(Boolean))).sort(),
+    areas: Array.from(areaCounts, ([name, count]) => ({ name, count })).sort((x, y) =>
+      x.name.localeCompare(y.name)
+    ),
     tradeCounts,
   };
 

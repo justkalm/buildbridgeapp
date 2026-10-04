@@ -46,8 +46,7 @@ type SortOption = 'experience' | 'projects' | 'location';
 // (with the first batch only) the dropdown options.
 type Facets = {
   cities: string[];
-  areasByCity: Record<string, string[]>;
-  allAreas: string[];
+  areas: { name: string; count: number }[];
   tradeCounts: Record<string, number>;
 };
 type BrowseResponse = {
@@ -224,9 +223,10 @@ function BrowsePageInner() {
 
   const availableCities = facets?.cities ?? [];
 
-  // Areas are scoped to the selected city: picking "Mumbai" then only
-  // offers Mumbai's areas. With no city selected, all areas are offered.
-  const availableAreas = selectedCity === 'all' ? (facets?.allAreas ?? []) : (facets?.areasByCity[selectedCity] ?? []);
+  // Every Mumbai area is offered with its count, like the trades above
+  // ("Bandra (7)", "Dahisar (0)"). Mumbai is the only city for now, so the
+  // list isn't narrowed by city.
+  const availableAreas = (facets?.areas ?? []).map((a) => ({ value: a.name, label: `${a.name} (${a.count})` }));
 
   // One number for the phone "Filters" button badge. Sort isn't counted:
   // it reorders results rather than narrowing them, and it always has a
@@ -304,7 +304,7 @@ function BrowsePageInner() {
           label="Area"
           value={selectedArea}
           onChange={setSelectedArea}
-          options={[{ value: 'all', label: 'All areas' }, ...availableAreas.map((a) => ({ value: a, label: a }))]}
+          options={[{ value: 'all', label: 'All areas' }, ...availableAreas]}
         />
         <FilterSelect
           stacked={stacked}

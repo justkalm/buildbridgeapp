@@ -8,7 +8,8 @@ import ImageUpload from '@/components/ImageUpload';
 import AdminTabs from '@/components/AdminTabs';
 import TradeTypePicker from '@/components/TradeTypePicker';
 import { isPlaceholderLicense } from '@/lib/license';
-import { normalizeLocation } from '@/lib/location';
+import { MUMBAI_CITY } from '@/lib/mumbai-areas';
+import AreaPicker from '@/components/AreaPicker';
 import { MAX_INSURANCE_COVER_LAKH, MAX_TEAM_SIZE, teamSizeRangeError } from '@/lib/project-validation';
 
 type ProjectDraft = {
@@ -35,7 +36,7 @@ const emptyProject = (): ProjectDraft => ({
 
 export default function NewContractorPage() {
   const [name, setName] = useState('');
-  const [city, setCity] = useState('Mumbai');
+  const city = MUMBAI_CITY; // Mumbai only for now (src/lib/mumbai-areas.ts)
   const [area, setArea] = useState('');
   const [tradeTypes, setTradeTypes] = useState<string[]>([]);
   const [pickerKey, setPickerKey] = useState(0);
@@ -226,23 +227,10 @@ export default function NewContractorPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="City">
-              <input
-                required
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                onBlur={(e) => setCity(normalizeLocation(e.target.value))}
-                className={inputCls}
-              />
+              <input value={MUMBAI_CITY} readOnly className={`${inputCls} bg-paper-dim text-stone`} />
             </Field>
             <Field label="Area / neighborhood">
-              <input
-                required
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-                onBlur={(e) => setArea(normalizeLocation(e.target.value))}
-                placeholder="e.g. Thane"
-                className={inputCls}
-              />
+              <AreaPicker value={area} onChange={setArea} className={inputCls} />
             </Field>
           </div>
 

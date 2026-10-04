@@ -70,14 +70,14 @@ const LAST_NAMES = [
 const BUSINESS_SUFFIXES = ['Constructions', 'Builders', 'Infra', 'Contractors', 'Projects', 'Enterprises'];
 
 const AREAS: { city: string; area: string }[] = [
-  { city: 'Mumbai', area: 'Thane' },
+  { city: 'Mumbai', area: 'Mulund' },
   { city: 'Mumbai', area: 'Andheri West' },
   { city: 'Mumbai', area: 'Bandra' },
   { city: 'Mumbai', area: 'Powai' },
   { city: 'Mumbai', area: 'Mazagaon' },
   { city: 'Mumbai', area: 'Borivali' },
   { city: 'Mumbai', area: 'Chembur' },
-  { city: 'Mumbai', area: 'Vashi' },
+  { city: 'Mumbai', area: 'Govandi' },
   { city: 'Mumbai', area: 'Kandivali' },
   { city: 'Mumbai', area: 'Dadar' },
 ];

@@ -26,6 +26,8 @@ import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import TradeTypePicker from '@/components/TradeTypePicker';
 import { normalizeLocation } from '@/lib/location';
+import { MUMBAI_CITY } from '@/lib/mumbai-areas';
+import AreaPicker from '@/components/AreaPicker';
 import { MAX_INSURANCE_COVER_LAKH, MAX_TEAM_SIZE, teamSizeRangeError } from '@/lib/project-validation';
 
 type ContractorMe = {
@@ -278,20 +280,16 @@ export default function ContractorProfilePage() {
               <div>
                 <label className="block text-sm font-medium mb-1.5">City</label>
                 <input
-                  required
-                  value={me.city}
-                  onChange={(e) => update({ city: e.target.value })}
-                  onBlur={(e) => update({ city: normalizeLocation(e.target.value) })}
-                  className={inputCls}
+                  value={me.city.trim() ? normalizeLocation(me.city) : MUMBAI_CITY}
+                  readOnly
+                  className={`${inputCls} bg-paper-dim text-stone`}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Area</label>
-                <input
-                  required
+                <AreaPicker
                   value={me.area}
-                  onChange={(e) => update({ area: e.target.value })}
-                  onBlur={(e) => update({ area: normalizeLocation(e.target.value) })}
+                  onChange={(area) => update({ area, ...(me.city.trim() ? {} : { city: MUMBAI_CITY }) })}
                   className={inputCls}
                 />
               </div>
