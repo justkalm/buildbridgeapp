@@ -20,3 +20,13 @@ export function isPlaceholderLicense(licenseNumber: string | null | undefined): 
   if (!licenseNumber) return false;
   return licenseNumber.startsWith(PLACEHOLDER_LICENSE_PREFIX);
 }
+
+// Demo contractors (prisma/seed-demo.ts) carry a DEMO/ licence number. They
+// are shown with a "Demo profile" tag instead of the Verified badge, so
+// nobody mistakes a made-up profile for a checked one.
+export const DEMO_LICENSE_PREFIX = 'DEMO/';
+
+export function isDemoLicense(licenseNumber: string | null | undefined): boolean {
+  if (!licenseNumber) return false;
+  return licenseNumber.startsWith(DEMO_LICENSE_PREFIX);
+}

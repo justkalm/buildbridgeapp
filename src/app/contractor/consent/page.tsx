@@ -14,23 +14,16 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 
-type ContractorMe = {
-  dataSharingConsent: boolean;
-  dataSharingConsentAt: string | null;
-};
-
 export default function ContractorConsentPage() {
   const { status: sessionStatus, data: session } = useSession();
   const router = useRouter();
-  const [me, setMe] = useState<ContractorMe | null>(null);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') router.push('/login');
@@ -42,28 +35,7 @@ export default function ContractorConsentPage() {
     }
   }, [sessionStatus, session, router]);
 
-  useEffect(() => {
-    if (sessionStatus !== 'authenticated') return;
-    fetch('/api/contractors/me')
-      .then((res) => (res.ok ? res.json() : null))
-      .then(setMe);
-  }, [sessionStatus]);
-
-  async function toggle(consent: boolean) {
-    setSaving(true);
-    const res = await fetch('/api/contractors/me/consent', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ consent }),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      setMe(updated);
-    }
-    setSaving(false);
-  }
-
-  if (sessionStatus !== 'authenticated' || !me) {
+  if (sessionStatus !== 'authenticated') {
     return null;
   }
 
@@ -75,38 +47,15 @@ export default function ContractorConsentPage() {
           ← Back to dashboard
         </Link>
         <h1 className="font-display font-light text-[28px] mb-4">Data sharing</h1>
-        <p className="text-stone text-sm mb-6">
-          (kalm) partners with material suppliers who may want to reach contractors on the
-          platform. If you opt in, your business details (company name, trade types, and
-          contact information) may be shared with these supplier partners. Your project history
-          and developer contacts are never shared. You can change this at any time.
+        {/* Supplier-sharing toggle hidden (owner, 4 Oct 2026) until a supplier
+            side exists. The /api/contractors/me/consent route and the
+            dataSharingConsent columns are untouched, so it can come back by
+            restoring the toggle block from git history. */}
+        <p className="text-stone text-sm">
+          (kalm) does not share your business details with anyone. If we ever offer to
+          connect you with material suppliers, we will ask for your permission here first.
+          Your project history and developer contacts are never shared.
         </p>
-
-        <div className="border border-line rounded-[6px] p-5 flex items-center justify-between gap-4">
-          <div>
-            <p className="font-medium text-sm">Share my data with material suppliers</p>
-            {me.dataSharingConsent && me.dataSharingConsentAt && (
-              <p className="text-xs text-stone mt-1">
-                Consented on {new Date(me.dataSharingConsentAt).toLocaleDateString()}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={() => toggle(!me.dataSharingConsent)}
-            disabled={saving}
-            className={`shrink-0 w-12 h-7 rounded-full transition-colors relative disabled:opacity-60 ${
-              me.dataSharingConsent ? 'bg-sage' : 'bg-paper-dim'
-            }`}
-            aria-pressed={me.dataSharingConsent}
-            aria-label="Toggle data sharing consent"
-          >
-            <span
-              className={`absolute top-0.5 w-6 h-6 rounded-full bg-paper transition-transform ${
-                me.dataSharingConsent ? 'translate-x-[22px]' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
-        </div>
       </main>
       <Footer />
     </>

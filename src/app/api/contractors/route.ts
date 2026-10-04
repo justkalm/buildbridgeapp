@@ -19,6 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isDemoLicense } from '@/lib/license';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
       id: true,
       slug: true,
       name: true,
+      licenseNumber: true, // only used to work out isDemo below; never sent out
       logoUrl: true,
       city: true,
       area: true,
@@ -54,5 +56,8 @@ export async function GET(req: NextRequest) {
     orderBy: [{ tier: 'desc' }, { rating: 'desc' }],
   });
 
-  return NextResponse.json(contractors);
+  // Send a plain isDemo flag, not the licence number itself.
+  return NextResponse.json(
+    contractors.map(({ licenseNumber, ...rest }) => ({ ...rest, isDemo: isDemoLicense(licenseNumber) }))
+  );
 }

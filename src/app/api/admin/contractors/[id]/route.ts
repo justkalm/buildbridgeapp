@@ -132,7 +132,16 @@ export async function PATCH(
 
   const existing = await prisma.contractor.findUnique({
     where: { id },
-    select: { id: true, licenseNumber: true, verificationStatus: true, city: true, area: true },
+    select: {
+      id: true,
+      licenseNumber: true,
+      verificationStatus: true,
+      city: true,
+      area: true,
+      checkDocumentsAt: true,
+      checkGstinAt: true,
+      checkContactAt: true,
+    },
   });
   if (!existing) {
     return NextResponse.json({ error: 'Contractor not found' }, { status: 404 });
@@ -202,6 +211,32 @@ export async function PATCH(
       },
       { status: 400 }
     );
+  }
+
+  // Three-checks rule (KALM-221): a contractor can only BECOME Verified once
+  // Documents, GSTIN and Spoke to them are all ticked. Looks at the ticks as
+  // they will be after this request (so ticking and verifying in one go
+  // works). Profiles that are already Verified are not re-tested here: they
+  // keep their badge, and the rule applies the next time they move into
+  // Verified from another status.
+  if (
+    hasStatus &&
+    body.verificationStatus === 'VERIFIED' &&
+    existing.verificationStatus !== 'VERIFIED'
+  ) {
+    const tick = (key: 'documents' | 'gstin' | 'contact', current: Date | null) =>
+      hasChecks && typeof body.checks[key] === 'boolean' ? body.checks[key] : !!current;
+    const missing = [
+      !tick('documents', existing.checkDocumentsAt) && 'Documents',
+      !tick('gstin', existing.checkGstinAt) && 'GSTIN',
+      !tick('contact', existing.checkContactAt) && 'Spoke to them',
+    ].filter(Boolean);
+    if (missing.length > 0) {
+      return NextResponse.json(
+        { error: `Tick all three checks before marking Verified. Still missing: ${missing.join(', ')}.` },
+        { status: 400 }
+      );
+    }
   }
 
   const checkData: Record<string, Date | null> = {};

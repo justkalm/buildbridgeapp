@@ -10,6 +10,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { ALL_TRADES, hasTrade, specialityLabel, tradesOf } from '@/lib/trade-types';
+import DemoBadge from '@/components/DemoBadge';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import ShortlistButton from '@/components/ShortlistButton';
 import BrowseFilterSheet from '@/components/BrowseFilterSheet';
@@ -27,6 +28,7 @@ type Contractor = {
   tradeTypes: string[];
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
   reverifyPending: boolean;
+  isDemo: boolean;
   tier: 'LISTED' | 'PLUS' | 'PRO';
   yearsInBusiness: number | null;
   rating: number;
@@ -460,7 +462,7 @@ function BrowsePageInner() {
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <div className="flex items-center gap-2.5 flex-wrap">
                             <span className="font-display text-lg">{c.name}</span>
-                            {c.verificationStatus === 'VERIFIED' && <VerifiedBadge reviewPending={c.reverifyPending} />}
+                            {c.isDemo ? <DemoBadge /> : c.verificationStatus === 'VERIFIED' && <VerifiedBadge reviewPending={c.reverifyPending} />}
                             {/* KALM-071: PLUS and PRO contractors are ranked
                                 above free listings (see the tier sort
                                 above), so say so on the card. One honest

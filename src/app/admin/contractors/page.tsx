@@ -380,6 +380,9 @@ export default function AdminContractorsPage() {
                       'no real license number on file (self-signup placeholder), so add their real license',
                     missingLocation &&
                       'no location on file, so they need to add their city and area in their profile',
+                    c.verificationStatus !== 'VERIFIED' &&
+                      !(c.checkDocumentsAt && c.checkGstinAt && c.checkContactAt) &&
+                      'tick all three checks (Documents, GSTIN, Spoke to them)',
                   ].filter(Boolean);
                   const verifyBlockedTitle =
                     verifyBlockers.length > 0

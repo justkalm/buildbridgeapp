@@ -31,6 +31,7 @@ import Footer from '@/components/Footer';
 import ProjectGallery from '@/components/ProjectGallery';
 import SiteVisitRequest from '@/components/SiteVisitRequest';
 import ProjectLightbox from '@/components/ProjectLightbox';
+import DemoBadge from '@/components/DemoBadge';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import ShortlistButton from '@/components/ShortlistButton';
 import ProfileMessageButton from '@/components/ProfileMessageButton';
@@ -50,7 +51,7 @@ import {
   type QuoteDetails,
 } from '@/components/QuoteFormParts';
 import ProfileQuoteBar, { ProfileQuoteBarSpacer } from '@/components/ProfileQuoteBar';
-import { isPlaceholderLicense } from '@/lib/license';
+import { isPlaceholderLicense, isDemoLicense } from '@/lib/license';
 import { formatLocation } from '@/lib/location';
 import { groupByTrade, tradesOf } from '@/lib/trade-types';
 
@@ -317,7 +318,7 @@ export default function ContractorProfilePage() {
               <div>
                 <div className="flex items-center gap-3 flex-wrap mb-2">
                   <h1 className="font-display font-light text-[28px]">{contractor.name}</h1>
-                  {contractor.verificationStatus === 'VERIFIED' && <VerifiedBadge reviewPending={contractor.reverifyPending} />}
+                  {isDemoLicense(contractor.licenseNumber) ? <DemoBadge /> : contractor.verificationStatus === 'VERIFIED' && <VerifiedBadge reviewPending={contractor.reverifyPending} />}
                 </div>
                 <div className="flex gap-4 flex-wrap text-[13.5px] text-stone mb-3">
                   <span>
