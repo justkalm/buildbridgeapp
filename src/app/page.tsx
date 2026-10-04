@@ -10,6 +10,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import KalmTrace from '@/components/KalmTrace';
 import { ALL_TRADES, HOMEPAGE_TRADES } from '@/lib/trade-types';
 
 export default async function Home() {
@@ -24,6 +25,7 @@ export default async function Home() {
 
       <header className="pt-28 pb-24 text-center">
         <div className="max-w-[720px] mx-auto px-5 sm:px-8">
+          <KalmTrace />
           <p className="font-display text-3xl md:text-4xl text-ink mb-8 leading-tight">
             Kaam. Connected.
           </p>
