@@ -3,13 +3,13 @@
 'use client';
 
 import { SHOW_RATINGS } from '@/lib/ratings';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
-import { ALL_TRADES, hasTrade, specialityLabel, tradesOf } from '@/lib/trade-types';
+import { ALL_TRADES, specialityLabel, tradesOf } from '@/lib/trade-types';
 import DemoBadge from '@/components/DemoBadge';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import ShortlistButton from '@/components/ShortlistButton';
@@ -42,6 +42,22 @@ type Contractor = {
 
 type SortOption = 'experience' | 'projects' | 'location';
 
+// What /api/contractors sends back: one batch of cards plus the counts and
+// (with the first batch only) the dropdown options.
+type Facets = {
+  cities: string[];
+  areasByCity: Record<string, string[]>;
+  allAreas: string[];
+  tradeCounts: Record<string, number>;
+};
+type BrowseResponse = {
+  items: Contractor[];
+  total: number;
+  realCount: number;
+  nextOffset: number | null;
+  facets?: Facets;
+};
+
 const MIN_EXPERIENCE_OPTIONS = [0, 5, 10, 20];
 
 // Specialities shown on a Browse card before "+N more".
@@ -69,7 +85,19 @@ const MIN_PROJECTS_OPTIONS = [0, 1, 3, 5];
 function BrowsePageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  // Cards loaded so far (20 at a time; "Load more" appends the next 20).
   const [contractors, setContractors] = useState<Contractor[] | null>(null);
+  const [total, setTotal] = useState(0); // contractors matching the filters, demos included
+  const [realCount, setRealCount] = useState(0); // the same, demos left out
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const [facets, setFacets] = useState<Facets | null>(null);
+  // Which filter set the cards on screen belong to; while it differs from the
+  // current filters, a new batch is on its way.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Only the newest request may update the page, so a slow answer to an old
+  // filter can't overwrite the results of a newer one.
+  const requestId = useRef(0);
   const [error, setError] = useState<string | null>(null);
   // The trade filter (KALM-167): one of the 20 trades in
   // src/lib/trade-types.ts. A contractor matches when any of their
@@ -92,23 +120,79 @@ function BrowsePageInner() {
   const isDeveloper = sessionStatus === 'authenticated' && (session?.user as { role?: string })?.role === 'developer';
   const [shortlistedIds, setShortlistedIds] = useState<Set<string> | null>(null);
 
+  function queryFor(offset: number): string {
+    const q = new URLSearchParams();
+    if (selectedTrade !== 'all') q.set('trade', selectedTrade);
+    if (selectedCity !== 'all') q.set('city', selectedCity);
+    if (selectedArea !== 'all') q.set('area', selectedArea);
+    if (minExperience > 0) q.set('minExperience', String(minExperience));
+    if (minProjects > 0) q.set('minProjects', String(minProjects));
+    q.set('sort', sortBy);
+    if (offset > 0) q.set('offset', String(offset));
+    return q.toString();
+  }
+
+  // Normalize city/area on arrival so the cards show one spelling per
+  // place, even for rows saved before capitalisation was enforced on save
+  // (see src/lib/location.ts).
+  function tidy(rows: Contractor[]): Contractor[] {
+    return rows.map((c) => ({ ...c, city: normalizeLocation(c.city), area: normalizeLocation(c.area) }));
+  }
+
+  // First batch: runs on arrival and again whenever a filter or the sort changes.
   useEffect(() => {
-    fetch('/api/contractors')
+    const id = ++requestId.current;
+    const key = queryFor(0);
+    fetch(`/api/contractors?${key}`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load contractors');
-        return res.json();
+        return res.json() as Promise<BrowseResponse>;
       })
-      // Normalize city/area once on arrival so the filters, the cards and
-      // the sort all see one spelling per place, even for rows saved
-      // before capitalisation was enforced on save (see
-      // src/lib/location.ts). "thane" and "Thane" become one option.
-      .then((rows: Contractor[]) =>
-        setContractors(
-          rows.map((c) => ({ ...c, city: normalizeLocation(c.city), area: normalizeLocation(c.area) }))
-        )
-      )
-      .catch(() => setError('Could not load contractors right now. Please try again shortly.'));
-  }, []);
+      .then((data) => {
+        if (id !== requestId.current) return;
+        setContractors(tidy(data.items));
+        setTotal(data.total);
+        setRealCount(data.realCount);
+        setNextOffset(data.nextOffset);
+        if (data.facets) setFacets(data.facets);
+        setLoadedKey(key);
+        setError(null);
+      })
+      .catch(() => {
+        if (id === requestId.current) {
+          setLoadedKey(key);
+          setError('Could not load contractors right now. Please try again shortly.');
+        }
+      });
+    // queryFor reads exactly these values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTrade, selectedCity, selectedArea, minExperience, minProjects, sortBy]);
+
+  // "Load more": the next 20, added under the ones already shown.
+  function loadMore() {
+    if (nextOffset === null || loadingMore) return;
+    const id = requestId.current;
+    setLoadingMore(true);
+    fetch(`/api/contractors?${queryFor(nextOffset)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to load contractors');
+        return res.json() as Promise<BrowseResponse>;
+      })
+      .then((data) => {
+        if (id !== requestId.current) return; // filters changed meanwhile
+        setContractors((prev) => {
+          const seen = new Set((prev ?? []).map((c) => c.id));
+          return [...(prev ?? []), ...tidy(data.items).filter((c) => !seen.has(c.id))];
+        });
+        setTotal(data.total);
+        setRealCount(data.realCount);
+        setNextOffset(data.nextOffset);
+      })
+      .catch(() => setError('Could not load more contractors. Please try again.'))
+      .finally(() => setLoadingMore(false));
+  }
+
+  const loading = loadedKey !== queryFor(0);
 
   // Load which contractors this developer already saved, so cards can
   // show the real "✓ Saved" state instead of always starting at "+ Save"
@@ -131,89 +215,18 @@ function BrowsePageInner() {
 
   // Every trade is offered, with how many contractors are listed in it,
   // so a developer can see the whole range even where it's still empty.
-  const tradeOptions = useMemo(
-    () =>
-      ALL_TRADES.map((trade) => {
-        const count = contractors ? contractors.filter((c) => hasTrade(c.tradeTypes, trade)).length : 0;
-        return { value: trade, label: `${trade} (${count})` };
-      }),
-    [contractors]
-  );
+  // The counts and the city/area lists come from the server (facets), since
+  // this page no longer holds the full list.
+  const tradeOptions = ALL_TRADES.map((trade) => ({
+    value: trade,
+    label: `${trade} (${facets?.tradeCounts[trade] ?? 0})`,
+  }));
 
-  const availableCities = useMemo(() => {
-    if (!contractors) return [];
-    // .filter(Boolean): a contractor with no city yet (e.g. self-signup
-    // before filling in their profile) would otherwise add a blank option.
-    return Array.from(new Set(contractors.map((c) => c.city).filter(Boolean))).sort();
-  }, [contractors]);
+  const availableCities = facets?.cities ?? [];
 
-  // Areas are scoped to the selected city — picking "Mumbai" then only
-  // offers Mumbai's areas, not every area across every city, since an
-  // area name like "Andheri West" is only meaningful relative to its
-  // city. With no city selected, all areas across all contractors are
-  // offered (still useful — a developer may know the area they want but
-  // not think of it in terms of city first).
-  const availableAreas = useMemo(() => {
-    if (!contractors) return [];
-    const pool = selectedCity === 'all' ? contractors : contractors.filter((c) => c.city === selectedCity);
-    return Array.from(new Set(pool.map((c) => c.area).filter(Boolean))).sort();
-  }, [contractors, selectedCity]);
-
-  const filteredContractors = useMemo(() => {
-    if (!contractors) return null;
-
-    let result = contractors;
-    if (selectedTrade !== 'all') {
-      result = result.filter((c) => hasTrade(c.tradeTypes, selectedTrade));
-    }
-    if (selectedCity !== 'all') {
-      result = result.filter((c) => c.city === selectedCity);
-    }
-    if (selectedArea !== 'all') {
-      result = result.filter((c) => c.area === selectedArea);
-    }
-    if (minExperience > 0) {
-      result = result.filter((c) => (c.yearsInBusiness ?? 0) >= minExperience);
-    }
-    if (minProjects > 0) {
-      result = result.filter((c) => c._count.projects >= minProjects);
-    }
-
-    // Sort on a copy — the arrays above may already be `contractors` itself
-    // when no filter was applied, and mutating that with .sort() would
-    // silently reorder the original fetched list too.
-    result = [...result];
-
-    // KALM-172: profiles with no projects always go to the bottom (owner
-    // decision 1 Oct: empty promoted profiles at the top looked bad to
-    // developers). Among the rest, tier comes next — paying contractors (PRO, then PLUS) show
-    // above free (LISTED) ones regardless of which sort option is picked.
-    // This used to be undone entirely: the backend fetch already ordered
-    // by tier, but this client-side sort ran on top of it and only looked
-    // at experience/projects/location, silently discarding that order. The
-    // dropdown now only controls ranking WITHIN a tier, not whether tier
-    // matters at all — "highest payer shows first" should hold no matter
-    // which sort view someone's looking at.
-    const TIER_RANK: Record<Contractor['tier'], number> = { PRO: 0, PLUS: 1, LISTED: 2 };
-
-    result.sort((a, b) => {
-      const emptyDiff = Number(a._count.projects === 0) - Number(b._count.projects === 0);
-      if (emptyDiff !== 0) return emptyDiff;
-
-      const tierDiff = TIER_RANK[a.tier] - TIER_RANK[b.tier];
-      if (tierDiff !== 0) return tierDiff;
-
-      if (sortBy === 'experience') {
-        return (b.yearsInBusiness ?? 0) - (a.yearsInBusiness ?? 0);
-      }
-      if (sortBy === 'projects') {
-        return b._count.projects - a._count.projects;
-      }
-      return `${a.city}${a.area}`.localeCompare(`${b.city}${b.area}`);
-    });
-
-    return result;
-  }, [contractors, selectedTrade, selectedCity, selectedArea, minExperience, minProjects, sortBy]);
+  // Areas are scoped to the selected city: picking "Mumbai" then only
+  // offers Mumbai's areas. With no city selected, all areas are offered.
+  const availableAreas = selectedCity === 'all' ? (facets?.allAreas ?? []) : (facets?.areasByCity[selectedCity] ?? []);
 
   // One number for the phone "Filters" button badge. Sort isn't counted:
   // it reorders results rather than narrowing them, and it always has a
@@ -333,7 +346,8 @@ function BrowsePageInner() {
     );
   }
 
-  const resultCount = filteredContractors?.length ?? 0;
+  // Matches for the phone sheet's button; the cards below are 20 at a time.
+  const resultCount = total;
 
   return (
     <>
@@ -360,13 +374,13 @@ function BrowsePageInner() {
             Filters are hidden here, since there's nothing to narrow and
             "try different filters" would send people hunting for results
             that don't exist. */}
-        {contractors !== null && contractors.length === 0 && (
+        {contractors !== null && total === 0 && !hasActiveFilters && (
           <div className="border border-line rounded-md p-10 text-center bg-paper">
             <p className="text-ink font-medium">No verified contractors yet. Check back soon.</p>
           </div>
         )}
 
-        {contractors !== null && contractors.length > 0 && filteredContractors !== null && (
+        {contractors !== null && !(total === 0 && !hasActiveFilters) && (
           <>
             {/* Phones: one button that opens the filter sheet, instead of
                 the desktop bar wrapping into half a screen of selects. */}
@@ -430,9 +444,11 @@ function BrowsePageInner() {
             {/* aria-live so a screen reader hears the new count after each
                 filter change, without having to go looking for it. */}
             <p className="text-sm text-stone mb-6" aria-live="polite">
-              {resultCount === 0
+              {total === 0
                 ? 'No matches'
-                : `${resultCount} verified contractor${resultCount === 1 ? '' : 's'}`}
+                : realCount === 0
+                  ? 'No verified contractors here yet. Showing sample profiles.'
+                  : `${realCount} verified contractor${realCount === 1 ? '' : 's'}`}
             </p>
 
             {/* Empty state (b): contractors exist, the filters just exclude
@@ -449,8 +465,8 @@ function BrowsePageInner() {
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col gap-4">
-                {filteredContractors.map((c) => (
+              <div className={`flex flex-col gap-4 transition-opacity ${loading ? 'opacity-60' : ''}`} aria-busy={loading}>
+                {contractors.map((c) => (
                   <Link
                     key={c.id}
                     href={`/contractors/${c.slug}`}
@@ -540,6 +556,16 @@ function BrowsePageInner() {
                     </div>
                   </Link>
                 ))}
+                {nextOffset !== null && (
+                  <button
+                    type="button"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="self-center mt-2 text-sm font-medium px-6 py-3 rounded-md border border-ink text-ink hover:bg-ink hover:text-paper transition-colors disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+                  >
+                    {loadingMore ? 'Loading…' : 'Load more'}
+                  </button>
+                )}
               </div>
             )}
           </>
