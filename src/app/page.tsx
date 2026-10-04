@@ -32,10 +32,8 @@ export default async function Home() {
           <h1 className="font-display font-light text-[clamp(34px,4.4vw,52px)] leading-[1.15] text-ink mb-7">
             Build with contractors who&apos;ve proven it before.
           </h1>
-          <p className="text-[17px] leading-relaxed text-stone max-w-[480px] mx-auto mb-10">
-            (kalm) connects developers with licensed contractors. Verified means we&apos;ve checked
-            their documents and GSTIN and spoken to them directly. Every profile shows project
-            history with photos, timelines and sizes.
+          <p className="text-[17px] leading-relaxed text-stone max-w-[440px] mx-auto mb-10">
+            Find licensed contractors in Mumbai, and see their finished work before you ask for a quote.
           </p>
           <div className="flex gap-4 flex-wrap justify-center">
             <Link
