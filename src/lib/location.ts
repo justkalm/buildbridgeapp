@@ -18,6 +18,11 @@
 // (caps lock left on), every word is title-cased, abbreviations included.
 // Safe to run on an already-normalized value: it returns it unchanged.
 //
+// Same-place spellings (Bombay is Mumbai) are folded into one, so the
+// filters, saved rows and search treat them as a single place. Only a WHOLE
+// value is matched, so "New Bombay" and "Bombay Central" are left alone.
+const SAME_PLACE: Record<string, string> = { bombay: 'Mumbai' };
+
 // Pure function, no imports, so both server routes and client components
 // can use it.
 
@@ -27,6 +32,9 @@ export function normalizeLocation(input: string): string {
 
   const hasLower = /[a-z]/.test(collapsed);
   const allCaps = !hasLower && /[A-Z]/.test(collapsed);
+
+  const sameAs = SAME_PLACE[collapsed.toLowerCase()];
+  if (sameAs) return sameAs;
 
   // Split on separators but keep them, so "Navi-Mumbai (East)" keeps its
   // hyphen, space and brackets exactly where they were.
