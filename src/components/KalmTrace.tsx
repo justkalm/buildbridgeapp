@@ -18,6 +18,8 @@
 //
 // Pure SVG and CSS: no image file, so there is no photo to download.
 
+import Wordmark from '@/components/Wordmark';
+
 const CSS = `
 @keyframes kt-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes kt-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -231,11 +233,8 @@ export default function KalmTrace() {
           </g>
         </svg>
       </div>
-      <p
-        className="kt-word font-display font-light text-ink tracking-[-0.01em] leading-none mt-4"
-        style={{ fontSize: 'clamp(44px, 8vw, 68px)' }}
-      >
-        (kalm)
+      <p className="kt-word mt-5" style={{ fontSize: 'clamp(40px, 7.5vw, 64px)' }}>
+        <Wordmark />
       </p>
     </div>
   );

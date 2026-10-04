@@ -26,7 +26,7 @@ export default async function Home() {
       <header className="pt-28 pb-24 text-center">
         <div className="max-w-[720px] mx-auto px-5 sm:px-8">
           <KalmTrace />
-          <p className="font-display text-3xl md:text-4xl text-ink mb-8 leading-tight">
+          <p className="font-logo font-light text-2xl md:text-3xl text-ink mb-8 leading-tight tracking-[0.16em]">
             Kaam. Connected.
           </p>
           <h1 className="font-display font-light text-[clamp(34px,4.4vw,52px)] leading-[1.15] text-ink mb-7">

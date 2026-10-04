@@ -35,6 +35,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Wordmark from '@/components/Wordmark';
 import { useSession, signOut } from 'next-auth/react';
 import { useUnreadMessages } from '@/lib/use-unread-messages';
 
@@ -107,8 +108,8 @@ export default function Nav() {
   return (
     <nav className="sticky top-0 z-50 bg-paper/90 backdrop-blur-sm border-b border-line">
       <div className="max-w-[1440px] mx-auto px-5 sm:px-8 h-[var(--nav-h)] flex items-center justify-between">
-        <Link href="/" className="font-display text-2xl text-ink tracking-tight" onClick={closeMobile}>
-          (kalm)
+        <Link href="/" aria-label="(kalm) home" className="text-[24px]" onClick={closeMobile}>
+          <Wordmark />
         </Link>
 
         <div className="hidden md:flex items-center gap-10">

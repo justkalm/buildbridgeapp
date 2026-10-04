@@ -3,6 +3,7 @@
 'use client';
 
 import Link from 'next/link';
+import Wordmark from '@/components/Wordmark';
 import { useSession } from 'next-auth/react';
 
 export default function Footer() {
@@ -14,7 +15,7 @@ export default function Footer() {
       <div className="max-w-[1440px] mx-auto px-5 sm:px-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10 pb-12 border-b border-line">
           <div>
-            <div className="font-display text-xl text-ink mb-3.5">(kalm)</div>
+            <div className="mb-3.5 text-[20px]"><Wordmark /></div>
             <p className="text-sm leading-relaxed max-w-[260px]">
               Connecting developers with licensed, verified contractors.
             </p>

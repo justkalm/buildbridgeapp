@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
 import { SEARCH_ENGINES_ALLOWED, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
-import { Fraunces, Inter } from "next/font/google";
+import { Fraunces, Inter, Jost } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import CookieBanner from "@/components/CookieBanner";
@@ -19,6 +19,14 @@ const fraunces = Fraunces({
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "swap",
+});
+// The (kalm) logo face: a thin geometric sans in the Futura family (round
+// single-storey a, straight k and l). Used only for the wordmark and the
+// tagline, so the name looks the same everywhere as it does in the logo.
+const jost = Jost({
+  subsets: ["latin"],
+  variable: "--font-jost",
   display: "swap",
 });
 
@@ -61,7 +69,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   await connection();
   return (
-    <html lang="en" className={`${fraunces.variable} ${inter.variable} h-full antialiased`}>
+    <html lang="en" className={`${fraunces.variable} ${inter.variable} ${jost.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-paper text-ink">
         <Providers>{children}</Providers>
         <CookieBanner />
