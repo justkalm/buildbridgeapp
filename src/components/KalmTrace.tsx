@@ -48,7 +48,7 @@ export default function KalmTrace() {
   return (
     <div className="mb-8 flex flex-col items-center">
       <div
-        className="w-full max-w-[980px]"
+        className="w-full max-w-[800px]"
         style={{
           WebkitMaskImage: EDGE_FADE,
           maskImage: EDGE_FADE,
@@ -233,7 +233,7 @@ export default function KalmTrace() {
           </g>
         </svg>
       </div>
-      <p className="kt-word mt-5" style={{ fontSize: 'clamp(40px, 7.5vw, 64px)' }}>
+      <p className="kt-word mt-3" style={{ fontSize: 'clamp(34px, 6vw, 52px)' }}>
         <Wordmark />
       </p>
     </div>

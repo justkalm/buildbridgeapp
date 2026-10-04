@@ -23,48 +23,52 @@ export default async function Home() {
     <>
       <Nav />
 
-      <header className="pt-28 pb-24 text-center">
-        <div className="max-w-[720px] mx-auto px-5 sm:px-8">
-          <KalmTrace />
-          <p className="font-logo font-light text-2xl md:text-3xl text-ink mb-8 leading-tight tracking-[0.16em]">
-            Kaam. Connected.
-          </p>
-          <h1 className="font-display font-light text-[clamp(34px,4.4vw,52px)] leading-[1.15] text-ink mb-7">
-            Build with contractors who&apos;ve proven it before.
-          </h1>
-          <p className="text-[17px] leading-relaxed text-stone max-w-[440px] mx-auto mb-10">
-            Find licensed contractors in Mumbai, and see their finished work before you ask for a quote.
-          </p>
-          <div className="flex gap-4 flex-wrap justify-center">
-            <Link
-              href="/browse"
-              className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
-            >
-              Browse Contractors
-            </Link>
-            <Link
-              href="/signup"
-              className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full border border-line text-ink hover:border-ink transition-colors"
-            >
-              Sign up as a developer
-            </Link>
+      <header className="pt-10 md:pt-12 pb-20 md:pb-24">
+        <KalmTrace />
+        <div className="max-w-[1180px] mx-auto px-5 sm:px-8 mt-9 md:mt-10 grid md:grid-cols-12 gap-x-12 gap-y-9 items-end">
+          <div className="md:col-span-7">
+            <p className="font-logo text-[15px] md:text-[17px] text-stone mb-5 tracking-[0.22em]">
+              Kaam. Connected.
+            </p>
+            <h1 className="font-logo font-light text-[clamp(38px,5.4vw,70px)] leading-[1.06] tracking-[0.005em] text-ink">
+              Build with contractors who&apos;ve proven it before.
+            </h1>
           </div>
-          <p className="text-sm text-stone mt-6">
-            Are you a contractor?{' '}
-            <Link href="/contractor/signup" className="text-ink underline underline-offset-2 hover:text-stone">
-              List your business
-            </Link>
-          </p>
+          <div className="md:col-span-5 md:pb-2">
+            <p className="text-[17px] leading-relaxed text-stone max-w-[420px] mb-8">
+              Find licensed contractors in Mumbai, and see their finished work before you ask for a quote.
+            </p>
+            <div className="flex gap-4 flex-wrap">
+              <Link
+                href="/browse"
+                className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
+              >
+                Browse Contractors
+              </Link>
+              <Link
+                href="/signup"
+                className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full border border-line text-ink hover:border-ink transition-colors"
+              >
+                Sign up as a developer
+              </Link>
+            </div>
+            <p className="text-sm text-stone mt-6">
+              Are you a contractor?{' '}
+              <Link href="/contractor/signup" className="text-ink underline underline-offset-2 hover:text-stone">
+                List your business
+              </Link>
+            </p>
+          </div>
         </div>
       </header>
 
       <section className="py-24 bg-paper-dim border-t border-line">
-        <div className="max-w-[880px] mx-auto px-5 sm:px-8">
-          <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-center text-ink mb-14">
+        <div className="max-w-[1180px] mx-auto px-5 sm:px-8">
+          <h2 className="font-logo font-light tracking-[0.01em] text-[clamp(30px,3.6vw,46px)] text-ink mb-12">
             Every trade, one directory.
           </h2>
 
-          <div className="flex flex-wrap justify-center gap-3">
+          <div className="flex flex-wrap gap-3">
             {/* The trades almost every project hires (KALM-167); the rest
                 are one tap away in Browse's trade filter. */}
             {HOMEPAGE_TRADES.map((trade) => (
@@ -90,11 +94,11 @@ export default async function Home() {
           thing that sets (kalm) apart, so it's explained before anything
           else about how the site works. */}
       <section className="py-24 border-t border-line">
-        <div className="max-w-[640px] mx-auto px-5 sm:px-8 text-center">
-          <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-ink mb-6">
+        <div className="max-w-[1180px] mx-auto px-5 sm:px-8">
+          <h2 className="font-logo font-light tracking-[0.01em] text-[clamp(30px,3.6vw,46px)] text-ink mb-8">
             A badge that means something.
           </h2>
-          <div className="max-w-[520px] mx-auto">
+          <div className="max-w-[560px]">
             <p className="text-[15.5px] leading-relaxed text-stone mb-4 text-left sm:text-justify">
               Before a contractor is marked Verified, our team does three things, not just take
               their word for it:
@@ -120,8 +124,8 @@ export default async function Home() {
           covered the same journey twice; the owner asked for a shorter
           homepage, so they're merged into these four steps. */}
       <section className="py-24 border-t border-line bg-paper-dim">
-        <div className="max-w-[880px] mx-auto px-5 sm:px-8">
-          <h2 className="font-display font-light text-[clamp(28px,3.2vw,38px)] text-center text-ink mb-16">
+        <div className="max-w-[1180px] mx-auto px-5 sm:px-8">
+          <h2 className="font-logo font-light tracking-[0.01em] text-[clamp(30px,3.6vw,46px)] text-ink mb-14">
             How it works.
           </h2>
 
@@ -144,15 +148,15 @@ export default async function Home() {
                 body: 'Share your project details. You deal with the contractor directly, no obligation.',
               },
             ].map((step, i) => (
-              <li key={step.title} className="text-center md:text-left">
+              <li key={step.title} className="text-left">
                 <p className="text-xs font-medium tracking-wider text-stone mb-2">STEP {i + 1}</p>
-                <h3 className="font-display text-lg text-ink mb-2">{step.title}</h3>
+                <h3 className="font-logo text-xl text-ink mb-2 tracking-[0.01em]">{step.title}</h3>
                 <p className="text-sm text-stone leading-relaxed">{step.body}</p>
               </li>
             ))}
           </ol>
 
-          <div className="flex gap-4 flex-wrap justify-center mt-16">
+          <div className="flex gap-4 flex-wrap mt-16">
             <Link
               href="/browse"
               className="inline-flex items-center justify-center text-sm px-7 py-3.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
@@ -172,9 +176,9 @@ export default async function Home() {
       {/* Contractors get one slim banner rather than a full section; the
           details of what a listing offers live on the signup page. */}
       <section className="py-12 border-t border-line">
-        <div className="max-w-[880px] mx-auto px-5 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+        <div className="max-w-[1180px] mx-auto px-5 sm:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <p className="font-display text-xl text-ink">Are you a contractor?</p>
+            <p className="font-logo text-2xl text-ink tracking-[0.01em]">Are you a contractor?</p>
             <p className="text-sm text-stone mt-1">
               Show your completed work and get quote requests from developers, free during the trial.
             </p>

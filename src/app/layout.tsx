@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
 import { SEARCH_ENGINES_ALLOWED, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
-import { Fraunces, Inter, Jost } from "next/font/google";
+import { Fraunces, Instrument_Sans, Jost } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import CookieBanner from "@/components/CookieBanner";
@@ -16,9 +16,12 @@ const fraunces = Fraunces({
   variable: "--font-fraunces",
   display: "swap",
 });
-const inter = Inter({
+// Body text (5 Oct 2026): Instrument Sans in place of Inter. A little narrower
+// and more editorial than Inter, so the site stops looking like the default
+// template, and it sits well beside the geometric logo face.
+const bodyFont = Instrument_Sans({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-body-face",
   display: "swap",
 });
 // The (kalm) logo face: a thin geometric sans in the Futura family (round
@@ -69,7 +72,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   await connection();
   return (
-    <html lang="en" className={`${fraunces.variable} ${inter.variable} ${jost.variable} h-full antialiased`}>
+    <html lang="en" className={`${fraunces.variable} ${bodyFont.variable} ${jost.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-paper text-ink">
         <Providers>{children}</Providers>
         <CookieBanner />

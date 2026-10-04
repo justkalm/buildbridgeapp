@@ -40,7 +40,7 @@
   --color-danger-soft: var(--danger-soft);
 
   --font-display: var(--font-fraunces), Georgia, serif;
-  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-body: var(--font-body-face), system-ui, sans-serif;
   --font-logo: var(--font-jost), Futura, 'Century Gothic', system-ui, sans-serif;
 }
 
