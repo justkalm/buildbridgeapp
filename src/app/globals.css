@@ -2,7 +2,8 @@
 
 /* Fonts are loaded by next/font in src/app/layout.tsx (self-hosted at build
    time, no render-blocking request to Google), which sets the
-   --font-fraunces and --font-inter variables used below. They used to be
+   --font-jost (headings and the wordmark) and --font-body-face (body text)
+   variables used below. They used to be
    pulled in with a CSS @import from fonts.googleapis.com, which blocked
    rendering and caused text to flash in a fallback font first. */
 
@@ -39,7 +40,7 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
 
-  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-display: var(--font-jost), Futura, 'Century Gothic', system-ui, sans-serif;
   --font-body: var(--font-body-face), system-ui, sans-serif;
   --font-logo: var(--font-jost), Futura, 'Century Gothic', system-ui, sans-serif;
 }

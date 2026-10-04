@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
 import { SEARCH_ENGINES_ALLOWED, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
-import { Fraunces, Instrument_Sans, Jost } from "next/font/google";
+import { Instrument_Sans, Jost } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import CookieBanner from "@/components/CookieBanner";
@@ -10,12 +10,6 @@ import CookieBanner from "@/components/CookieBanner";
 // served from this site, so there's no render-blocking request to Google
 // Fonts and no flash of fallback text. Each exposes a CSS variable that
 // globals.css maps to --font-display / --font-body.
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  axes: ["opsz"],
-  variable: "--font-fraunces",
-  display: "swap",
-});
 // Body text (5 Oct 2026): Instrument Sans in place of Inter. A little narrower
 // and more editorial than Inter, so the site stops looking like the default
 // template, and it sits well beside the geometric logo face.
@@ -25,8 +19,8 @@ const bodyFont = Instrument_Sans({
   display: "swap",
 });
 // The (kalm) logo face: a thin geometric sans in the Futura family (round
-// single-storey a, straight k and l). Used only for the wordmark and the
-// tagline, so the name looks the same everywhere as it does in the logo.
+// single-storey a, straight k and l). Used for the wordmark, the tagline and
+// every heading (--font-display), so the whole site speaks in the logo's voice.
 const jost = Jost({
   subsets: ["latin"],
   variable: "--font-jost",
@@ -72,7 +66,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   await connection();
   return (
-    <html lang="en" className={`${fraunces.variable} ${bodyFont.variable} ${jost.variable} h-full antialiased`}>
+    <html lang="en" className={`${bodyFont.variable} ${jost.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-paper text-ink">
         <Providers>{children}</Providers>
         <CookieBanner />
