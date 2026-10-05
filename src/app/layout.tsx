@@ -38,8 +38,9 @@ export const viewport: Viewport = {
 
 // Site-wide titles and link previews. Each page sets its own title, shown
 // as "<page> | (kalm)"; contractor profiles also set their own preview
-// (src/app/contractors/[slug]/layout.tsx). The preview image is the (kalm)
-// app icon. robots: see SEARCH_ENGINES_ALLOWED in src/lib/site.ts.
+// (src/app/contractors/[slug]/layout.tsx). The preview image is the wide
+// wordmark picture drawn in src/app/opengraph-image.tsx. robots: see
+// SEARCH_ENGINES_ALLOWED in src/lib/site.ts.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: "(kalm) | Kaam. Connected.", template: "%s | (kalm)" },
@@ -54,9 +55,8 @@ export const metadata: Metadata = {
     locale: "en_IN",
     title: "(kalm) | Kaam. Connected.",
     description: SITE_DESCRIPTION,
-    images: [{ url: "/icon-512.png", width: 512, height: 512, alt: "(kalm)" }],
   },
-  twitter: { card: "summary", title: "(kalm) | Kaam. Connected.", description: SITE_DESCRIPTION, images: ["/icon-512.png"] },
+  twitter: { card: "summary_large_image", title: "(kalm) | Kaam. Connected.", description: SITE_DESCRIPTION },
   robots: SEARCH_ENGINES_ALLOWED ? { index: true, follow: true } : { index: false, follow: false },
 };
 
