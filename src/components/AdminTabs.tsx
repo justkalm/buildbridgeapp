@@ -21,6 +21,7 @@ const TABS = [
   { key: 'developers', label: 'Developers', href: '/admin/developers' },
   { key: 'project-posts', label: 'Project Posts', href: '/admin/project-posts' },
   { key: 'review', label: 'Review', href: '/admin/review' },
+  { key: 'reports', label: 'Reports', href: '/admin/reports' },
   { key: 'messages', label: 'Messages', href: '/admin/messages' },
   { key: 'emails', label: 'Failed emails', href: '/admin/emails' },
 ] as const;

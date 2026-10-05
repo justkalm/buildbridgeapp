@@ -44,6 +44,7 @@ export default function Footer() {
               <li><Link href="/contact" className="text-sm hover:text-ink transition-colors">Contact</Link></li>
               <li><Link href="/terms" className="text-sm hover:text-ink transition-colors">Terms</Link></li>
               <li><Link href="/privacy" className="text-sm hover:text-ink transition-colors">Privacy</Link></li>
+              <li><Link href="/report" className="text-sm hover:text-ink transition-colors">Report content</Link></li>
             </ul>
           </div>
         </div>

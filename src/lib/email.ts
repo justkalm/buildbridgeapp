@@ -231,6 +231,57 @@ export async function sendProjectForReviewEmail(input: {
   }
 }
 
+// Tells the admin inbox that someone reported content (KALM-254). It carries
+// what was reported, why, the reporter's details and their own words. It never
+// carries a message's text or any photo: the admin opens the Reports desk and
+// looks at the content there.
+export async function sendReportEmail(input: {
+  reasonLabel: string;
+  targetSummary: string;
+  details: string;
+  reporterEmail: string;
+  reporterRole: string | null;
+  reportsUrl: string;
+}): Promise<boolean> {
+  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+
+  if (!notifyAddress) {
+    console.error('QUOTE_NOTIFICATION_EMAIL is not set, cannot send report email');
+    return false;
+  }
+
+  try {
+    const { error } = await getResendClient().emails.send({
+      from: '(kalm) <onboarding@resend.dev>',
+      to: notifyAddress,
+      subject: `Content report: ${sanitizeSubject(input.reasonLabel)}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 560px;">
+          <h2 style="margin-bottom: 4px;">Content report</h2>
+          <p style="color: #666; margin-top: 0;">Someone has reported content on the site. Please look at it soon.</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <tr><td style="padding: 8px 0; color: #666; width: 140px;">Reason</td><td style="padding: 8px 0;">${escapeHtml(input.reasonLabel)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">About</td><td style="padding: 8px 0;">${escapeHtml(input.targetSummary)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Reported by</td><td style="padding: 8px 0;">${escapeHtml(input.reporterEmail)}${input.reporterRole ? ` (${escapeHtml(input.reporterRole)})` : ' (not logged in)'}</td></tr>
+          </table>
+          ${input.details ? `<p style="color: #666; margin-bottom: 4px;">Their words</p><p style="white-space: pre-wrap;">${escapeHtml(input.details)}</p>` : ''}
+          <p><a href="${escapeHtml(input.reportsUrl)}">Open the Reports page</a></p>
+        </div>
+      `,
+    });
+
+    if (error) {
+      await recordEmailFailure('content report', notifyAddress, error);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    await recordEmailFailure('content report', notifyAddress, err);
+    return false;
+  }
+}
+
 type ProjectPostAlertEmailInput = {
   toEmail: string;
   toName: string;

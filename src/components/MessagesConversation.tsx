@@ -45,6 +45,7 @@ import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import Link from 'next/link';
 import Skeleton from '@/components/Skeleton';
 import MessagesAvatar from '@/components/MessagesAvatar';
+import ReportLink from '@/components/ReportLink';
 import MessagesComposer from '@/components/MessagesComposer';
 import { dayKey, formatClock, formatDayLabel } from '@/components/MessagesTime';
 import { announceNotificationsChanged } from '@/lib/use-unread-messages';
@@ -372,6 +373,7 @@ export default function MessagesConversation({ id }: { id: string }) {
                 View profile
               </Link>
             )}
+            <ReportLink type="MESSAGE" id={id} className="shrink-0" />
           </div>
           <p className="truncate text-[12.5px] text-stone">{meta.title}</p>
           {meta.quote && statusLabel && (

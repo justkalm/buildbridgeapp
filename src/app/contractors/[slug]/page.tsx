@@ -29,6 +29,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import ProjectGallery from '@/components/ProjectGallery';
+import ReportLink from '@/components/ReportLink';
 import SiteVisitRequest from '@/components/SiteVisitRequest';
 import ProjectLightbox from '@/components/ProjectLightbox';
 import DemoBadge from '@/components/DemoBadge';
@@ -431,6 +432,8 @@ export default function ContractorProfilePage() {
                         {p.title}
                       </button>
                     </h3>
+                    {/* relative z-10 lifts it above the card-wide click area. */}
+                    <ReportLink type="PROJECT" id={p.id} className="relative z-10 inline-block mb-2" />
                     {(p.developerName || p.projectType || p.elevationFloors) && (
                       <p className="text-xs text-stone mb-3">
                         {[
@@ -655,6 +658,12 @@ export default function ContractorProfilePage() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="max-w-[1100px] mx-auto px-5 sm:px-8 pb-10 text-center">
+        <ReportLink type="CONTRACTOR" id={contractor.slug}>
+          Report this profile
+        </ReportLink>
       </div>
 
       <Footer />
