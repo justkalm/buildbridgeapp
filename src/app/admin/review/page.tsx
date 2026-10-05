@@ -21,6 +21,8 @@ type PendingProject = {
   projectType: string | null;
   squareFeet: number | null;
   elevationFloors: number | null;
+  committedDurationMonths: number | null;
+  actualDurationMonths: number | null;
   imageUrls: string[];
   moderationNote: string | null;
   moderatedAt: string | null;
@@ -158,6 +160,8 @@ export default function AdminReviewPage() {
                   p.developerName && `For ${p.developerName}`,
                   p.squareFeet && `${p.squareFeet.toLocaleString('en-IN')} sq ft`,
                   p.elevationFloors && `${p.elevationFloors} floors`,
+                  p.committedDurationMonths && `${p.committedDurationMonths} months committed`,
+                  p.actualDurationMonths && `${p.actualDurationMonths} months actual`,
                 ]
                   .filter(Boolean)
                   .join(' · ') || 'No details given'}

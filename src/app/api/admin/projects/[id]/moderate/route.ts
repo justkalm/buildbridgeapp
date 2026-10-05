@@ -9,10 +9,12 @@
 //            so there is a record of what it was. A reason is required: it
 //            is shown to the contractor and kept in the moderation log.
 //
-// STALE-CLICK GUARD: the page sends the submittedAt it was showing. If the
-// contractor edited the project after the admin loaded it, submittedAt has
-// moved on, nothing is changed, and the admin gets a 409 asking to reload.
-// This is what stops content from being approved unseen.
+// STALE-CLICK GUARD (approvals only): the page sends the submittedAt it was
+// showing. If the contractor edited the project after the admin loaded it,
+// submittedAt has moved on, nothing is changed, and the admin gets a 409
+// asking to reload. This is what stops content from being approved unseen.
+// Hiding is never blocked this way: taking content down is always safe, even
+// if the admin has not seen its latest version.
 //
 // Every action writes a ModerationLog row (what, when, why). The admin login
 // is one shared password, so the log cannot say which person acted.
@@ -29,13 +31,13 @@ import { rejectCrossOrigin } from '@/lib/same-origin';
 
 // submittedAt as the page saw it (null for projects that were never edited
 // by a contractor, such as admin-created ones).
-const seen = z.string().datetime().nullable();
+const seen = z.iso.datetime().nullable();
 
 const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('approve'), submittedAt: seen }),
   z.object({
     action: z.literal('hide'),
-    submittedAt: seen,
+    submittedAt: seen.optional(),
     note: z.string().trim().min(1, 'Please give a reason').max(500),
   }),
 ]);
@@ -70,13 +72,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const hide = parsed.data.action === 'hide';
   const note = parsed.data.action === 'hide' ? parsed.data.note : null;
   const seenAt = parsed.data.submittedAt ? new Date(parsed.data.submittedAt) : null;
+  // Approve must match what the admin saw; hide matches whatever is there now.
+  const where = hide ? { id } : { id, submittedAt: seenAt };
 
-  // The status change and its log entry succeed or fail together. The
-  // submittedAt condition makes the update a no-op if the contractor
-  // edited in the meantime.
+  // The status change and its log entry succeed or fail together. For an
+  // approval, the submittedAt condition makes the update a no-op if the
+  // contractor edited in the meantime.
   const changed = await prisma.$transaction(async (tx) => {
     const result = await tx.project.updateMany({
-      where: { id, submittedAt: seenAt },
+      where,
       data: {
         approvalStatus: hide ? 'HIDDEN' : 'APPROVED',
         moderatedAt: new Date(),

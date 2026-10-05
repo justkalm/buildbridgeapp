@@ -8,7 +8,7 @@
 // the UI never offering another contractor's project id is not enough on
 // its own.
 
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -97,15 +97,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // stops counting toward the public rating until it is approved again.
   await recomputeContractorRating(contractorId);
 
-  // An edit puts it back in the queue, so tell the admin inbox (never throws;
-  // see the POST route in ../route.ts).
-  const owner = await prisma.contractor.findUnique({ where: { id: contractorId }, select: { name: true } });
-  await sendProjectForReviewEmail({
-    contractorName: owner?.name ?? 'A contractor',
-    projectTitle: updated.title,
-    photoCount: updated.imageUrls.length,
-    kind: 'edited',
-    reviewUrl: `${SITE_URL}/admin/review`,
+  // An edit puts it back in the queue, so tell the admin inbox (runs after the
+  // response; see the POST route in ../route.ts).
+  after(async () => {
+    try {
+      const owner = await prisma.contractor.findUnique({ where: { id: contractorId }, select: { name: true } });
+      await sendProjectForReviewEmail({
+        contractorName: owner?.name ?? 'A contractor',
+        projectTitle: updated.title,
+        photoCount: updated.imageUrls.length,
+        kind: 'edited',
+        reviewUrl: `${SITE_URL}/admin/review`,
+      });
+    } catch (err) {
+      console.error('Project review email failed:', err);
+    }
   });
 
   return NextResponse.json(updated);
@@ -133,6 +139,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   }
 
   await prisma.project.delete({ where: { id } });
+  // A deleted project's review must stop counting toward the public rating.
+  await recomputeContractorRating(contractorId);
 
   return NextResponse.json({ ok: true });
 }

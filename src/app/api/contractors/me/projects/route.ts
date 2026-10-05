@@ -10,7 +10,7 @@
 // true now that the contractor types them in directly; nothing about who
 // enters the data changes its verification status).
 
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -98,17 +98,25 @@ export async function POST(req: Request) {
     data: { ...parsed.data, contractorId, approvalStatus: 'PENDING', submittedAt: new Date() },
   });
 
-  // Tell the admin inbox it is waiting. This never throws (failures are
-  // logged under Admin > Failed emails), so a mail problem cannot fail the
-  // contractor's save. Each contractor is already limited to 20 creates an
-  // hour above, which also caps how many of these emails one account can send.
-  const owner = await prisma.contractor.findUnique({ where: { id: contractorId }, select: { name: true } });
-  await sendProjectForReviewEmail({
-    contractorName: owner?.name ?? 'A contractor',
-    projectTitle: project.title,
-    photoCount: project.imageUrls.length,
-    kind: 'new',
-    reviewUrl: `${SITE_URL}/admin/review`,
+  // Tell the admin inbox it is waiting. Mail failures are logged under Admin >
+  // Failed emails. Each contractor is already limited to 20 creates an hour
+  // above, which also caps how many of these emails one account can send.
+  // It runs after the response is sent (same pattern as the re-verify email),
+  // so a slow or failing mail service or lookup can never make a saved
+  // project look like a failed save.
+  after(async () => {
+    try {
+      const owner = await prisma.contractor.findUnique({ where: { id: contractorId }, select: { name: true } });
+      await sendProjectForReviewEmail({
+        contractorName: owner?.name ?? 'A contractor',
+        projectTitle: project.title,
+        photoCount: project.imageUrls.length,
+        kind: 'new',
+        reviewUrl: `${SITE_URL}/admin/review`,
+      });
+    } catch (err) {
+      console.error('Project review email failed:', err);
+    }
   });
 
   return NextResponse.json(project);

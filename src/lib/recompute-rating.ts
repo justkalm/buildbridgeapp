@@ -6,7 +6,7 @@
 // contractor.rating directly; call this instead after any review is
 // added, edited, or removed, so the aggregate always matches the actual
 // underlying reviews. Call sites: the admin project review routes, the admin moderate route
-// (approve or hide changes what counts), and the contractor's project edit.
+// (approve or hide changes what counts), and the contractor's project edit and delete.
 
 import { prisma } from '@/lib/prisma';
 

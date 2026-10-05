@@ -31,6 +31,8 @@ export async function GET(req: Request) {
       projectType: true,
       squareFeet: true,
       elevationFloors: true,
+      committedDurationMonths: true,
+      actualDurationMonths: true,
       imageUrls: true,
       approvalStatus: true,
       submittedAt: true,
