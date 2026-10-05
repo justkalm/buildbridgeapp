@@ -5,8 +5,9 @@
 // /report, which posts here.
 //
 // What is checked, and why:
-//  - Same origin and a per-IP rate limit, so this cannot be scripted into a
-//    way to flood the admin inbox.
+//  - Same origin (stops other websites using a visitor's browser to file
+//    reports; a script can still set the header) and a per-IP rate limit
+//    (10 an hour). The admin EMAIL is also capped across everyone (below).
 //  - The reporter's identity comes from the login session, never from the
 //    request body, so nobody can file a report as someone else.
 //  - A logged-out reporter must give an email, so there is a way to reach them.
@@ -78,7 +79,9 @@ export async function POST(req: Request) {
   let targetSummary = 'A general report (not about one profile, project or message)';
   if (v.targetType === 'CONTRACTOR') {
     const c = await prisma.contractor.findFirst({
-      where: { OR: [{ slug: v.targetId }, { id: v.targetId }] },
+      // Only public (VERIFIED) profiles, by slug: this form must not work as
+      // a way to check whether an unlisted business has signed up.
+      where: { slug: v.targetId, verificationStatus: 'VERIFIED' },
       select: { id: true, name: true },
     });
     if (!c) return NextResponse.json({ error: 'We could not find that profile' }, { status: 400 });
@@ -114,6 +117,13 @@ export async function POST(req: Request) {
 
   after(async () => {
     try {
+      // A cap on the notification email across ALL reporters. Every email uses
+      // the shared Resend quota, which also sends sign-up, password-reset and
+      // quote emails, so a flood of reports must not be able to exhaust it.
+      // Over the cap the report is still saved and shows on the Reports desk;
+      // only the email is skipped. (Reports themselves are deliberately NOT
+      // capped globally: that would let an attacker block real reports.)
+      if (!(await checkRateLimit('report-email:global', { maxAttempts: 20, windowMs: 60 * 60 * 1000 }))) return;
       await sendReportEmail({
         reasonLabel: reasonLabel(v.reason),
         targetSummary,

@@ -96,7 +96,13 @@ export default function AdminReportsPage() {
     setError(null);
     try {
       if (hideProject && r.project) {
-        const hidden = await send(`/api/admin/projects/${r.project.id}/moderate`, { action: 'hide', note });
+        // The contractor is shown the project's hide reason, so it is a FIXED
+        // line here. The admin's own note (which may name the reporter) stays
+        // on the report and the moderation log only, never shown to them.
+        const hidden = await send(`/api/admin/projects/${r.project.id}/moderate`, {
+          action: 'hide',
+          note: 'Hidden after a report.',
+        });
         if (!hidden.ok) {
           setError(hidden.error);
           return;
@@ -200,6 +206,12 @@ export default function AdminReportsPage() {
                   <label htmlFor={`note-${r.id}`} className="text-xs text-stone">
                     What did you decide, and why? (kept on record)
                   </label>
+                  {r.project && (
+                    <p className="text-xs text-stone">
+                      Private to you. If you hide the project, the contractor is only told it was hidden after a report,
+                      never who reported it.
+                    </p>
+                  )}
                   <input
                     id={`note-${r.id}`}
                     value={notes[r.id] ?? ''}
