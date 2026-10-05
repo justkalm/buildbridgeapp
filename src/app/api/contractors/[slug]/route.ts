@@ -55,6 +55,8 @@ export async function GET(
       // hash itself must never reach the response.
       passwordHash: true,
       projects: {
+        // Only approved projects are public (KALM-252).
+        where: { approvalStatus: 'APPROVED' },
         select: {
           id: true,
           title: true,

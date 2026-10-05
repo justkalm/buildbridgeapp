@@ -17,6 +17,8 @@ import { prisma } from '@/lib/prisma';
 import { positiveWhole } from '@/lib/project-validation';
 import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { sendProjectForReviewEmail } from '@/lib/email';
+import { SITE_URL } from '@/lib/site';
 
 async function requireContractor() {
   const session = await auth();
@@ -90,8 +92,23 @@ export async function POST(req: Request) {
     );
   }
 
+  // A contractor's own project starts PENDING: saved, but hidden from the
+  // public until the admin approves it (KALM-252).
   const project = await prisma.project.create({
-    data: { ...parsed.data, contractorId },
+    data: { ...parsed.data, contractorId, approvalStatus: 'PENDING', submittedAt: new Date() },
+  });
+
+  // Tell the admin inbox it is waiting. This never throws (failures are
+  // logged under Admin > Failed emails), so a mail problem cannot fail the
+  // contractor's save. Each contractor is already limited to 20 creates an
+  // hour above, which also caps how many of these emails one account can send.
+  const owner = await prisma.contractor.findUnique({ where: { id: contractorId }, select: { name: true } });
+  await sendProjectForReviewEmail({
+    contractorName: owner?.name ?? 'A contractor',
+    projectTitle: project.title,
+    photoCount: project.imageUrls.length,
+    kind: 'new',
+    reviewUrl: `${SITE_URL}/admin/review`,
   });
 
   return NextResponse.json(project);

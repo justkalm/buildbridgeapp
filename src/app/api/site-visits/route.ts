@@ -92,7 +92,8 @@ export async function POST(req: NextRequest) {
       name: true,
       email: true,
       passwordHash: true,
-      projects: { select: { id: true, title: true } },
+      // Only approved (public) projects can be picked (KALM-252).
+      projects: { where: { approvalStatus: 'APPROVED' }, select: { id: true, title: true } },
     },
   });
   if (!contractor) {

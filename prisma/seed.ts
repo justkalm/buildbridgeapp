@@ -151,6 +151,7 @@ async function main() {
         await prisma.project.create({
           data: {
             contractorId: contractor.id,
+            approvalStatus: 'APPROVED', // seed data is trusted (KALM-252)
             title: p.title,
             developerName: p.developerName,
             projectType: p.projectType,

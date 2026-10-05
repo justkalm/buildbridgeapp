@@ -66,7 +66,7 @@ export async function GET() {
   const allProjectIds = [...new Set(visits.flatMap((v) => v.projectIds))];
   const projects = allProjectIds.length
     ? await prisma.project.findMany({
-        where: { id: { in: allProjectIds } },
+        where: { id: { in: allProjectIds }, approvalStatus: 'APPROVED' },
         select: { id: true, title: true, contractorId: true },
       })
     : [];

@@ -15,6 +15,9 @@ import { prisma } from '@/lib/prisma';
 import { positiveWhole } from '@/lib/project-validation';
 import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { recomputeContractorRating } from '@/lib/recompute-rating';
+import { sendProjectForReviewEmail } from '@/lib/email';
+import { SITE_URL } from '@/lib/site';
 
 async function requireContractor() {
   const session = await auth();
@@ -81,9 +84,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     );
   }
 
+  // Every edit sends the project back to review (owner's call, 6 Oct), so
+  // new photos or changed text never go public unseen. It also covers a
+  // HIDDEN project: the contractor can resubmit it, but it stays out of
+  // public view until the admin looks at it again (the admin's earlier
+  // moderationNote is kept so the reviewer sees why it was hidden).
   const updated = await prisma.project.update({
     where: { id },
-    data: parsed.data,
+    data: { ...parsed.data, approvalStatus: 'PENDING', submittedAt: new Date() },
+  });
+  // The edit took the project out of public view, so its review (if any)
+  // stops counting toward the public rating until it is approved again.
+  await recomputeContractorRating(contractorId);
+
+  // An edit puts it back in the queue, so tell the admin inbox (never throws;
+  // see the POST route in ../route.ts).
+  const owner = await prisma.contractor.findUnique({ where: { id: contractorId }, select: { name: true } });
+  await sendProjectForReviewEmail({
+    contractorName: owner?.name ?? 'A contractor',
+    projectTitle: updated.title,
+    photoCount: updated.imageUrls.length,
+    kind: 'edited',
+    reviewUrl: `${SITE_URL}/admin/review`,
   });
 
   return NextResponse.json(updated);

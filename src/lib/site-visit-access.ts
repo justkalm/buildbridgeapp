@@ -28,7 +28,10 @@ export async function getSiteVisitForParty(id: string) {
           slug: true,
           email: true,
           phone: true,
-          projects: { select: { id: true, title: true } },
+          // Only approved projects show on visit cards, emails and calendar
+          // files. A project edited after the visit was requested is PENDING
+          // again, and its new text must not reach the developer unreviewed.
+          projects: { where: { approvalStatus: 'APPROVED' }, select: { id: true, title: true } },
         },
       },
     },

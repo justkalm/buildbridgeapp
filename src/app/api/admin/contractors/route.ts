@@ -186,6 +186,8 @@ export async function POST(req: NextRequest) {
           committedDurationMonths: p.committedDurationMonths,
           actualDurationMonths: p.actualDurationMonths,
           imageUrls: p.imageUrls,
+          // Entered and uploaded by the admin, so trusted (KALM-252).
+          approvalStatus: 'APPROVED' as const,
         })),
       },
     },

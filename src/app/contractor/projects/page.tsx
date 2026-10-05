@@ -18,6 +18,7 @@ import Image from 'next/image';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import ImageUpload from '@/components/ImageUpload';
+import { VERIFICATION_EMAIL } from '@/lib/site';
 
 type Project = {
   id: string;
@@ -29,9 +30,11 @@ type Project = {
   committedDurationMonths: number | null;
   actualDurationMonths: number | null;
   imageUrls: string[];
+  approvalStatus: 'PENDING' | 'APPROVED' | 'HIDDEN';
+  moderationNote: string | null;
 };
 
-type NewProjectDraft = Omit<Project, 'id'>;
+type NewProjectDraft = Omit<Project, 'id' | 'approvalStatus' | 'moderationNote'>;
 
 const emptyDraft = (): NewProjectDraft => ({
   title: '',
@@ -124,6 +127,10 @@ export default function ContractorProjectsPage() {
           Completed projects show on your public profile as proof of past work. Adding or editing
           a project doesn&apos;t affect your listing&apos;s verification status.
         </p>
+        <p className="text-sm text-stone mb-8 -mt-4">
+          Every new or edited project, including its photos, is checked by our team before it
+          appears on your public profile. This usually does not take long.
+        </p>
 
         {projects.length > 0 && (
           <div className="flex flex-col gap-4 mb-10">
@@ -132,6 +139,16 @@ export default function ContractorProjectsPage() {
                 <div className="flex justify-between items-start gap-3">
                   <div>
                     <p className="font-medium text-sm">{p.title}</p>
+                    {p.approvalStatus === 'PENDING' && (
+                      <p className="text-xs text-stone mt-0.5">Waiting for review. Not public yet.</p>
+                    )}
+                    {p.approvalStatus === 'HIDDEN' && (
+                      <p className="text-xs text-danger mt-0.5">
+                        Removed from your public profile.
+                        {p.moderationNote ? ` Reason: ${p.moderationNote}.` : ''} If you think this is
+                        a mistake, write to us at {VERIFICATION_EMAIL}.
+                      </p>
+                    )}
                     {/* KALM-181: subtle hint for projects with no photos. */}
                     {p.imageUrls.length === 0 && (
                       <p className="text-xs text-stone mt-0.5">No photos yet</p>

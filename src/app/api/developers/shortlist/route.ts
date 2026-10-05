@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
           yearsInBusiness: true,
           rating: true,
           reviewCount: true,
-          _count: { select: { projects: true } },
+          _count: { select: { projects: { where: { approvalStatus: 'APPROVED' } } } },
         },
       },
     },

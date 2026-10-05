@@ -178,6 +178,59 @@ export async function sendProjectPostAdminEmail(input: ProjectPostEmailInput): P
   }
 }
 
+// Tells the admin inbox (QUOTE_NOTIFICATION_EMAIL, the same one as quote
+// requests) that a contractor's project is waiting for review (KALM-253).
+// Without this, a pending project could sit unseen: nothing else tells the
+// admin a submission arrived. The email carries the title and the contractor's
+// name only. Photos are deliberately NOT included, so an unreviewed image
+// never lands in an inbox; the admin opens the Review page to look at it.
+export async function sendProjectForReviewEmail(input: {
+  contractorName: string;
+  projectTitle: string;
+  photoCount: number;
+  kind: 'new' | 'edited';
+  reviewUrl: string;
+}): Promise<boolean> {
+  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+
+  if (!notifyAddress) {
+    console.error('QUOTE_NOTIFICATION_EMAIL is not set, cannot send project review email');
+    return false;
+  }
+
+  const what = input.kind === 'new' ? 'New project' : 'Edited project';
+
+  try {
+    const { error } = await getResendClient().emails.send({
+      from: '(kalm) <onboarding@resend.dev>',
+      to: notifyAddress,
+      subject: `${what} waiting for review: ${sanitizeSubject(input.projectTitle)}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 560px;">
+          <h2 style="margin-bottom: 4px;">${what} waiting for review</h2>
+          <p style="color: #666; margin-top: 0;">It is hidden from the public until you approve it.</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <tr><td style="padding: 8px 0; color: #666; width: 140px;">Contractor</td><td style="padding: 8px 0;">${escapeHtml(input.contractorName)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Project</td><td style="padding: 8px 0;">${escapeHtml(input.projectTitle)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Photos</td><td style="padding: 8px 0;">${input.photoCount}</td></tr>
+          </table>
+          <p><a href="${escapeHtml(input.reviewUrl)}">Open the Review page</a></p>
+        </div>
+      `,
+    });
+
+    if (error) {
+      await recordEmailFailure('project for review', notifyAddress, error);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    await recordEmailFailure('project for review', notifyAddress, err);
+    return false;
+  }
+}
+
 type ProjectPostAlertEmailInput = {
   toEmail: string;
   toName: string;

@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       tier: true,
       yearsInBusiness: true,
       licenseNumber: true,
-      _count: { select: { projects: true } },
+      _count: { select: { projects: { where: { approvalStatus: 'APPROVED' } } } },
     },
     orderBy: [{ tier: 'desc' }, { rating: 'desc' }, { id: 'asc' }],
   });
@@ -157,7 +157,7 @@ export async function GET(req: NextRequest) {
       yearsInBusiness: true,
       rating: true,
       reviewCount: true,
-      _count: { select: { projects: true } },
+      _count: { select: { projects: { where: { approvalStatus: 'APPROVED' } } } },
     },
   });
   const byId = new Map(full.map((c) => [c.id, c]));

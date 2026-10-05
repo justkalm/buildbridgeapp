@@ -5,13 +5,16 @@
 // DERIVED, not independently editable — nothing should ever set
 // contractor.rating directly; call this instead after any review is
 // added, edited, or removed, so the aggregate always matches the actual
-// underlying reviews. Call sites: the admin project review routes.
+// underlying reviews. Call sites: the admin project review routes, the admin moderate route
+// (approve or hide changes what counts), and the contractor's project edit.
 
 import { prisma } from '@/lib/prisma';
 
 export async function recomputeContractorRating(contractorId: string): Promise<void> {
   const reviewed = await prisma.project.findMany({
-    where: { contractorId, reviewRating: { not: null } },
+    // Only approved projects count: a hidden or pending project's review
+    // text is not public, so it must not move the public rating either.
+    where: { contractorId, reviewRating: { not: null }, approvalStatus: 'APPROVED' },
     select: { reviewRating: true },
   });
 

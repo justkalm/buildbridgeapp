@@ -153,6 +153,10 @@ model Contractor {
   checkGstinAt     DateTime? // GSTIN checked on the GST portal
   checkContactAt   DateTime? // spoken with directly, by phone or in person
 
+  // Private note per contractor, admin eyes only (verification desk,
+  // KALM-239). Never returned by any public or contractor-facing route.
+  adminNote String?
+
   projects      Project[]
   quoteRequests QuoteRequest[]
   projectAlerts ProjectPostAlert[]
@@ -219,9 +223,80 @@ model Project {
   reviewText   String? // the developer's own words, typed in by admin
   reviewedAt   DateTime? // when the review was collected/entered — null if reviewRating is null
 
+  // Content approval (KALM-252). A project a contractor creates or edits is
+  // PENDING: saved, but hidden from everyone except its owner and the admin,
+  // until the admin approves it. HIDDEN = taken down by the admin (kept, not
+  // deleted, so there is a record). The database default is PENDING on
+  // purpose: any code path that forgets to set a status keeps the content
+  // hidden, never public. Admin-created projects are set to APPROVED in
+  // code. Public reads must filter on APPROVED.
+  approvalStatus ApprovalStatus @default(PENDING)
+  submittedAt    DateTime? // when the contractor last created or edited it; the admin's Approve must match this, so content changed after the admin loaded it can never be approved unseen
+  moderatedAt    DateTime? // when the admin last approved or hid it
+  moderationNote String?   // why it was hidden, shown to the contractor
+
   createdAt DateTime @default(now())
 
   @@index([contractorId])
+  @@index([approvalStatus])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  HIDDEN
+}
+
+// ---------------------------------------------------------------------------
+// Report / ModerationLog (KALM-254, 255)
+// ---------------------------------------------------------------------------
+// Anyone can report content; the admin works the queue. Reports and the log
+// are kept even after the content is hidden, as the record of what was
+// reported and what was done. targetId is a plain string (not a foreign key)
+// so a report survives the deletion of what it was about. The admin login is
+// one shared password, so the log records WHAT was done and WHEN, not which
+// person did it.
+model Report {
+  id             String       @id @default(cuid())
+  targetType     ReportTarget
+  targetId       String?
+  reason         String
+  details        String?
+  reporterRole   String? // 'developer' | 'contractor' | null (not logged in)
+  reporterId     String?
+  reporterEmail  String?
+  status         ReportStatus @default(OPEN)
+  resolutionNote String?
+  resolvedAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([status])
+}
+
+model ModerationLog {
+  id         String       @id @default(cuid())
+  action     String // e.g. 'project_approved', 'project_hidden', 'report_dismissed'
+  targetType ReportTarget
+  targetId   String?
+  reportId   String?
+  note       String?
+  createdAt  DateTime     @default(now())
+
+  @@index([targetId])
+}
+
+enum ReportTarget {
+  CONTRACTOR
+  PROJECT
+  MESSAGE
+  PROJECT_POST
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  ACTIONED
+  DISMISSED
 }
 // ---------------------------------------------------------------------------
 // Developer
