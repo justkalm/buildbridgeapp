@@ -35,7 +35,7 @@ export async function isFullyVisibleLead(contractorId: string, quoteRequestId: s
       prisma.contractor.findUnique({ where: { id: contractorId }, select: { tier: true } }),
       prisma.quoteRequest.findMany({
         where: { contractorId, createdAt: { gte: getMonthStart() } },
-        orderBy: { createdAt: 'asc' },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         select: { id: true },
       }),
     ]);

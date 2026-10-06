@@ -80,7 +80,11 @@ export function buildContractorReport(
 ): ContractorReport {
   // The cap only ever applies to the current month (earlier months are never
   // locked), and "which are free" is first come first served within the month.
-  const oldestFirst = [...requests].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  // Same order as the database queries behind the dashboard: oldest first, and
+  // for two leads in the same millisecond, by id, so the free five never shuffle.
+  const oldestFirst = [...requests].sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
   const visibility = isCurrentMonth ? computeLeadVisibility(tier, oldestFirst) : new Map();
 
   const leads: ReportLead[] = requests

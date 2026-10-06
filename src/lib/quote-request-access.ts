@@ -61,7 +61,7 @@ export async function getQuoteRequestParty(quoteRequestId: string): Promise<Quot
       const thisMonthRequests = await prisma.quoteRequest.findMany({
         where: { contractorId: userId, createdAt: { gte: monthStart } },
         select: { id: true, createdAt: true },
-        orderBy: { createdAt: 'asc' },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
       const visibility = computeLeadVisibility(contractor.tier, thisMonthRequests);
       // A request from a PRIOR month was never subject to blurring, so it
@@ -97,7 +97,7 @@ export async function blurredLeadIdsFor(contractorId: string): Promise<Set<strin
   const thisMonth = await prisma.quoteRequest.findMany({
     where: { contractorId, createdAt: { gte: monthStart } },
     select: { id: true, createdAt: true },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
   const visibility = computeLeadVisibility(contractor.tier, thisMonth);
   return new Set(thisMonth.filter((r) => visibility.get(r.id) !== 'full').map((r) => r.id));

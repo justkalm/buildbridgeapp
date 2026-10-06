@@ -54,6 +54,13 @@ describe('buildContractorReport', () => {
     expect(buildContractorReport(seven, new Set(), 'PRO', true).hiddenCount).toBe(0);
   });
 
+  it('two leads in the same millisecond are ordered by id, so the free five are stable', () => {
+    const same = new Date('2026-10-02T10:00:00Z');
+    const six = ['f', 'e', 'd', 'c', 'b', 'a'].map((id) => lead(1, { id, createdAt: same }));
+    const r = buildContractorReport(six, new Set(), 'LISTED', true);
+    expect(r.leads.filter((l) => l.contactsHidden).map((l) => l.id)).toEqual(['f']);
+  });
+
   it('never carries developer email, phone or details (the shape has no such fields)', () => {
     const r = buildContractorReport([lead(1)], new Set(), 'LISTED', true);
     expect(Object.keys(r.leads[0]).sort()).toEqual(

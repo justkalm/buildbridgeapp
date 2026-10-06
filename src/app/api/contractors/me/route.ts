@@ -176,7 +176,7 @@ export async function GET() {
   // fully-visible quote requests per calendar month; the rest are blurred.
   // See src/lib/lead-limits.ts for the full reasoning. This has to happen
   // server-side, not just hidden in the UI: stripping developer.email/
-  // phone/name out of the actual response is what stops a contractor from
+  // phone out of the actual response is what stops a contractor from
   // just reading the network tab to see contact info they haven't paid
   // for. A CSS blur alone would be purely cosmetic.
   const monthStart = getMonthStart();
@@ -189,7 +189,7 @@ export async function GET() {
   const thisMonthRequests = await prisma.quoteRequest.findMany({
     where: { contractorId, createdAt: { gte: monthStart } },
     select: { id: true },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
 
   const visibilityById = computeLeadVisibility(contractor.tier, thisMonthRequests);
@@ -197,7 +197,11 @@ export async function GET() {
   const quoteRequestsWithVisibility = contractor.quoteRequests.map((r) => {
     // Requests from a PRIOR month are never blurred — the cap is scoped to
     // the current month only, so history already visible stays visible.
-    const visibility = visibilityById.get(r.id) ?? 'full';
+    // Fails CLOSED for this month: a free contractor's current-month lead that
+    // is somehow missing from the month-wide list is blurred, never shown. Only
+    // a request from an earlier month (or a paid plan) defaults to full.
+    const visibility =
+      visibilityById.get(r.id) ?? (contractor.tier === 'LISTED' && r.createdAt >= monthStart ? 'blurred' : 'full');
 
     if (visibility === 'full') {
       return { ...r, leadVisibility: 'full' as const };
@@ -285,7 +289,7 @@ export async function GET() {
     projectAlerts,
     leadLimit:
       contractor.tier === 'LISTED'
-        ? { cap: LISTED_MONTHLY_LEAD_CAP, usedThisMonth: thisMonthRequests.length }
+        ? { cap: LISTED_MONTHLY_LEAD_CAP, usedThisMonth: Math.min(thisMonthRequests.length, LISTED_MONTHLY_LEAD_CAP) }
         : null,
   });
 }
