@@ -169,11 +169,21 @@ export async function GET(req: NextRequest) {
 
   const nextOffset = offset + items.length < total ? offset + items.length : null;
 
-  return NextResponse.json({
-    items,
-    total,
-    realCount,
-    nextOffset,
-    ...(offset === 0 ? { facets } : {}),
-  });
+  return NextResponse.json(
+    {
+      items,
+      total,
+      realCount,
+      nextOffset,
+      ...(offset === 0 ? { facets } : {}),
+    },
+    {
+      // Public list, identical for everyone and no login involved, so
+      // Vercel's network may keep a copy for 30 seconds (and serve a stale one
+      // for 30 more while it refreshes). Most visitors then never wait on the
+      // database. Cost: a verification change or a take-down can take up to
+      // about a minute to show on Browse.
+      headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=30' },
+    }
+  );
 }
