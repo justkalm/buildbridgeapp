@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyLeadVisibility, BLURRED_DETAILS_MAX_CHARS, maskContactDetails } from './lead-limits';
+import { BLURRED_MESSAGE_NOTICE, notificationTextFor } from './notification-text';
 
 // What the contractor dashboard may receive. These tests exist because the
 // blur is a revenue rule AND a privacy rule: a free contractor must never get a
@@ -95,6 +96,35 @@ describe('maskContactDetails (the preview text of a blurred lead)', () => {
     expect(maskContactDetails('mail me at rahul.k+site@gmail.co.in please')).toBe('mail me at •••• please');
   });
 
+  it('masks slash-separated numbers, Hindi digits and numbers hidden with zero-width characters', () => {
+    for (const t of ['98200/12345', '\u096F\u096E\u0968\u0966\u0966\u0967\u0968\u0969\u096A\u096B', '98200\u200B12345', '\uFF19\uFF18\uFF12\uFF10\uFF10\uFF11\uFF12\uFF13\uFF14\uFF15']) {
+      const out = maskContactDetails(`ring ${t} soon`);
+      expect(out).toBe('ring •••• soon');
+    }
+  });
+
+  it('masks emails written with spaces, brackets or words', () => {
+    for (const t of ['rahul @ gmail.com', 'rahul[at]gmail.com', 'rahul(at)gmail(dot)com', 'rahul@gmail .com', 'rahul at gmail dot com']) {
+      expect(maskContactDetails(`mail ${t} please`)).toBe('mail •••• please');
+    }
+  });
+
+  it('does NOT mask ranges, dates or ordinary figures', () => {
+    for (const t of [
+      '1200 - 1500 sqft', '3.5 - 4.5 Cr', '07-10-2026', '2026-10-07', '15.10.2026', '25,00,000', 'Rs. 1,25,00,000 budget',
+      'size 30 x 40 (1200)', '40 - 50 lakh', 'G+14 tower', 'PIN 400001', 'meet at the site, look at plan. floors 12',
+    ]) {
+      expect(maskContactDetails(t)).toBe(t);
+    }
+  });
+
+  it('is fast on long input (no catastrophic backtracking)', () => {
+    const nasty = ('1 '.repeat(5000)) + 'a'.repeat(5000) + '@';
+    const t0 = Date.now();
+    maskContactDetails(nasty);
+    expect(Date.now() - t0).toBeLessThan(1500);
+  });
+
   it('leaves ordinary project figures alone', () => {
     const t = 'G+14 tower, 25000 sq ft per floor, 6 months, budget 2.5 Cr';
     expect(maskContactDetails(t)).toBe(t);
@@ -102,7 +132,7 @@ describe('maskContactDetails (the preview text of a blurred lead)', () => {
 
   it('masks BEFORE cutting, so a number at the cut line cannot leak its first digits', () => {
     const text = 'a'.repeat(76) + ' 9820012345 is my number';
-    const [r] = applyLeadVisibility('LISTED', monthStart, [{ id: 'lead-06' }, ...month(5)].slice(0, 0), [row(6, { id: 'lead-06', details: text })]);
+    const [r] = applyLeadVisibility('LISTED', monthStart, month(6), [row(6, { details: text })]);
     expect(r.leadVisibility).toBe('blurred');
     expect(r.details).not.toMatch(/\d{3}/);
   });
@@ -148,5 +178,41 @@ describe('applyLeadVisibility, other cases', () => {
     const copy = JSON.parse(JSON.stringify(input));
     applyLeadVisibility('LISTED', monthStart, month(7), input);
     expect(JSON.parse(JSON.stringify(input))).toEqual(copy);
+  });
+});
+
+describe('free text on a blurred lead (project type and area)', () => {
+  it('masks a number typed into the project type or the area of a blurred lead', () => {
+    const [r] = applyLeadVisibility('LISTED', monthStart, month(6), [
+      row(6, { projectType: 'Waterproofing call 98200 12345', location: 'Thane, ring 9820012345' } as Partial<Row>),
+    ] as never);
+    const out = r as unknown as { projectType: string; location: string; leadVisibility: string };
+    expect(out.leadVisibility).toBe('blurred');
+    expect(out.projectType).toBe('Waterproofing call ••••');
+    expect(out.location).toBe('Thane, ring ••••');
+  });
+
+  it('leaves the project type and area of a FULL lead exactly as typed', () => {
+    const [r] = applyLeadVisibility('LISTED', monthStart, month(6), [
+      row(1, { projectType: 'Waterproofing call 98200 12345' } as Partial<Row>),
+    ] as never);
+    expect((r as unknown as { projectType: string }).projectType).toBe('Waterproofing call 98200 12345');
+  });
+});
+
+describe('push and email text for a new message (notificationTextFor)', () => {
+  const body = 'Hi, my number is 9820012345, please call';
+
+  it('a blurred lead gets NO preview of the message, only a notice', () => {
+    const { preview, title } = notificationTextFor(true, body, 'Fire safety, call 9820012345');
+    expect(preview).toBe(BLURRED_MESSAGE_NOTICE);
+    expect(preview).not.toContain('9820012345');
+    expect(title).toBe('Fire safety, call ••••');
+  });
+
+  it('a full lead (or a message to a developer) gets the usual preview', () => {
+    const { preview, title } = notificationTextFor(false, body, 'Fire safety');
+    expect(preview).toContain('9820012345');
+    expect(title).toBe('Fire safety');
   });
 });

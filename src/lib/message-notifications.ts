@@ -22,13 +22,9 @@ import { prisma } from '@/lib/prisma';
 import { sendNewMessageEmail } from '@/lib/email';
 import { sendPush } from '@/lib/push';
 import { conversationTitle } from '@/lib/conversations';
-
-const PREVIEW_CHARS = 120;
-
-export function messagePreview(body: string): string {
-  const oneLine = body.replace(/\s+/g, ' ').trim();
-  return oneLine.length > PREVIEW_CHARS ? `${oneLine.slice(0, PREVIEW_CHARS)}…` : oneLine;
-}
+import { blurredLeadIdsFor } from '@/lib/quote-request-access';
+import { notificationTextFor } from '@/lib/notification-text';
+export { messagePreview } from '@/lib/notification-text';
 
 export async function notifyNewMessage(
   quoteRequestId: string,
@@ -58,7 +54,9 @@ export async function notifyNewMessage(
   if (!toDeveloper && !qr.contractor.passwordHash) return;
 
   const fromName = toDeveloper ? qr.contractor.name : qr.developer.name;
-  const preview = messagePreview(body);
+  // Is this lead blurred for the contractor who is about to be notified?
+  const blurredForRecipient = !toDeveloper && (await blurredLeadIdsFor(qr.contractorId)).has(quoteRequestId);
+  const { preview, title: threadTitle } = notificationTextFor(blurredForRecipient, body, conversationTitle(qr));
   const baseUrl = process.env.NEXTAUTH_URL ?? '';
   const path = `/messages/${quoteRequestId}`;
 
@@ -82,7 +80,7 @@ export async function notifyNewMessage(
     toEmail: toDeveloper ? qr.developer.email : qr.contractor.email,
     toName: toDeveloper ? qr.developer.name : qr.contractor.name,
     fromName,
-    projectType: conversationTitle(qr),
+    projectType: threadTitle,
     preview,
     conversationUrl: `${baseUrl}${path}`,
   });

@@ -16,7 +16,7 @@ import { after } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendNewQuoteToContractorEmail, sendQuoteRequestEmail } from '@/lib/email';
 import { sendPush } from '@/lib/push';
-import { computeLeadVisibility, getMonthStart } from '@/lib/lead-limits';
+import { computeLeadVisibility, getMonthStart, maskContactDetails } from '@/lib/lead-limits';
 
 export type QuoteRequestFields = {
   projectType: string;
@@ -64,13 +64,18 @@ export async function createQuoteRequest({
     // Same rule as the dashboard: is this lead fully visible to the
     // contractor? Only then does the email carry the details and a reply-to.
     const fullyVisible = await isFullyVisibleLead(contractor.id, quoteRequest.id);
+    // The project type and area are free text the developer typed. For a
+    // blurred lead they are masked in the email and the push like everywhere
+    // else, so a number typed there cannot get past the blur.
+    const shownType = fullyVisible ? fields.projectType : maskContactDetails(fields.projectType);
+    const shownLocation = fullyVisible ? fields.location : maskContactDetails(fields.location);
     after(() =>
       Promise.all([
         sendNewQuoteToContractorEmail({
           toEmail: contractor.email,
           contractorName: contractor.name,
-          projectType: fields.projectType,
-          location: fields.location,
+          projectType: shownType,
+          location: shownLocation,
           dashboardUrl: `${baseUrl}/contractor/dashboard`,
           lead: fullyVisible
             ? {
@@ -84,7 +89,7 @@ export async function createQuoteRequest({
         }),
         sendPush('CONTRACTOR', contractor.id, {
           title: 'New quote request',
-          body: `${fields.projectType} in ${fields.location}`,
+          body: `${shownType} in ${shownLocation}`,
           url: '/contractor/dashboard',
           tag: `quote-${quoteRequest.id}`,
         }),

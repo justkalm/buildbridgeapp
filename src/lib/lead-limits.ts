@@ -107,9 +107,12 @@ type LeadRowInput = {
   // Never expected here (the dashboard query does not fetch it), but if a
   // future query ever does, a blurred row still must not carry it.
   contactPhone?: unknown;
+  // Free text typed by the developer; masked on blurred rows when present.
+  projectType?: string;
+  location?: string;
 };
 
-export type LeadRowForContractor<T extends LeadRowInput> = Omit<T, 'developer' | 'details'> & {
+export type LeadRowForContractor<T extends LeadRowInput> = Omit<T, 'developer' | 'details' | 'contactPhone'> & {
   details: string;
   developer: { name: string; email: string | null; phone: string | null };
   leadVisibility: LeadVisibility;
@@ -117,18 +120,47 @@ export type LeadRowForContractor<T extends LeadRowInput> = Omit<T, 'developer' |
 
 export const BLURRED_DETAILS_MAX_CHARS = 80;
 
-// The short preview of a blurred lead's message must not carry the way to
-// reach the developer. Developers often type their number or email into the
-// details ("call me on 98200 12345"), so email addresses and runs of eight or
-// more digits (with spaces, dashes, dots, brackets or a leading +) are
-// replaced before the text is cut. Done BEFORE cutting so a number can never
-// be sliced in half and leak its first digits. Shorter figures such as 14
-// floors or 25000 sq ft are left alone.
+// The short preview of a blurred lead's message (and the free-text project type
+// and area) must not carry the way to reach the developer. Developers often
+// type their number or email into free text ("call me on 98200 12345"), so
+// email addresses and phone-like numbers are replaced before the text is cut.
+//
+// Phone-like = eight or more DIGITS, with at most two separator characters
+// (space . - / or brackets) between digits, so "98200 12345", "98200/12345",
+// "+91 98200 12345" and "(022) 2345 6789" are caught, while "1200 - 1500 sqft"
+// (three characters between the groups) and plain dates are left alone.
+// Digits in other scripts (Hindi, Marathi, Gujarati and so on) and hidden
+// zero-width characters are normalised first. Emails are caught as
+// "a@b.com", "a @ b . com", "a[at]b.com" and "a at b dot com".
+//
+// Done BEFORE cutting to 80 characters, so a number can never be sliced in
+// half and leak its first digits. Shorter figures (14 floors, 25000 sq ft,
+// 25,00,000) are untouched. This is a best effort on free text, not a
+// guarantee: unusual spellings can still get through, which is why blurred
+// leads also never carry the developer's email or phone fields at all.
 const MASK = '••••';
+const ZERO_WIDTH = /[\u200B-\u200D\u2060\uFEFF]/g;
+const NON_ASCII_DIGITS = /[\u0660-\u0669\u06F0-\u06F9\u0966-\u096F\u09E6-\u09EF\u0A66-\u0A6F\u0AE6-\u0AEF\u0B66-\u0B6F\u0BE6-\u0BEF\u0C66-\u0C6F\u0CE6-\u0CEF\u0D66-\u0D6F\uFF10-\uFF19]/g;
+const DIGIT_ZEROES = [0x0660, 0x06f0, 0x0966, 0x09e6, 0x0a66, 0x0ae6, 0x0b66, 0x0be6, 0x0c66, 0x0ce6, 0x0d66, 0xff10];
+const PHONE_LIKE = /\+?\d(?:[\s.\-/()]{0,2}\d){7,}/g;
+const DATE_LIKE = /^(?:\d{1,2}[-./]\d{1,2}[-./]\d{2,4}|\d{4}[-./]\d{1,2}[-./]\d{1,2})$/;
+const EMAIL_SYMBOL = /[\w.+-]+\s*(?:@|\[at\]|\(at\))\s*[\w-]+(?:\s*(?:\.|\[dot\]|\(dot\))\s*[\w-]+)+/gi;
+const EMAIL_WORDS = /[\w.+-]+\s+at\s+[\w-]+(?:\s+dot\s+[\w-]+)+/gi;
+
 export function maskContactDetails(text: string): string {
-  return text
-    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, MASK)
-    .replace(/\+?\d[\d\s().-]{6,}\d/g, MASK);
+  const plain = text.replace(ZERO_WIDTH, '').replace(NON_ASCII_DIGITS, (ch) => {
+    const code = ch.charCodeAt(0);
+    const zero = DIGIT_ZEROES.find((z) => code >= z && code <= z + 9);
+    return zero === undefined ? ch : String(code - zero);
+  });
+  return plain
+    .replace(EMAIL_SYMBOL, MASK)
+    .replace(EMAIL_WORDS, MASK)
+    .replace(PHONE_LIKE, (run) => (DATE_LIKE.test(run.trim()) ? run : MASK));
+}
+
+function cutPreview(text: string): string {
+  return text.length > BLURRED_DETAILS_MAX_CHARS ? `${text.slice(0, BLURRED_DETAILS_MAX_CHARS)}…` : text;
 }
 
 /**
@@ -143,10 +175,6 @@ export function maskContactDetails(text: string): string {
  * Earlier months are never blurred. A current-month lead that is missing from
  * the month list is blurred, never shown (fails closed). Paid plans see all.
  */
-function cutPreview(text: string): string {
-  return text.length > BLURRED_DETAILS_MAX_CHARS ? `${text.slice(0, BLURRED_DETAILS_MAX_CHARS)}…` : text;
-}
-
 export function applyLeadVisibility<T extends LeadRowInput>(
   tier: 'LISTED' | 'PLUS' | 'PRO',
   monthStart: Date,
@@ -166,6 +194,8 @@ export function applyLeadVisibility<T extends LeadRowInput>(
     const { developer, details, contactPhone: _contactPhone, ...rest } = r;
     return {
       ...rest,
+      ...(typeof rest.projectType === 'string' ? { projectType: maskContactDetails(rest.projectType) } : {}),
+      ...(typeof rest.location === 'string' ? { location: maskContactDetails(rest.location) } : {}),
       details: cutPreview(maskContactDetails(details)),
       developer: { name: developer.name, email: null, phone: null },
       leadVisibility: 'blurred' as const,
