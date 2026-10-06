@@ -7,8 +7,10 @@
 // DELETE cascades to that contractor's Projects AND their QuoteRequests —
 // see the onDelete: Cascade on both relations in schema.prisma. This means
 // deleting a contractor with real quote-request history permanently erases
-// that history, not just the contractor's profile. There's no "soft delete"
-// or undo here; the confirmation step lives in the admin UI, not here.
+// that history, not just the contractor's profile. There's no soft delete or
+// undo, so the server itself refuses (409) when quote requests, site
+// visits or projects exist, until the caller sends the contractor's exact name as
+// confirmName (KALM-241). Every delete is also written to the moderation log.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
@@ -30,21 +32,91 @@ export async function DELETE(
 
   const { id } = await params;
 
-  // select here only pulls what this handler actually needs (existence
-  // check + the name for the response) — no reason to fetch the whole row,
-  // password hash and reset/verify tokens included, just to check it
-  // exists and delete it.
-  const existing = await prisma.contractor.findUnique({
-    where: { id },
-    select: { id: true, name: true },
-  });
-  if (!existing) {
-    return NextResponse.json({ error: 'Contractor not found' }, { status: 404 });
+  // Safer deletion (KALM-241 / 124). Deleting a contractor also erases, for
+  // good, every quote request and message thread with them, their projects
+  // (with any developer reviews), site visits, shortlist entries and project
+  // alerts. Developers lose that history too. So when quote requests, site
+  // visits or projects exist the server refuses (409, with the counts) and
+  // only goes ahead when the caller sends the contractor's exact name back
+  // as confirmName. A contractor with none of those deletes as before.
+  let confirmName: unknown;
+  try {
+    confirmName = (await req.json())?.confirmName;
+  } catch {
+    confirmName = undefined; // no body: the first, unconfirmed attempt
   }
+  const normalise = (v: string) => v.normalize('NFC').replace(/\s+/g, ' ').trim().toLowerCase();
 
-  await prisma.contractor.delete({ where: { id } });
-
-  return NextResponse.json({ ok: true, deletedName: existing.name });
+  // The counts are read AGAIN inside the transaction, right before the
+  // delete, so history created while the admin was reading the warning
+  // can't be erased unconfirmed and the log note always matches what was
+  // really removed. Serializable makes the database refuse (P2034) if
+  // something changes underneath. The moderation log row is written in the
+  // same transaction, so a delete never goes unrecorded; it holds the
+  // contractor's name and counts only, never message text, and it outlives
+  // the contractor (targetId has no foreign key).
+  class NeedsConfirmation extends Error {
+    constructor(public name2: string, public counts: Record<string, number>) {
+      super('needs confirmation');
+    }
+  }
+  try {
+    const deletedName = await prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.contractor.findUnique({
+          where: { id },
+          select: {
+            name: true,
+            _count: {
+              select: { projects: true, quoteRequests: true, siteVisits: true, projectAlerts: true, shortlistedBy: true },
+            },
+          },
+        });
+        if (!existing) return null;
+        const counts = existing._count;
+        const hasHistory = counts.quoteRequests > 0 || counts.siteVisits > 0 || counts.projects > 0;
+        const confirmed = typeof confirmName === 'string' && normalise(confirmName) === normalise(existing.name);
+        if (hasHistory && !confirmed) {
+          const messages = await tx.message.count({ where: { quoteRequest: { contractorId: id } } });
+          throw new NeedsConfirmation(existing.name, { ...counts, messages });
+        }
+        await tx.moderationLog.create({
+          data: {
+            action: 'contractor_deleted',
+            targetType: 'CONTRACTOR',
+            targetId: id,
+            note: `Deleted "${existing.name}". Removed ${counts.projects} project(s), ${counts.quoteRequests} quote request(s), ${counts.siteVisits} site visit(s), ${counts.projectAlerts} project alert(s), ${counts.shortlistedBy} shortlist entr${counts.shortlistedBy === 1 ? 'y' : 'ies'}.`,
+          },
+        });
+        await tx.contractor.delete({ where: { id } });
+        return existing.name;
+      },
+      { isolationLevel: 'Serializable' }
+    );
+    if (deletedName === null) {
+      return NextResponse.json({ error: 'Contractor not found' }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, deletedName });
+  } catch (err) {
+    if (err instanceof NeedsConfirmation) {
+      return NextResponse.json(
+        {
+          error: `${err.name2} has history that would be erased for good. Type their exact name to confirm.`,
+          requiresConfirmation: true,
+          counts: err.counts,
+        },
+        { status: 409 }
+      );
+    }
+    const code = (err as { code?: string })?.code;
+    // P2025: already deleted (double click, second tab). P2034: the data
+    // changed underneath the transaction; nothing was deleted.
+    if (code === 'P2025') return NextResponse.json({ error: 'Contractor not found' }, { status: 404 });
+    if (code === 'P2034') {
+      return NextResponse.json({ error: 'Something changed while deleting. Nothing was deleted. Try again.' }, { status: 409 });
+    }
+    throw err;
+  }
 }
 
 // PATCH updates a contractor's verification status, tier and/or license

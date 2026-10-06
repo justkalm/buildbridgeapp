@@ -299,12 +299,39 @@ export default function AdminContractorsPage() {
 
     setDeletingId(contractor.id);
     try {
-      const res = await fetch(`/api/admin/contractors/${contractor.id}`, { method: 'DELETE' });
+      let res = await fetch(`/api/admin/contractors/${contractor.id}`, { method: 'DELETE' });
+      // The server refuses (409) when the contractor has quote requests or
+      // site visits, and says exactly what would be erased. Ask for the exact
+      // name before sending it again (KALM-241).
+      if (res.status === 409) {
+        const info = await res.json().catch(() => null);
+        if (!info?.requiresConfirmation) {
+          alert(info?.error ?? 'Failed to delete contractor');
+          return;
+        }
+        const c = info.counts as Record<string, number>;
+        const typed = window.prompt(
+          `${contractor.name} has history that will be erased for good:\n\n` +
+            `${c.quoteRequests} quote request(s) with ${c.messages} message(s)\n` +
+            `${c.siteVisits} site visit(s)\n${c.projects} project(s)\n\n` +
+            `Developers lose their side of it too. To go ahead, type the exact name: ${contractor.name}`
+        );
+        if (typed === null) return;
+        res = await fetch(`/api/admin/contractors/${contractor.id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmName: typed }),
+        });
+      }
       if (res.ok) {
         setContractors((prev) => (prev ? prev.filter((c) => c.id !== contractor.id) : prev));
       } else {
-        const data = await res.json();
-        alert(data.error ?? 'Failed to delete contractor');
+        const data = await res.json().catch(() => null);
+        alert(
+          data?.requiresConfirmation
+            ? 'The name did not match. Nothing was deleted.'
+            : (data?.error ?? 'Failed to delete contractor')
+        );
       }
     } catch {
       alert('Failed to delete contractor. Please try again.');
