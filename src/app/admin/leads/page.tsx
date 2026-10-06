@@ -21,6 +21,7 @@ type Row = {
   byProject: number;
   emailFailed: number;
   replied: number;
+  contacted: number;
   quoted: number;
   declined: number;
   waiting: number;
@@ -42,6 +43,7 @@ const COLUMNS: { key: keyof Totals; label: string; hint: string }[] = [
   { key: 'byProject', label: 'Project post', hint: 'Started from a project a developer posted' },
   { key: 'emailFailed', label: 'Failed emails', hint: 'Emails to this contractor that failed to send this month (also listed under Failed emails). Delivery is not tracked, so zero does not prove an email arrived.' },
   { key: 'replied', label: 'Replied', hint: 'The contractor sent at least one message in the app' },
+  { key: 'contacted', label: 'Contacted', hint: 'The contractor marked Contacted: they spoke to the developer outside the app (phone, email or WhatsApp). Their own word, not checked.' },
   { key: 'quoted', label: 'Quoted', hint: 'Marked Quote sent' },
   { key: 'declined', label: 'Declined', hint: 'Marked Not interested' },
   { key: 'waiting', label: 'Waiting', hint: 'Still Pending and no reply yet' },

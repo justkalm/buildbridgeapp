@@ -20,6 +20,11 @@ describe('buildLedger', () => {
     expect(totals).toMatchObject({ leads: 5, replied: 2, quoted: 1, declined: 1, waiting: 1 });
   });
 
+  it('counts Contacted separately: off-app contact by the contractor\'s own word', () => {
+    const { rows } = buildLedger([req('1', 'a', 'CONTACTED'), req('2', 'a')], new Set(), [free]);
+    expect(rows[0]).toMatchObject({ leads: 2, contacted: 1, replied: 0, waiting: 1 });
+  });
+
   it('a Pending lead that has a reply is not waiting', () => {
     const { rows } = buildLedger([req('1', 'a')], new Set(['1']), [free]);
     expect(rows[0].waiting).toBe(0);
@@ -80,8 +85,8 @@ describe('ledgerToCsv', () => {
     const csv = ledgerToCsv(rows, totals);
     expect(csv).toContain(`"'=HYPERLINK(""http://evil"")"`);
     expect(csv).toContain('"Rao, Sons ""Ltd"""');
-    expect(csv.split('\r\n')[0]).toBe('Contractor,Plan,Leads,Via quote form,Via message,Via project post,Failed emails,Replied,Quoted,Declined,Still waiting,Over free cap');
-    expect(csv.trimEnd().split('\r\n').pop()).toBe('Total,,2,2,0,0,0,0,0,0,2,0');
+    expect(csv.split('\r\n')[0]).toBe('Contractor,Plan,Leads,Via quote form,Via message,Via project post,Failed emails,Replied,Marked contacted,Quoted,Declined,Still waiting,Over free cap');
+    expect(csv.trimEnd().split('\r\n').pop()).toBe('Total,,2,2,0,0,0,0,0,0,0,2,0');
   });
 });
 

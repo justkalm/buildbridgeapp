@@ -32,6 +32,7 @@ export type LedgerRow = {
   byProject: number; // arrived from a project post
   emailFailed: number; // emails to this contractor that failed to send this month (Admin > Failed emails)
   replied: number;
+  contacted: number; // contractor marked Contacted: spoke to them outside the app (their own say-so)
   quoted: number;
   declined: number;
   waiting: number; // still Pending and nobody has replied
@@ -57,7 +58,7 @@ export function buildLedger(
     if (!c) continue;
     let row = rows.get(c.id);
     if (!row) {
-      row = { contractorId: c.id, name: c.name, tier: c.tier, leads: 0, byQuote: 0, byEnquiry: 0, byProject: 0, emailFailed: 0, replied: 0, quoted: 0, declined: 0, waiting: 0, overFreeCap: 0 };
+      row = { contractorId: c.id, name: c.name, tier: c.tier, leads: 0, byQuote: 0, byEnquiry: 0, byProject: 0, emailFailed: 0, replied: 0, contacted: 0, quoted: 0, declined: 0, waiting: 0, overFreeCap: 0 };
       rows.set(c.id, row);
     }
     const replied = repliedRequestIds.has(r.id);
@@ -66,6 +67,7 @@ export function buildLedger(
     else if (r.kind === 'PROJECT') row.byProject += 1;
     else row.byQuote += 1;
     if (replied) row.replied += 1;
+    if (r.status === 'CONTACTED') row.contacted += 1;
     if (r.status === 'QUOTED') row.quoted += 1;
     if (r.status === 'DECLINED') row.declined += 1;
     if (r.status === 'PENDING' && !replied) row.waiting += 1;
@@ -78,7 +80,7 @@ export function buildLedger(
   }
   list.sort((a, b) => b.leads - a.leads || a.name.localeCompare(b.name));
 
-  const totals: LedgerTotals = { leads: 0, byQuote: 0, byEnquiry: 0, byProject: 0, emailFailed: 0, replied: 0, quoted: 0, declined: 0, waiting: 0, overFreeCap: 0 };
+  const totals: LedgerTotals = { leads: 0, byQuote: 0, byEnquiry: 0, byProject: 0, emailFailed: 0, replied: 0, contacted: 0, quoted: 0, declined: 0, waiting: 0, overFreeCap: 0 };
   for (const row of list) {
     totals.leads += row.leads;
     totals.byQuote += row.byQuote;
@@ -86,6 +88,7 @@ export function buildLedger(
     totals.byProject += row.byProject;
     totals.emailFailed += row.emailFailed;
     totals.replied += row.replied;
+    totals.contacted += row.contacted;
     totals.quoted += row.quoted;
     totals.declined += row.declined;
     totals.waiting += row.waiting;
@@ -107,15 +110,15 @@ function csvCell(value: string | number): string {
 export function ledgerToCsv(rows: LedgerRow[], totals: LedgerTotals): string {
   const plan: Record<LedgerContractor['tier'], string> = { LISTED: 'Listed', PLUS: 'Plus', PRO: 'Pro' };
   const lines = [
-    ['Contractor', 'Plan', 'Leads', 'Via quote form', 'Via message', 'Via project post', 'Failed emails', 'Replied', 'Quoted', 'Declined', 'Still waiting', 'Over free cap'],
+    ['Contractor', 'Plan', 'Leads', 'Via quote form', 'Via message', 'Via project post', 'Failed emails', 'Replied', 'Marked contacted', 'Quoted', 'Declined', 'Still waiting', 'Over free cap'],
   ];
   for (const r of rows) {
     lines.push(
-      [r.name, plan[r.tier], r.leads, r.byQuote, r.byEnquiry, r.byProject, r.emailFailed, r.replied, r.quoted, r.declined, r.waiting, r.overFreeCap].map(String)
+      [r.name, plan[r.tier], r.leads, r.byQuote, r.byEnquiry, r.byProject, r.emailFailed, r.replied, r.contacted, r.quoted, r.declined, r.waiting, r.overFreeCap].map(String)
     );
   }
   lines.push(
-    ['Total', '', totals.leads, totals.byQuote, totals.byEnquiry, totals.byProject, totals.emailFailed, totals.replied, totals.quoted, totals.declined, totals.waiting, totals.overFreeCap].map(String)
+    ['Total', '', totals.leads, totals.byQuote, totals.byEnquiry, totals.byProject, totals.emailFailed, totals.replied, totals.contacted, totals.quoted, totals.declined, totals.waiting, totals.overFreeCap].map(String)
   );
   return lines.map((line) => line.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
