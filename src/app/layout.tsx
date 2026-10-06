@@ -5,6 +5,13 @@ import { Instrument_Sans, Jost } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import CookieBanner from "@/components/CookieBanner";
+// Cookie-free visitor and page-speed measurement (KALM-238). It sets no
+// cookies and stores nothing in the browser, which is why CookieBanner can
+// stay a plain notice. If this is ever swapped for a tool that does set
+// cookies, CookieBanner must become a real opt-in first. Both only report
+// from the live site on Vercel; locally they do nothing.
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 // Self-hosted via next/font: the font files are downloaded at build time and
 // served from this site, so there's no render-blocking request to Google
@@ -70,6 +77,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-paper text-ink">
         <Providers>{children}</Providers>
         <CookieBanner />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

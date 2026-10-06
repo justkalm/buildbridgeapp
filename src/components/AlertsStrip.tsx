@@ -78,6 +78,9 @@ export default function AlertsStrip({ audience }: { audience: 'contractor' | 'de
   const what = audience === 'contractor' ? 'new enquiries and messages' : 'replies and site visit updates';
 
   let text: string | null = null;
+  // Drawn bell (same thin line style as the icons in the top bar) beside the
+  // "turn on alerts" line. Hidden from screen readers; the sentence says it all.
+  let showBell = false;
   let action: { label: string; run: () => void } | null = null;
   let dismissKey: string | null = null;
 
@@ -85,7 +88,8 @@ export default function AlertsStrip({ audience }: { audience: 'contractor' | 'de
     text = `Get alerts for ${what}: tap Share, then "Add to Home Screen", and open (kalm) from there.`;
     dismissKey = PUSH_DISMISS_KEY;
   } else if (push === 'off' && !pushDismissed) {
-    text = `🔔 Get alerts for ${what}, even when (kalm) is closed.`;
+    text = `Get alerts for ${what}, even when (kalm) is closed.`;
+    showBell = true;
     action = { label: busy ? 'Turning on…' : 'Turn on', run: turnOn };
     dismissKey = PUSH_DISMISS_KEY;
   } else if (push === 'denied' && !pushDismissed) {
@@ -127,6 +131,23 @@ export default function AlertsStrip({ audience }: { audience: 'contractor' | 'de
   return (
     <div className="mb-5 px-3.5 py-2.5 rounded-[6px] border border-line bg-paper-dim flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <p className="text-[13px] text-ink min-w-0 flex-1">
+        {showBell && (
+          <svg
+            aria-hidden="true"
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="inline-block align-[-2px] mr-1.5"
+          >
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+        )}
         {text}
         {error && <span className="block text-xs text-danger mt-0.5">{error}</span>}
       </p>

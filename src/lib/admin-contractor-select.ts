@@ -40,6 +40,10 @@ export const ADMIN_SAFE_CONTRACTOR_SELECT = {
   checkDocumentsAt: true,
   checkGstinAt: true,
   checkContactAt: true,
+  // Private admin note (verification desk, KALM-239). Safe here because this
+  // select is only used by /api/admin routes; never add it to a public or
+  // contractor-facing select.
+  adminNote: true,
   dataSharingConsent: true,
   dataSharingConsentAt: true,
   createdAt: true,

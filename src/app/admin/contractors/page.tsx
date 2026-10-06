@@ -20,11 +20,17 @@ import Link from 'next/link';
 import AdminTabs from '@/components/AdminTabs';
 import { isPlaceholderLicense } from '@/lib/license';
 import { formatLocation } from '@/lib/location';
+import { whatsappLink } from '@/lib/whatsapp';
 
 type ContractorRow = {
   id: string;
   name: string;
   email: string;
+  phone: string;
+  // Private admin note (KALM-239). Admin eyes only.
+  adminNote: string | null;
+  createdAt: string;
+  reverifyRequestedAt: string | null;
   city: string;
   area: string;
   tradeTypes: string[];
@@ -67,6 +73,91 @@ const statusStyle: Record<ContractorRow['verificationStatus'], string> = {
   REJECTED: 'bg-danger-soft text-danger',
 };
 
+// Verification desk (KALM-239): filter chips and sort options.
+type DeskFilter = 'ALL' | 'PENDING' | 'READY' | 'RECHECK' | 'VERIFIED' | 'REJECTED';
+type DeskSort = 'WAITING' | 'NEWEST' | 'NAME' | 'CHECKS';
+
+const FILTER_LABELS: Record<DeskFilter, string> = {
+  ALL: 'All',
+  PENDING: 'Pending',
+  READY: 'Ready to verify',
+  RECHECK: 'Re-check',
+  VERIFIED: 'Verified',
+  REJECTED: 'Rejected',
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function checksDone(c: ContractorRow): number {
+  return [c.checkDocumentsAt, c.checkGstinAt, c.checkContactAt].filter(Boolean).length;
+}
+
+// All three checks ticked but still Pending: just needs the status flipped.
+function isReady(c: ContractorRow): boolean {
+  return c.verificationStatus === 'PENDING' && checksDone(c) === 3;
+}
+
+// When this contractor started waiting on admin: signup for a Pending
+// contractor, the edit that triggered it for a re-check, otherwise null.
+function waitingSince(c: ContractorRow): number | null {
+  if (c.reverifyPending) return new Date(c.reverifyRequestedAt ?? c.createdAt).getTime();
+  if (c.verificationStatus === 'PENDING') return new Date(c.createdAt).getTime();
+  return null;
+}
+
+function matchesFilter(c: ContractorRow, filter: DeskFilter): boolean {
+  switch (filter) {
+    case 'ALL':
+      return true;
+    case 'PENDING':
+      return c.verificationStatus === 'PENDING';
+    case 'READY':
+      return isReady(c);
+    case 'RECHECK':
+      return c.reverifyPending;
+    case 'VERIFIED':
+      return c.verificationStatus === 'VERIFIED';
+    case 'REJECTED':
+      return c.verificationStatus === 'REJECTED';
+  }
+}
+
+function matchesSearch(c: ContractorRow, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  // Phone numbers are typed with spaces and dashes; match on digits too.
+  const qDigits = q.replace(/\D/g, '');
+  return (
+    [c.name, c.email, c.licenseNumber, c.area, c.city, c.adminNote ?? ''].some((v) =>
+      v.toLowerCase().includes(q)
+    ) ||
+    (qDigits.length >= 3 && c.phone.replace(/\D/g, '').includes(qDigits))
+  );
+}
+
+function sortRows(rows: ContractorRow[], sort: DeskSort): ContractorRow[] {
+  const copy = [...rows];
+  switch (sort) {
+    case 'WAITING':
+      // People waiting on admin first, longest wait at the top; everyone
+      // else after, newest signup first.
+      return copy.sort((a, b) => {
+        const wa = waitingSince(a);
+        const wb = waitingSince(b);
+        if (wa !== null && wb !== null) return wa - wb;
+        if (wa !== null) return -1;
+        if (wb !== null) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    case 'NEWEST':
+      return copy.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    case 'NAME':
+      return copy.sort((a, b) => a.name.localeCompare(b.name));
+    case 'CHECKS':
+      return copy.sort((a, b) => checksDone(b) - checksDone(a) || a.name.localeCompare(b.name));
+  }
+}
+
 export default function AdminContractorsPage() {
   const [contractors, setContractors] = useState<ContractorRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +168,49 @@ export default function AdminContractorsPage() {
   const [ratingDraft, setRatingDraft] = useState(5);
   const [textDraft, setTextDraft] = useState('');
   const [savingReview, setSavingReview] = useState(false);
+  // Verification desk (KALM-239)
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<DeskFilter>('ALL');
+  const [sort, setSort] = useState<DeskSort>('WAITING');
+  // "Now" is read once when the page opens, so the waiting-days figures stay
+  // steady while the page is drawn; reloading the page refreshes them.
+  const [now] = useState(() => Date.now());
+  const [noteOpenId, setNoteOpenId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+
+  function openNote(contractor: ContractorRow) {
+    if (noteOpenId === contractor.id) {
+      setNoteOpenId(null);
+      return;
+    }
+    setNoteOpenId(contractor.id);
+    setNoteDraft(contractor.adminNote ?? '');
+  }
+
+  async function saveNote(contractor: ContractorRow) {
+    setSavingNote(true);
+    try {
+      const res = await fetch(`/api/admin/contractors/${contractor.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminNote: noteDraft }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error ?? 'Failed to save the note');
+        return;
+      }
+      setContractors((prev) =>
+        prev ? prev.map((c) => (c.id === contractor.id ? { ...c, adminNote: data.contractor.adminNote } : c)) : prev
+      );
+      setNoteOpenId(null);
+    } catch {
+      alert('Failed to save the note. Please try again.');
+    } finally {
+      setSavingNote(false);
+    }
+  }
 
   async function toggleExpand(contractorId: string) {
     if (expandedContractorId === contractorId) {
@@ -320,6 +454,14 @@ export default function AdminContractorsPage() {
     }
   }
 
+  const visibleContractors = contractors
+    ? sortRows(
+        contractors.filter((c) => matchesFilter(c, filter) && matchesSearch(c, query)),
+        sort
+      )
+    : [];
+  const filterCounts = (f: DeskFilter) => (contractors ? contractors.filter((c) => matchesFilter(c, f)).length : 0);
+
   return (
     <main className="min-h-screen bg-paper py-10 px-6">
       <div className="max-w-4xl mx-auto">
@@ -336,7 +478,11 @@ export default function AdminContractorsPage() {
           </div>
         </div>
         <p className="text-stone text-sm mb-8">
-          {contractors ? `${contractors.length} contractor${contractors.length === 1 ? '' : 's'} total` : 'Loading…'}
+          {contractors
+            ? visibleContractors.length === contractors.length
+              ? `${contractors.length} contractor${contractors.length === 1 ? '' : 's'} total`
+              : `Showing ${visibleContractors.length} of ${contractors.length}`
+            : 'Loading…'}
         </p>
 
         {error && (
@@ -355,6 +501,63 @@ export default function AdminContractorsPage() {
         )}
 
         {contractors && contractors.length > 0 && (
+          <div className="mb-4 flex flex-col gap-3">
+            <div className="flex flex-wrap gap-3 items-center">
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name, phone, area, note"
+                aria-label="Search contractors"
+                className="flex-1 min-w-[220px] text-sm px-3 py-2 border border-line rounded-[4px] bg-white focus:outline-none focus:ring-2 focus:ring-ink"
+              />
+              <label className="flex items-center gap-2 text-xs text-stone">
+                Sort
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as DeskSort)}
+                  className="text-sm px-2 py-2 border border-line rounded-[4px] bg-white text-ink"
+                >
+                  <option value="WAITING">Longest waiting first</option>
+                  <option value="NEWEST">Newest signup</option>
+                  <option value="CHECKS">Most checks done</option>
+                  <option value="NAME">Name A to Z</option>
+                </select>
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
+              {(Object.keys(FILTER_LABELS) as DeskFilter[]).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  aria-pressed={filter === f}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+                    filter === f ? 'bg-ink text-paper border-ink' : 'bg-white text-stone border-line hover:text-ink'
+                  }`}
+                >
+                  {FILTER_LABELS[f]} <span className="opacity-70">{filterCounts(f)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {contractors && contractors.length > 0 && visibleContractors.length === 0 && (
+          <div className="border border-line rounded-md p-10 text-center bg-white">
+            <p className="text-stone font-medium mb-1">Nobody matches that</p>
+            <button
+              onClick={() => {
+                setQuery('');
+                setFilter('ALL');
+              }}
+              className="text-sm text-sage font-medium"
+            >
+              Clear search and filter
+            </button>
+          </div>
+        )}
+
+        {contractors && visibleContractors.length > 0 && (
           <div className="bg-white border border-line rounded-md overflow-x-auto">
             <table className="w-full text-sm min-w-[900px]">
               <thead>
@@ -370,7 +573,10 @@ export default function AdminContractorsPage() {
                 </tr>
               </thead>
               <tbody>
-                {contractors.map((c) => {
+                {visibleContractors.map((c) => {
+                  const waitStart = waitingSince(c);
+                  const waitDays = waitStart === null ? null : Math.max(0, Math.floor((now - waitStart) / DAY_MS));
+                  const waLink = whatsappLink(c.phone);
                   const placeholderLicense = isPlaceholderLicense(c.licenseNumber);
                   const missingLocation = !c.city.trim() || !c.area.trim();
                   // Every reason VERIFIED is blocked for this row, joined
@@ -393,6 +599,11 @@ export default function AdminContractorsPage() {
                   <tr className="border-b border-line last:border-b-0">
                     <td className="px-4 py-4">
                       <div className="font-medium">{c.name}</div>
+                      {waitDays !== null && (
+                        <div className={`text-[11px] ${waitDays >= 7 ? 'text-danger font-medium' : 'text-stone'}`}>
+                          {c.reverifyPending ? 'Re-check' : 'Pending'}: waiting {waitDays === 0 ? 'since today' : `${waitDays} day${waitDays === 1 ? '' : 's'}`}
+                        </div>
+                      )}
                       {placeholderLicense ? (
                         <div className="text-xs text-danger font-medium">
                           No license on file{' '}
@@ -415,7 +626,32 @@ export default function AdminContractorsPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-4 text-stone text-xs">{c.email}</td>
+                    <td className="px-4 py-4 text-stone text-xs">
+                      <div>{c.email}</div>
+                      <div className="mt-0.5">
+                        {c.phone}
+                        {waLink && (
+                          <>
+                            {' '}
+                            <a
+                              href={waLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-sage underline underline-offset-2"
+                            >
+                              WhatsApp
+                            </a>
+                          </>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => openNote(c)}
+                        aria-expanded={noteOpenId === c.id}
+                        className="mt-1 underline underline-offset-2 hover:text-ink"
+                      >
+                        {c.adminNote ? 'Note ●' : 'Add note'}
+                      </button>
+                    </td>
                     <td className="px-4 py-4 text-stone">
                       {missingLocation ? (
                         <span
@@ -511,6 +747,39 @@ export default function AdminContractorsPage() {
                       </button>
                     </td>
                   </tr>
+                  {noteOpenId === c.id && (
+                    <tr className="border-b border-line last:border-b-0 bg-paper-dim/40">
+                      <td colSpan={8} className="px-4 py-4">
+                        <label className="block text-xs text-stone mb-1" htmlFor={`note-${c.id}`}>
+                          Private note about {c.name}. Only admins see this.
+                        </label>
+                        <textarea
+                          id={`note-${c.id}`}
+                          value={noteDraft}
+                          onChange={(e) => setNoteDraft(e.target.value)}
+                          rows={3}
+                          maxLength={2000}
+                          placeholder="e.g. Spoke on 8 Oct, sending GST papers tomorrow"
+                          className="w-full text-sm px-3 py-2 border border-line rounded-[4px] bg-white focus:outline-none focus:ring-2 focus:ring-ink"
+                        />
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => saveNote(c)}
+                            disabled={savingNote}
+                            className="text-xs font-medium px-3 py-1.5 rounded-full bg-ink text-paper disabled:opacity-60"
+                          >
+                            {savingNote ? 'Saving…' : 'Save note'}
+                          </button>
+                          <button
+                            onClick={() => setNoteOpenId(null)}
+                            className="text-xs font-medium px-3 py-1.5 rounded-full border border-line"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {expandedContractorId === c.id && (
                     <tr className="border-b border-line last:border-b-0 bg-paper-dim/40">
                       <td colSpan={8} className="px-4 py-4">

@@ -4,7 +4,7 @@
 // (was a placeholder pointing at the dashboard itself, see
 // src/app/contractor/dashboard/page.tsx). Pricing itself is explicitly
 // TEMPORARY per the person's own framing ("this is temporary rn") — the
-// numbers (₹750/₹1500) and feature list live here as plain data at the
+// numbers (₹750/₹1,000) and feature list live here as plain data at the
 // top of the file specifically so they're a five-second edit later, not
 // scattered through JSX.
 //
@@ -40,11 +40,11 @@ const TIERS = [
     ],
     cta: 'Upgrade to Plus',
     href: '/contact',
-    highlighted: true,
+    highlighted: false,
   },
   {
     name: 'Pro',
-    price: '₹1,500',
+    price: '₹1,000',
     priceSuffix: '/month',
     description: 'Priority visibility, and work delivered to your inbox.',
     features: [
@@ -54,7 +54,7 @@ const TIERS = [
     ],
     cta: 'Upgrade to Pro',
     href: '/contact',
-    highlighted: false,
+    highlighted: true,
   },
 ];
 

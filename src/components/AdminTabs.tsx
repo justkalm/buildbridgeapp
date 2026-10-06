@@ -31,12 +31,12 @@ export type AdminTabKey = (typeof TABS)[number]['key'];
 export default function AdminTabs({ active }: { active: AdminTabKey }) {
   return (
     <div className="flex items-center justify-between mb-6 -mt-2 border-b border-line">
-      <nav className="flex gap-1">
+      <nav className="flex gap-1 overflow-x-auto min-w-0" aria-label="Admin sections">
         {TABS.map((tab) => (
           <Link
             key={tab.key}
             href={tab.href}
-            className={`text-sm px-3 py-2.5 border-b-2 -mb-px transition-colors ${
+            className={`text-sm px-3 py-2.5 border-b-2 -mb-px transition-colors whitespace-nowrap ${
               tab.key === active
                 ? 'border-ink text-ink font-medium'
                 : 'border-transparent text-stone hover:text-ink'
@@ -46,7 +46,7 @@ export default function AdminTabs({ active }: { active: AdminTabKey }) {
           </Link>
         ))}
       </nav>
-      <Link href="/admin" className="text-sm text-stone hover:text-ink pb-2.5">
+      <Link href="/admin" className="text-sm text-stone hover:text-ink pb-2.5 pl-3 shrink-0 whitespace-nowrap">
         ← Admin home
       </Link>
     </div>

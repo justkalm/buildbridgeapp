@@ -107,8 +107,24 @@ export async function PATCH(
   // changes verificationStatus.
   const hasChecks = body.checks !== null && typeof body.checks === 'object' && !Array.isArray(body.checks);
 
-  if (!hasStatus && !hasTier && !hasLicense && !confirmReverify && !hasChecks) {
+  // Private note (KALM-239): a string, or null/blank to clear it. Admin eyes
+  // only; no public or contractor-facing route ever selects this column.
+  const hasNote = 'adminNote' in body;
+
+  if (!hasStatus && !hasTier && !hasLicense && !confirmReverify && !hasChecks && !hasNote) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+  }
+
+  let newNote: string | null | undefined;
+  if (hasNote) {
+    if (body.adminNote !== null && typeof body.adminNote !== 'string') {
+      return NextResponse.json({ error: 'Note must be text' }, { status: 400 });
+    }
+    const trimmed = typeof body.adminNote === 'string' ? body.adminNote.trim() : '';
+    if (trimmed.length > 2000) {
+      return NextResponse.json({ error: 'Note must be 2000 characters or fewer' }, { status: 400 });
+    }
+    newNote = trimmed || null;
   }
 
   if (hasStatus && !VALID_STATUSES.includes(body.verificationStatus)) {
@@ -269,6 +285,7 @@ export async function PATCH(
       ...(clearReverify ? { reverifyPending: false, reverifyRequestedAt: null, reverifyFields: [] } : {}),
       ...(hasTier ? { tier: body.tier as ContractorTier } : {}),
       ...(licenseChanging ? { licenseNumber: newLicense } : {}),
+      ...(newNote !== undefined ? { adminNote: newNote } : {}),
     },
     select: ADMIN_SAFE_CONTRACTOR_SELECT,
   });

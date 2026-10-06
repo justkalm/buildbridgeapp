@@ -78,6 +78,12 @@ export default function PrivacyPage() {
               We use cookies necessary for the site to function, such as keeping you signed in.
               See our cookie notice for details.
             </p>
+            <p className="text-stone mt-3">
+              We also measure how the site is used and how fast it loads, using Vercel&apos;s
+              analytics. It records which pages are visited, roughly where from (country level),
+              the type of device and browser, and page speed. It does not use cookies and does not
+              follow you across other websites.
+            </p>
           </section>
 
           <section>
