@@ -89,3 +89,86 @@ export function computeLeadVisibility(
 }
 
 export { LISTED_MONTHLY_LEAD_CAP };
+
+// ---------------------------------------------------------------------------
+// What a contractor's dashboard is allowed to receive for each lead
+// ---------------------------------------------------------------------------
+// Pulled out of src/app/api/contractors/me/route.ts so the rule that actually
+// protects a free contractor's missing contact details can be tested on its
+// own. The blur has to happen on the server, in the data itself: a CSS blur
+// alone would leave the real email and phone sitting in the JSON for anyone
+// who opens the browser's network tab.
+
+type LeadRowInput = {
+  id: string;
+  createdAt: Date;
+  details: string;
+  developer: { name: string; email: string | null; phone: string | null };
+  // Never expected here (the dashboard query does not fetch it), but if a
+  // future query ever does, a blurred row still must not carry it.
+  contactPhone?: unknown;
+};
+
+export type LeadRowForContractor<T extends LeadRowInput> = Omit<T, 'developer' | 'details'> & {
+  details: string;
+  developer: { name: string; email: string | null; phone: string | null };
+  leadVisibility: LeadVisibility;
+};
+
+export const BLURRED_DETAILS_MAX_CHARS = 80;
+
+// The short preview of a blurred lead's message must not carry the way to
+// reach the developer. Developers often type their number or email into the
+// details ("call me on 98200 12345"), so email addresses and runs of eight or
+// more digits (with spaces, dashes, dots, brackets or a leading +) are
+// replaced before the text is cut. Done BEFORE cutting so a number can never
+// be sliced in half and leak its first digits. Shorter figures such as 14
+// floors or 25000 sq ft are left alone.
+const MASK = '••••';
+export function maskContactDetails(text: string): string {
+  return text
+    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, MASK)
+    .replace(/\+?\d[\d\s().-]{6,}\d/g, MASK);
+}
+
+/**
+ * @param monthIdsOldestFirst EVERY request of the current month for this
+ *   contractor, oldest first (ids only). Never a trimmed list: the free five
+ *   are decided from the whole month.
+ * @param rows the leads actually shown on the dashboard (may be fewer).
+ *
+ * Free (LISTED) plan: this month's first five leads stay full; the rest are
+ * blurred (developer email and phone removed, details masked and cut to 80 characters;
+ * the developer's name and the project basics stay, as on the dashboard).
+ * Earlier months are never blurred. A current-month lead that is missing from
+ * the month list is blurred, never shown (fails closed). Paid plans see all.
+ */
+function cutPreview(text: string): string {
+  return text.length > BLURRED_DETAILS_MAX_CHARS ? `${text.slice(0, BLURRED_DETAILS_MAX_CHARS)}…` : text;
+}
+
+export function applyLeadVisibility<T extends LeadRowInput>(
+  tier: 'LISTED' | 'PLUS' | 'PRO',
+  monthStart: Date,
+  monthIdsOldestFirst: { id: string }[],
+  rows: T[]
+): LeadRowForContractor<T>[] {
+  const visibilityById = computeLeadVisibility(tier, monthIdsOldestFirst);
+
+  return rows.map((r) => {
+    const visibility: LeadVisibility =
+      visibilityById.get(r.id) ?? (tier === 'LISTED' && r.createdAt >= monthStart ? 'blurred' : 'full');
+
+    if (visibility === 'full') {
+      return { ...r, leadVisibility: 'full' as const };
+    }
+
+    const { developer, details, contactPhone: _contactPhone, ...rest } = r;
+    return {
+      ...rest,
+      details: cutPreview(maskContactDetails(details)),
+      developer: { name: developer.name, email: null, phone: null },
+      leadVisibility: 'blurred' as const,
+    } as LeadRowForContractor<T>;
+  });
+}

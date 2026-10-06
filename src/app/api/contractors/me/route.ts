@@ -50,7 +50,7 @@ import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { computeLeadVisibility, getMonthStart, LISTED_MONTHLY_LEAD_CAP } from '@/lib/lead-limits';
+import { applyLeadVisibility, getMonthStart, LISTED_MONTHLY_LEAD_CAP } from '@/lib/lead-limits';
 import { sendReverifyRequestEmail } from '@/lib/email';
 import { normalizeLocation } from '@/lib/location';
 import { insuranceCoverLakhField, teamSizeField, teamSizeRangeError, tradeTypesField } from '@/lib/project-validation';
@@ -192,41 +192,15 @@ export async function GET() {
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
 
-  const visibilityById = computeLeadVisibility(contractor.tier, thisMonthRequests);
-
-  const quoteRequestsWithVisibility = contractor.quoteRequests.map((r) => {
-    // Requests from a PRIOR month are never blurred — the cap is scoped to
-    // the current month only, so history already visible stays visible.
-    // Fails CLOSED for this month: a free contractor's current-month lead that
-    // is somehow missing from the month-wide list is blurred, never shown. Only
-    // a request from an earlier month (or a paid plan) defaults to full.
-    const visibility =
-      visibilityById.get(r.id) ?? (contractor.tier === 'LISTED' && r.createdAt >= monthStart ? 'blurred' : 'full');
-
-    if (visibility === 'full') {
-      return { ...r, leadVisibility: 'full' as const };
-    }
-
-    // Blurred: truncate details and strip the developer's contact info.
-    // Previously `...rest` kept every other field on the QuoteRequest,
-    // including contactPhone (the developer's own phone number, captured
-    // at request time even before any contractor relationship exists; the
-    // select above no longer fetches it at all) and the full, untruncated
-    // details text, which
-    // frequently contains a site address or a second number. A LISTED
-    // contractor at their cap could open devtools, read this response
-    // directly, and get full contact information for a "blurred" lead —
-    // the blur was cosmetic on the frontend while the real data still
-    // shipped in the JSON. Stripping it here, not just hiding it in the
-    // UI, is what actually enforces the cap.
-    const { developer, details, ...rest } = r;
-    return {
-      ...rest,
-      details: details.length > 80 ? `${details.slice(0, 80)}…` : details,
-      developer: { name: developer.name, email: null, phone: null },
-      leadVisibility: 'blurred' as const,
-    };
-  });
+  // Which leads are full and which are blurred (and the stripping of email,
+  // phone and long details from blurred ones) is src/lib/lead-limits.ts
+  // applyLeadVisibility, which has its own tests.
+  const quoteRequestsWithVisibility = applyLeadVisibility(
+    contractor.tier,
+    monthStart,
+    thisMonthRequests,
+    contractor.quoteRequests
+  );
 
   // Pull the profile fields out of the row; the quote requests and alerts
   // are rebuilt below with only what the dashboard shows.
