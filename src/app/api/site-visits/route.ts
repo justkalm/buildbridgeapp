@@ -35,7 +35,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { requireVerifiedDeveloperEmail } from '@/lib/require-verified-email';
 import { sendSiteVisitRequestEmail } from '@/lib/email';
 import { sendPush } from '@/lib/push';
-import { blurredLeadIdsFor } from '@/lib/quote-request-access';
+import { lockedLeadIdsAmong } from '@/lib/quote-request-access';
 import { MAX_AHEAD_MS, MAX_SITES, MIN_NOTICE_MS, SLOT_COUNT, minSitesFor } from '@/lib/site-visits';
 
 const requestSchema = z.object({
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
       lastActionBy: 'DEVELOPER',
       developerSeenAt: new Date(),
     },
-    select: { id: true },
+    select: { id: true, createdAt: true },
   });
 
   const baseUrl = process.env.NEXTAUTH_URL ?? '';
@@ -166,7 +166,13 @@ export async function POST(req: NextRequest) {
   // five it is locked for them: the email leaves out the developer's own note
   // (it can hold a phone number), exactly as the new-quote email leaves out
   // the details of a blurred lead.
-  const locked = (await blurredLeadIdsFor(contractorId)).has(visit.id);
+  // Fails closed: if the check cannot be made, treat the request as locked.
+  let locked = true;
+  try {
+    locked = (await lockedLeadIdsAmong(contractorId, [{ id: visit.id, createdAt: visit.createdAt }])).has(visit.id);
+  } catch {
+    locked = true;
+  }
   const emailSent = await sendSiteVisitRequestEmail({
     toEmail: contractor.email,
     contractorName: contractor.name,

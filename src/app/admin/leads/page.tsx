@@ -79,7 +79,7 @@ const COLUMNS: { key: keyof Totals; label: string; hint: string }[] = [
   { key: 'quoted', label: 'Quoted', hint: 'Marked Quote sent' },
   { key: 'declined', label: 'Declined', hint: 'Marked Not interested' },
   { key: 'waiting', label: 'Waiting', hint: 'Still Pending and no reply yet' },
-  { key: 'overFreeCap', label: 'Over free cap', hint: 'Leads a free contractor could not see in full (the free plan shows 5 a month)' },
+  { key: 'overFreeCap', label: 'Over free cap', hint: 'Leads above the free five (counted for the month shown, using the contractor\'s plan today)' },
 ];
 
 export default function AdminLeadsPage() {

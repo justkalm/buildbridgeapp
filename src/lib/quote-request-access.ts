@@ -96,3 +96,19 @@ export async function blurredLeadIdsFor(contractorId: string): Promise<Set<strin
   const visibility = computeLeadVisibility(contractor.tier, thisMonth);
   return new Set(thisMonth.filter((r) => visibility.get(r.id) !== 'full').map((r) => r.id));
 }
+
+// Which of the given leads are LOCKED for this contractor right now (free plan,
+// current month, not one of the first five). Fails CLOSED: a current-month lead
+// that is missing from the month list counts as locked. Used by the site visit
+// routes, which hold rows with their own dates.
+export async function lockedLeadIdsAmong(
+  contractorId: string,
+  leads: { id: string; createdAt: Date }[]
+): Promise<Set<string>> {
+  if (leads.length === 0) return new Set();
+  const contractor = await prisma.contractor.findUnique({ where: { id: contractorId }, select: { tier: true } });
+  if (!contractor || contractor.tier !== 'LISTED') return new Set();
+  const monthStart = getMonthStart();
+  const visibility = computeLeadVisibility(contractor.tier, await monthLeadsFor(contractorId, monthStart));
+  return new Set(leads.filter((l) => l.createdAt >= monthStart && visibility.get(l.id) !== 'full').map((l) => l.id));
+}

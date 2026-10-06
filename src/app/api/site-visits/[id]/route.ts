@@ -33,7 +33,8 @@ import {
   sendSiteVisitDeclinedEmail,
 } from '@/lib/email';
 import { sendPush } from '@/lib/push';
-import { blurredLeadIdsFor } from '@/lib/quote-request-access';
+import { lockedLeadIdsAmong } from '@/lib/quote-request-access';
+import { siteVisitIsLocked } from '@/lib/lead-limits';
 
 // In-app notification bookkeeping (see the SiteVisit schema comment): the
 // contractor just acted, so the change is new for the developer and
@@ -66,7 +67,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // monthly five are locked for the contractor: they cannot confirm, decline
   // or cancel them until they upgrade (the developer can still cancel their
   // own request). Same rule as a locked message thread.
-  if (party === 'CONTRACTOR' && (await blurredLeadIdsFor(visit.contractorId)).has(visit.id)) {
+  const lockedForContractor = siteVisitIsLocked(
+    visit.status,
+    (await lockedLeadIdsAmong(visit.contractorId, [{ id: visit.id, createdAt: visit.createdAt }])).has(visit.id)
+  );
+  if (party === 'CONTRACTOR' && lockedForContractor) {
     return NextResponse.json(
       { error: 'This visit request is past the free leads on your plan this month. Upgrade to see and answer it.' },
       { status: 403 }
@@ -233,7 +238,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       toName: toDeveloper ? visit.developer.name : visit.contractor.name,
       cancelledByName: toDeveloper ? visit.contractor.name : visit.developer.name,
       slotLine: visit.confirmedSlot ? `planned for ${formatVisitTime(visit.confirmedSlot)}` : 'you were arranging',
-      note,
+      // A developer's cancel note can hold a phone number. If this visit is
+      // locked for the contractor, the email carries no note.
+      note: party === 'DEVELOPER' && lockedForContractor ? null : note,
       dashboardUrl: `${baseUrl}${toDeveloper ? '/dashboard' : '/contractor/dashboard'}#site-visits`,
     }),
     ])

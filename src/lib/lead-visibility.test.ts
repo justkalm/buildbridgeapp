@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyLeadVisibility, applySiteVisitVisibility, BLURRED_DETAILS_MAX_CHARS, maskContactDetails, mergeMonthLeads } from './lead-limits';
+import { applyLeadVisibility, applySiteVisitVisibility, BLURRED_DETAILS_MAX_CHARS, maskContactDetails, mergeMonthLeads, siteVisitIsLocked } from './lead-limits';
 import { BLURRED_MESSAGE_NOTICE, notificationTextFor } from './notification-text';
 
 // What the contractor dashboard may receive. These tests exist because the
@@ -129,6 +129,17 @@ describe('maskContactDetails (the preview text of a blurred lead)', () => {
     expect(maskContactDetails('mail rahul\uFF20gmail.com ok')).toBe('mail •••• ok');
     expect(maskContactDetails('ring 9820\u00AD012345 ok')).toBe('ring •••• ok');
     expect(maskContactDetails('ring 9820\u200D012345 ok')).toBe('ring •••• ok');
+  });
+
+  it('masks a mobile split with spaced dashes, fancy-font digits, circled digits and direction marks', () => {
+    expect(maskContactDetails('ring 98200 - 12345 now')).toBe('ring •••• now');
+    expect(maskContactDetails('ring \u{1D7EF}\u{1D7F4}\u{1D7EE}\u{1D7EC}\u{1D7EC}\u{1D7ED}\u{1D7EE}\u{1D7EF}\u{1D7F0}\u{1D7F1} now')).toBe('ring •••• now');
+    expect(maskContactDetails('ring 9820\u200E012345 now')).toBe('ring •••• now');
+    expect(maskContactDetails('ring 98200\u202B12345 now')).toBe('ring •••• now');
+  });
+
+  it('still leaves spaced ranges alone', () => {
+    for (const t of ['1200 - 1500 sqft', '3000 - 3500 sq ft', 'Rs 20000 - 25000']) expect(maskContactDetails(t)).toBe(t);
   });
 
   it('is fast on long input: 20000 plain letters, and 20000 letters with an @ at the end (no catastrophic backtracking)', () => {
@@ -283,5 +294,22 @@ describe('applySiteVisitVisibility: a site visit as the contractor may see it', 
 
   it('a locked visit with no note stays null', () => {
     expect(applySiteVisitVisibility(true, { ...visit, developerNote: null }).developerNote).toBeNull();
+  });
+});
+
+describe('siteVisitIsLocked: which statuses can be locked', () => {
+  it('is locked only while open or called off unanswered, never once confirmed or declined', () => {
+    expect(siteVisitIsLocked('REQUESTED', true)).toBe(true);
+    expect(siteVisitIsLocked('CANCELLED', true)).toBe(true);
+    expect(siteVisitIsLocked('CONFIRMED', true)).toBe(false);
+    expect(siteVisitIsLocked('DECLINED', true)).toBe(false);
+    expect(siteVisitIsLocked('REQUESTED', false)).toBe(false);
+  });
+
+  it("masks and cuts a developer's cancel note on a locked visit, and keeps null as null", () => {
+    const base = { contactPhone: '9820012345', developerNote: null, developer: { name: 'Rahul', email: 'r@x.com' } };
+    expect(applySiteVisitVisibility(true, { ...base, responseNote: 'call me on 98200 12345' }).responseNote).toBe('call me on ••••');
+    expect(applySiteVisitVisibility(true, { ...base, responseNote: null }).responseNote).toBeNull();
+    expect(applySiteVisitVisibility(false, { ...base, responseNote: 'call me on 98200 12345' }).responseNote).toBe('call me on 98200 12345');
   });
 });

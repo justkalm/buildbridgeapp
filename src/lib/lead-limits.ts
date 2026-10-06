@@ -125,8 +125,8 @@ export const BLURRED_DETAILS_MAX_CHARS = 80;
 // type their number or email into free text ("call me on 98200 12345"), so
 // email addresses and phone-like numbers are replaced before the text is cut.
 //
-// Phone-like = eight or more DIGITS, with at most two separator characters
-// (space . - / or brackets) between digits, so "98200 12345", "98200/12345",
+// Phone-like = eight or more DIGITS, with at most three separator characters
+// (space . - / or brackets, up to three in a row) between digits, so "98200 12345", "98200/12345",
 // "+91 98200 12345" and "(022) 2345 6789" are caught, while "1200 - 1500 sqft"
 // (three characters between the groups), "1200-1500", "20000-25000" and plain
 // dates are left alone.
@@ -143,20 +143,20 @@ const MASK = '••••';
 // Hidden characters that can sit between digits to break up a number. The
 // zero-width joiner (U+200D) is real punctuation inside Indic words, so it is
 // only removed when it sits between two digits (see below).
-const HIDDEN = /[\u200B\u200C\u2060\uFEFF\u00AD]/g;
+const HIDDEN = /[\u200B\u200C\u2060\uFEFF\u00AD\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
 const JOINER_BETWEEN_DIGITS = /(?<=\d)\u200D(?=\d)/g;
 const NON_ASCII_DIGITS = /[\u0660-\u0669\u06F0-\u06F9\u0966-\u096F\u09E6-\u09EF\u0A66-\u0A6F\u0AE6-\u0AEF\u0B66-\u0B6F\u0BE6-\u0BEF\u0C66-\u0C6F\u0CE6-\u0CEF\u0D66-\u0D6F\uFF10-\uFF19]/g;
 const DIGIT_ZEROES = [0x0660, 0x06f0, 0x0966, 0x09e6, 0x0a66, 0x0ae6, 0x0b66, 0x0be6, 0x0c66, 0x0ce6, 0x0d66, 0xff10];
 // A phone-like run: starts where no other number is running (lookbehind) and
 // not at the start of a date (so "on 12/10/2026 9am" keeps its date).
 const DATE = String.raw`(?:\d{1,2}[-./]\d{1,2}[-./]\d{2,4}|\d{4}[-./]\d{1,2}[-./]\d{1,2})(?!\d)`;
-const PHONE_LIKE = new RegExp(String.raw`(?<!\d)(?!${DATE})\+?\d(?:[\s.\-/()]{0,2}\d){7,}`, 'g');
+const PHONE_LIKE = new RegExp(String.raw`(?<!\d)(?!${DATE})\+?\d(?:[\s.\-/()]{0,3}\d){7,}`, 'g');
 // Plain figures that look like a phone but are a range ("1200-1500", "area
 // 2000/2500", "20000-25000"): two groups of 3 to 5 digits with one - or /.
 // A real mobile written in two halves ("98200-12345": starts 6 to 9, ten
 // digits) is still masked.
-const RANGE_LIKE = /^\d{3,5}[-/]\d{3,5}$/;
-const MOBILE_IN_TWO_HALVES = /^[6-9]\d{4}[-/]\d{5}$/;
+const RANGE_LIKE = /^\d{3,5}\s?[-/]\s?\d{3,5}$/;
+const MOBILE_IN_TWO_HALVES = /^[6-9]\d{4}\s?[-/]\s?\d{5}$/;
 // The (?<![\w.+-]) lookbehind keeps these linear on long runs of letters: a
 // match can only start at the beginning of a word, not at every character.
 const EMAIL_SYMBOL = /(?<![\w.+-])[\w.+-]+\s*(?:@|\[at\]|\(at\))\s*[\w-]+(?:\s*(?:\.|\[dot\]|\(dot\))\s*[\w-]+)+/gi;
@@ -164,7 +164,11 @@ const EMAIL_WORDS = /(?<![\w.+-])[\w.+-]+\s+at\s+[\w-]+(?:\s+dot\s+[\w-]+)+/gi;
 const EMAIL_AT_WORD = /(?<![\w.+-])[\w.+-]+\s+at\s+[\w-]+(?:\.[\w-]+)+/gi;
 
 export function maskContactDetails(text: string): string {
+  // NFKC first: it turns fancy-font and circled digits, full-width digits and the
+  // full-width @ into their plain forms. The Indic digit ranges are not covered
+  // by it, so those are mapped below.
   const plain = text
+    .normalize('NFKC')
     .replace(NON_ASCII_DIGITS, (ch) => {
       const code = ch.charCodeAt(0);
       const zero = DIGIT_ZEROES.find((z) => code >= z && code <= z + 9);
@@ -250,8 +254,21 @@ export function mergeMonthLeads(
 type VisitForContractor = {
   contactPhone: string | null;
   developerNote: string | null;
+  // The note left when a visit is cancelled or answered. On a locked visit the
+  // only one that can exist is the developer's own cancel note, free text that
+  // can hold a phone number, so it is masked and cut like developerNote.
+  responseNote?: string | null;
   developer: { name: string; email?: string | null };
 };
+
+// A visit is locked for the contractor only while it is open or was called off
+// before it was ever answered. One that is CONFIRMED (or DECLINED) was answered,
+// so it was unlocked at the time; it stays unlocked even if the contractor has
+// since moved to the free plan, so they can still cancel it and reach the
+// developer they agreed to meet.
+export function siteVisitIsLocked(status: string, inLockedSet: boolean): boolean {
+  return inLockedSet && status !== 'CONFIRMED' && status !== 'DECLINED';
+}
 
 export function applySiteVisitVisibility<T extends VisitForContractor>(
   locked: boolean,
@@ -263,9 +280,12 @@ export function applySiteVisitVisibility<T extends VisitForContractor>(
   locked: boolean;
 } {
   if (!locked) return { ...visit, locked: false };
-  const { developer, developerNote, contactPhone: _contactPhone, ...rest } = visit;
+  const { developer, developerNote, contactPhone: _contactPhone, responseNote, ...rest } = visit;
   return {
     ...rest,
+    ...(responseNote !== undefined
+      ? { responseNote: responseNote ? cutPreview(maskContactDetails(responseNote)) : null }
+      : {}),
     contactPhone: null,
     developerNote: developerNote ? cutPreview(maskContactDetails(developerNote)) : null,
     developer: { name: developer.name },
