@@ -47,3 +47,26 @@ describe("computeLeadVisibility", () => {
     }
   });
 });
+
+describe('free-plan cap with a big month (the "newest 50" bug)', () => {
+  // The dashboard must decide the free five from EVERY lead of the month,
+  // oldest first, never from a list trimmed to the newest 50.
+  const month = Array.from({ length: 60 }, (_, i) => ({ id: `lead-${i + 1}` })); // oldest first
+
+  it('the oldest five stay free and the other 55 are blurred, even though only the newest 50 are displayed', () => {
+    const visibility = computeLeadVisibility('LISTED', month);
+    const displayed = month.slice(-50); // what the dashboard actually lists
+    const shownFull = displayed.filter((r) => visibility.get(r.id) === 'full');
+    expect(shownFull).toHaveLength(0); // lead-1 to lead-5 are older than the displayed 50
+    expect(displayed.every((r) => visibility.get(r.id) === 'blurred')).toBe(true);
+    expect(['lead-1', 'lead-2', 'lead-3', 'lead-4', 'lead-5'].every((id) => visibility.get(id) === 'full')).toBe(true);
+  });
+
+  it('deciding from the trimmed list instead gives the wrong five (what the old code did)', () => {
+    const trimmed = month.slice(-50);
+    const wrong = computeLeadVisibility('LISTED', trimmed);
+    expect(trimmed.filter((r) => wrong.get(r.id) === 'full').map((r) => r.id)).toEqual([
+      'lead-11', 'lead-12', 'lead-13', 'lead-14', 'lead-15',
+    ]);
+  });
+});

@@ -180,11 +180,17 @@ export async function GET() {
   // just reading the network tab to see contact info they haven't paid
   // for. A CSS blur alone would be purely cosmetic.
   const monthStart = getMonthStart();
-  const thisMonthRequests = contractor.quoteRequests
-    .filter((r) => r.createdAt >= monthStart)
-    // oldest-first for the cap calculation — see lead-limits.ts on why
-    .slice()
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  // EVERY request of this month, oldest first, ids only. The list sent to the
+  // dashboard (contractor.quoteRequests above) is cut to the newest 50, so it
+  // cannot be used to decide which five are free: with more than 50 leads in a
+  // month, the oldest ones would be missing and the wrong five would show in
+  // full. This is the same month-wide query the other cap checks use
+  // (src/lib/quote-request-access.ts, create-quote-request.ts).
+  const thisMonthRequests = await prisma.quoteRequest.findMany({
+    where: { contractorId, createdAt: { gte: monthStart } },
+    select: { id: true },
+    orderBy: { createdAt: 'asc' },
+  });
 
   const visibilityById = computeLeadVisibility(contractor.tier, thisMonthRequests);
 
