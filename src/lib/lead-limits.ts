@@ -39,6 +39,25 @@ export function getMonthStart(now: Date = new Date()): Date {
   return new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), 1) - IST_OFFSET_MS);
 }
 
+// "2026-10" for the India-time month a moment falls in (lead ledger, KALM-259).
+export function istMonthKey(date: Date): string {
+  const ist = new Date(date.getTime() + IST_OFFSET_MS);
+  return `${ist.getUTCFullYear()}-${String(ist.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+// Start (inclusive) and end (exclusive) of a "YYYY-MM" month in India time,
+// or null when the text is not a real month.
+export function getMonthRange(monthKey: string): { start: Date; end: Date } | null {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(monthKey);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  return {
+    start: new Date(Date.UTC(year, month - 1, 1) - IST_OFFSET_MS),
+    end: new Date(Date.UTC(year, month, 1) - IST_OFFSET_MS),
+  };
+}
+
 export type LeadVisibility = 'full' | 'blurred';
 
 /**
