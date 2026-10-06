@@ -97,13 +97,13 @@ export function buildLedger(
   return { rows: list, totals };
 }
 
-// One spreadsheet cell. A value starting with = + - @ (or a tab or return) can
+// One spreadsheet cell. A value starting with = + - @ | ; (or a tab, return or line break) can
 // run as a formula when the file is opened in Excel or Sheets, and contractor
 // names are typed by outsiders, so those get a leading apostrophe. Commas,
 // quotes and line breaks are wrapped in quotes.
 function csvCell(value: string | number): string {
   let text = String(value);
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  if (/^[=+\-@\t\r\n|;]/.test(text)) text = `'${text}`;
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

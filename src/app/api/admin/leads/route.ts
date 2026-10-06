@@ -55,13 +55,18 @@ export async function GET(req: NextRequest) {
   // log records the address). Delivery itself is not tracked.
   const idByEmail = new Map(contractors.map((c) => [c.email.toLowerCase(), c.id]));
   const failures = await prisma.emailFailure.findMany({
-    where: { createdAt: { gte: range.start, lt: range.end }, to: { in: [...idByEmail.keys()], mode: 'insensitive' } },
+    where: { createdAt: { gte: range.start, lt: range.end }, OR: [...idByEmail.keys()].map((address) => ({ to: { contains: address, mode: 'insensitive' as const } })) },
     select: { to: true },
   });
   const failuresByContractor = new Map<string, number>();
   for (const f of failures) {
-    const id = idByEmail.get(f.to.toLowerCase());
-    if (id) failuresByContractor.set(id, (failuresByContractor.get(id) ?? 0) + 1);
+    // A row can hold several addresses joined by commas (see recordEmailFailure
+    // in src/lib/email.ts); count it once for each contractor it names.
+    const named = new Set(f.to.split(',').map((a) => a.trim().toLowerCase()));
+    for (const address of named) {
+      const id = idByEmail.get(address);
+      if (id) failuresByContractor.set(id, (failuresByContractor.get(id) ?? 0) + 1);
+    }
   }
 
   const repliedIds = new Set(replied.map((m) => m.quoteRequestId));

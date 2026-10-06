@@ -90,6 +90,24 @@ describe('ledgerToCsv', () => {
   });
 });
 
+describe('csv guard', () => {
+  it('also neutralises leading line breaks, pipes and semicolons', () => {
+    const { rows, totals } = buildLedger(
+      [req('1', 'x'), req('2', 'y'), req('3', 'z')],
+      new Set(),
+      [
+        { id: 'x', name: '\n=1+1', tier: 'LISTED' },
+        { id: 'y', name: '|calc', tier: 'LISTED' },
+        { id: 'z', name: ';x', tier: 'LISTED' },
+      ]
+    );
+    const csv = ledgerToCsv(rows, totals);
+    expect(csv).toContain("\"'\n=1+1\"");
+    expect(csv).toContain("'|calc");
+    expect(csv).toContain("';x");
+  });
+});
+
 describe('month helpers', () => {
   it('range for October 2026 runs from 30 Sep 18:30 UTC to 31 Oct 18:30 UTC', () => {
     const r = getMonthRange('2026-10')!;
