@@ -139,3 +139,54 @@ export function monthKeysDescending(firstKey: string, currentKey: string): strin
   }
   return keys.length > 0 ? keys : [currentKey];
 }
+
+// One line per lead, for the drill-down under each contractor and the
+// per-lead CSV: which developer sent it, through which medium, and how it
+// stands. Newest first.
+export type LeadDetailInput = LedgerRequest & {
+  createdAt: Date;
+  developerName: string;
+  developerEmail: string;
+};
+export type LeadDetail = {
+  id: string;
+  contractorId: string;
+  developerName: string;
+  developerEmail: string;
+  medium: 'Quote form' | 'Message' | 'Project post';
+  status: LedgerRequest['status'];
+  repliedInApp: boolean;
+  createdAt: string; // ISO
+};
+
+export function buildLeadDetails(requests: LeadDetailInput[], repliedRequestIds: Set<string>): LeadDetail[] {
+  return requests
+    .map((r) => ({
+      id: r.id,
+      contractorId: r.contractorId,
+      developerName: r.developerName,
+      developerEmail: r.developerEmail,
+      medium: (r.kind === 'ENQUIRY' ? 'Message' : r.kind === 'PROJECT' ? 'Project post' : 'Quote form') as LeadDetail['medium'],
+      status: r.status,
+      repliedInApp: repliedRequestIds.has(r.id),
+      createdAt: r.createdAt.toISOString(),
+    }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+const STATUS_WORDS: Record<LedgerRequest['status'], string> = {
+  PENDING: 'Pending',
+  CONTACTED: 'Contacted',
+  QUOTED: 'Quoted',
+  DECLINED: 'Declined',
+};
+
+export function leadDetailsToCsv(details: LeadDetail[], contractors: LedgerContractor[]): string {
+  const nameById = new Map(contractors.map((c) => [c.id, c.name]));
+  const lines = [['Contractor', 'Developer', 'Developer email', 'Medium', 'Status', 'Replied in app', 'Received (India time)']];
+  for (const d of details) {
+    const when = new Date(new Date(d.createdAt).getTime() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 16).replace('T', ' ');
+    lines.push([nameById.get(d.contractorId) ?? '', d.developerName, d.developerEmail, d.medium, STATUS_WORDS[d.status], d.repliedInApp ? 'Yes' : 'No', when]);
+  }
+  return lines.map((line) => line.map(csvCell).join(',')).join('\r\n') + '\r\n';
+}

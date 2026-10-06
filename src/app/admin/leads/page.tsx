@@ -8,7 +8,8 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
+import Link from 'next/link';
 import AdminTabs from '@/components/AdminTabs';
 
 type Row = {
@@ -28,7 +29,34 @@ type Row = {
   overFreeCap: number;
 };
 type Totals = Omit<Row, 'contractorId' | 'name' | 'tier'>;
-type LedgerData = { month: string; months: string[]; rows: Row[]; totals: Totals };
+type Detail = {
+  id: string;
+  contractorId: string;
+  developerName: string;
+  developerEmail: string;
+  medium: 'Quote form' | 'Message' | 'Project post';
+  status: 'PENDING' | 'CONTACTED' | 'QUOTED' | 'DECLINED';
+  repliedInApp: boolean;
+  createdAt: string;
+};
+type LedgerData = { month: string; months: string[]; rows: Row[]; totals: Totals; details: Detail[] };
+
+const STATUS_WORDS: Record<Detail['status'], string> = {
+  PENDING: 'Pending',
+  CONTACTED: 'Contacted',
+  QUOTED: 'Quoted',
+  DECLINED: 'Declined',
+};
+
+function whenIst(iso: string) {
+  return new Date(iso).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 function monthLabel(key: string) {
@@ -54,6 +82,7 @@ export default function AdminLeadsPage() {
   const [month, setMonth] = useState<string | null>(null);
   const [data, setData] = useState<LedgerData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +120,7 @@ export default function AdminLeadsPage() {
                 value={data.month}
                 onChange={(e) => {
                   setData(null);
+                  setOpenId(null);
                   setMonth(e.target.value);
                 }}
                 aria-label="Month"
@@ -104,12 +134,20 @@ export default function AdminLeadsPage() {
               </select>
             )}
             {current && (
-              <a
-                href={`/api/admin/leads?month=${current}&format=csv`}
-                className="text-sm font-medium text-sage underline underline-offset-2"
-              >
-                Download CSV
-              </a>
+              <>
+                <a
+                  href={`/api/admin/leads?month=${current}&format=csv`}
+                  className="text-sm font-medium text-sage underline underline-offset-2"
+                >
+                  Totals CSV
+                </a>
+                <a
+                  href={`/api/admin/leads?month=${current}&format=csv-leads`}
+                  className="text-sm font-medium text-sage underline underline-offset-2"
+                >
+                  Every lead CSV
+                </a>
+              </>
             )}
           </div>
         </div>
@@ -142,24 +180,75 @@ export default function AdminLeadsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.rows.map((r) => (
-                  <tr key={r.contractorId} className="border-b border-line">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{r.name}</div>
-                      <div className="text-[11px] text-stone">{r.tier === 'LISTED' ? 'Listed (free)' : r.tier === 'PLUS' ? 'Plus' : 'Pro'}</div>
-                    </td>
-                    {COLUMNS.map((c) => (
-                      <td
-                        key={c.key}
-                        className={`px-3 py-3 text-right tabular-nums ${
-                          (c.key === 'waiting' || c.key === 'overFreeCap' || c.key === 'emailFailed') && r[c.key] > 0 ? 'text-danger font-medium' : 'text-stone'
-                        } ${c.key === 'leads' ? 'text-ink font-medium' : ''}`}
-                      >
-                        {r[c.key]}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {data.rows.map((r) => {
+                  const open = openId === r.contractorId;
+                  const leads = data.details.filter((d) => d.contractorId === r.contractorId);
+                  return (
+                    <Fragment key={r.contractorId}>
+                      <tr className="border-b border-line">
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => setOpenId(open ? null : r.contractorId)}
+                            aria-expanded={open}
+                            className="font-medium text-left underline-offset-2 hover:underline"
+                          >
+                            {r.name} <span className="text-stone text-xs">{open ? '▾' : '▸'}</span>
+                          </button>
+                          <div className="text-[11px] text-stone">
+                            {r.tier === 'LISTED' ? 'Listed (free)' : r.tier === 'PLUS' ? 'Plus' : 'Pro'} ·{' '}
+                            <Link
+                              href={`/admin/leads/${r.contractorId}?month=${data.month}`}
+                              className="text-sage font-medium underline underline-offset-2"
+                            >
+                              Report to send
+                            </Link>
+                          </div>
+                        </td>
+                        {COLUMNS.map((c) => (
+                          <td
+                            key={c.key}
+                            className={`px-3 py-3 text-right tabular-nums ${
+                              (c.key === 'waiting' || c.key === 'overFreeCap' || c.key === 'emailFailed') && r[c.key] > 0 ? 'text-danger font-medium' : 'text-stone'
+                            } ${c.key === 'leads' ? 'text-ink font-medium' : ''}`}
+                          >
+                            {r[c.key]}
+                          </td>
+                        ))}
+                      </tr>
+                      {open && (
+                        <tr className="border-b border-line bg-paper-dim/40">
+                          <td colSpan={COLUMNS.length + 1} className="px-4 py-3">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-left text-stone">
+                                  <th className="py-1 pr-3 font-normal">Received (India time)</th>
+                                  <th className="py-1 pr-3 font-normal">Developer</th>
+                                  <th className="py-1 pr-3 font-normal">How it arrived</th>
+                                  <th className="py-1 pr-3 font-normal">Status</th>
+                                  <th className="py-1 font-normal">Replied in app</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {leads.map((d) => (
+                                  <tr key={d.id} className="border-t border-line/70">
+                                    <td className="py-1.5 pr-3 whitespace-nowrap">{whenIst(d.createdAt)}</td>
+                                    <td className="py-1.5 pr-3">
+                                      <span className="font-medium text-ink">{d.developerName}</span>{' '}
+                                      <span className="text-stone">{d.developerEmail}</span>
+                                    </td>
+                                    <td className="py-1.5 pr-3 whitespace-nowrap">{d.medium}</td>
+                                    <td className="py-1.5 pr-3 whitespace-nowrap">{STATUS_WORDS[d.status]}</td>
+                                    <td className="py-1.5">{d.repliedInApp ? 'Yes' : 'No'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="font-medium">

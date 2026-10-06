@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { getMonthRange, istMonthKey } from '@/lib/lead-limits';
-import { buildLedger, ledgerToCsv, monthKeysDescending } from '@/lib/lead-ledger';
+import { buildLeadDetails, buildLedger, ledgerToCsv, leadDetailsToCsv, monthKeysDescending } from '@/lib/lead-ledger';
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminAuthenticated())) {
@@ -28,7 +28,14 @@ export async function GET(req: NextRequest) {
   const [requests, replied, earliest] = await Promise.all([
     prisma.quoteRequest.findMany({
       where: { createdAt: { gte: range.start, lt: range.end } },
-      select: { id: true, contractorId: true, status: true, kind: true },
+      select: {
+        id: true,
+        contractorId: true,
+        status: true,
+        kind: true,
+        createdAt: true,
+        developer: { select: { name: true, email: true } },
+      },
     }),
     prisma.message.findMany({
       where: { senderRole: 'CONTRACTOR', quoteRequest: { createdAt: { gte: range.start, lt: range.end } } },
@@ -57,11 +64,28 @@ export async function GET(req: NextRequest) {
     if (id) failuresByContractor.set(id, (failuresByContractor.get(id) ?? 0) + 1);
   }
 
+  const repliedIds = new Set(replied.map((m) => m.quoteRequestId));
   const { rows, totals } = buildLedger(
-    requests, new Set(replied.map((m) => m.quoteRequestId)),
+    requests,
+    repliedIds,
     contractors,
     failuresByContractor
   );
+
+  const details = buildLeadDetails(
+    requests.map(({ developer, ...r }) => ({ ...r, developerName: developer.name, developerEmail: developer.email })),
+    repliedIds
+  );
+
+  if (req.nextUrl.searchParams.get('format') === 'csv-leads') {
+    return new NextResponse(leadDetailsToCsv(details, contractors), {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="kalm-lead-list-${month}.csv"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
 
   if (req.nextUrl.searchParams.get('format') === 'csv') {
     return new NextResponse(ledgerToCsv(rows, totals), {
@@ -76,5 +100,5 @@ export async function GET(req: NextRequest) {
   // Every month from the first lead ever (or this month) up to this month, newest first.
   const months = monthKeysDescending(istMonthKey(earliest._min.createdAt ?? now), currentMonth);
 
-  return NextResponse.json({ month, months, rows, totals });
+  return NextResponse.json({ month, months, rows, totals, details });
 }

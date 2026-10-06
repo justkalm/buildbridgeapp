@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildLedger, ledgerToCsv, monthKeysDescending, type LedgerContractor, type LedgerRequest } from './lead-ledger';
+import { buildLeadDetails, buildLedger, leadDetailsToCsv, ledgerToCsv, monthKeysDescending, type LedgerContractor, type LedgerRequest } from './lead-ledger';
 import { getMonthRange, istMonthKey } from './lead-limits';
 
 const free: LedgerContractor = { id: 'a', name: 'Alpha', tier: 'LISTED' };
@@ -109,5 +109,35 @@ describe('month helpers', () => {
   it('lists months newest first across a year end', () => {
     expect(monthKeysDescending('2025-11', '2026-02')).toEqual(['2026-02', '2026-01', '2025-12', '2025-11']);
     expect(monthKeysDescending('2026-10', '2026-10')).toEqual(['2026-10']);
+  });
+});
+
+describe('lead details', () => {
+  const base = { contractorId: 'a', status: 'PENDING' as const, developerEmail: 'd@x.com' };
+  it('lists newest first with plain-word mediums and the reply flag', () => {
+    const d = buildLeadDetails(
+      [
+        { ...base, id: '1', kind: 'QUOTE', developerName: 'Dev One', createdAt: new Date('2026-10-02T10:00:00Z') },
+        { ...base, id: '2', kind: 'ENQUIRY', developerName: 'Dev Two', createdAt: new Date('2026-10-05T10:00:00Z') },
+        { ...base, id: '3', kind: 'PROJECT', developerName: 'Dev Three', createdAt: new Date('2026-10-03T10:00:00Z') },
+      ],
+      new Set(['2'])
+    );
+    expect(d.map((x) => [x.id, x.medium, x.repliedInApp])).toEqual([
+      ['2', 'Message', true],
+      ['3', 'Project post', false],
+      ['1', 'Quote form', false],
+    ]);
+  });
+
+  it('per-lead CSV shows India time and neutralises formulas in developer names', () => {
+    const d = buildLeadDetails(
+      [{ ...base, id: '1', kind: 'QUOTE', developerName: '+cmd|calc', createdAt: new Date('2026-09-30T18:30:00Z') }],
+      new Set()
+    );
+    const csv = leadDetailsToCsv(d, [{ id: 'a', name: 'Alpha', tier: 'LISTED' }]);
+    expect(csv).toContain("'+cmd|calc");
+    expect(csv).toContain('2026-10-01 00:00');
+    expect(csv.split('\r\n')[0]).toBe('Contractor,Developer,Developer email,Medium,Status,Replied in app,Received (India time)');
   });
 });
