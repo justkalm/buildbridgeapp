@@ -20,6 +20,7 @@ type Row = {
   byQuote: number;
   byEnquiry: number;
   byProject: number;
+  bySiteVisit: number;
   emailFailed: number;
   replied: number;
   contacted: number;
@@ -34,8 +35,9 @@ type Detail = {
   contractorId: string;
   developerName: string;
   developerEmail: string;
-  medium: 'Quote form' | 'Message' | 'Project post';
-  status: 'PENDING' | 'CONTACTED' | 'QUOTED' | 'DECLINED';
+  medium: 'Quote form' | 'Message' | 'Project post' | 'Site visit';
+  status: 'PENDING' | 'CONTACTED' | 'QUOTED' | 'DECLINED' | 'CLOSED';
+  statusLabel?: string;
   repliedInApp: boolean;
   createdAt: string;
 };
@@ -46,6 +48,7 @@ const STATUS_WORDS: Record<Detail['status'], string> = {
   CONTACTED: 'Contacted',
   QUOTED: 'Quoted',
   DECLINED: 'Declined',
+  CLOSED: 'Closed',
 };
 
 function whenIst(iso: string) {
@@ -69,6 +72,7 @@ const COLUMNS: { key: keyof Totals; label: string; hint: string }[] = [
   { key: 'byQuote', label: 'Quote form', hint: 'Arrived through the quote form on the contractor profile' },
   { key: 'byEnquiry', label: 'Message', hint: 'Arrived through the Message button on the contractor profile' },
   { key: 'byProject', label: 'Project post', hint: 'Started from a project a developer posted' },
+  { key: 'bySiteVisit', label: 'Site visit', hint: 'Arrived as a request to visit the contractor\'s projects. Site visits count as leads and follow the same free-plan cap.' },
   { key: 'emailFailed', label: 'Failed emails', hint: 'Emails to this contractor that failed to send this month (also listed under Failed emails). Delivery is not tracked, so zero does not prove an email arrived.' },
   { key: 'replied', label: 'Replied', hint: 'The contractor sent at least one message in the app' },
   { key: 'contacted', label: 'Contacted', hint: 'The contractor marked Contacted: they spoke to the developer outside the app (phone, email or WhatsApp). Their own word, not checked.' },
@@ -237,7 +241,7 @@ export default function AdminLeadsPage() {
                                       <span className="text-stone">{d.developerEmail}</span>
                                     </td>
                                     <td className="py-1.5 pr-3 whitespace-nowrap">{d.medium}</td>
-                                    <td className="py-1.5 pr-3 whitespace-nowrap">{STATUS_WORDS[d.status]}</td>
+                                    <td className="py-1.5 pr-3 whitespace-nowrap">{d.statusLabel ?? STATUS_WORDS[d.status]}</td>
                                     <td className="py-1.5">{d.repliedInApp ? 'Yes' : 'No'}</td>
                                   </tr>
                                 ))}

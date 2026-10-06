@@ -10,7 +10,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { getMonthRange, istMonthKey } from '@/lib/lead-limits';
-import { buildLeadDetails, buildLedger, ledgerToCsv, leadDetailsToCsv, monthKeysDescending } from '@/lib/lead-ledger';
+import {
+  buildLeadDetails,
+  buildLedger,
+  ledgerToCsv,
+  leadDetailsToCsv,
+  monthKeysDescending,
+  siteVisitAsLead,
+} from '@/lib/lead-ledger';
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminAuthenticated())) {
@@ -25,7 +32,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'month must look like 2026-10' }, { status: 400 });
   }
 
-  const [requests, replied, earliest] = await Promise.all([
+  const [requests, replied, earliest, visits, earliestVisit] = await Promise.all([
     prisma.quoteRequest.findMany({
       where: { createdAt: { gte: range.start, lt: range.end } },
       select: {
@@ -43,9 +50,23 @@ export async function GET(req: NextRequest) {
       distinct: ['quoteRequestId'],
     }),
     prisma.quoteRequest.aggregate({ _min: { createdAt: true } }),
+    // Site visit requests are leads too (they follow the same free-plan cap).
+    prisma.siteVisit.findMany({
+      where: { createdAt: { gte: range.start, lt: range.end } },
+      select: {
+        id: true,
+        contractorId: true,
+        status: true,
+        createdAt: true,
+        respondedAt: true,
+        developer: { select: { name: true, email: true } },
+      },
+    }),
+    prisma.siteVisit.aggregate({ _min: { createdAt: true } }),
   ]);
+  const visitLeads = visits.map((v) => ({ ...siteVisitAsLead(v), developer: v.developer }));
 
-  const contractorIds = [...new Set(requests.map((r) => r.contractorId))];
+  const contractorIds = [...new Set([...requests.map((r) => r.contractorId), ...visits.map((v) => v.contractorId)])];
   const contractors = await prisma.contractor.findMany({
     where: { id: { in: contractorIds } },
     select: { id: true, name: true, tier: true, email: true },
@@ -69,16 +90,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const repliedIds = new Set(replied.map((m) => m.quoteRequestId));
+  const repliedIds = new Set([
+    ...replied.map((m) => m.quoteRequestId),
+    ...visitLeads.filter((l) => l.replied).map((l) => l.request.id),
+  ]);
   const { rows, totals } = buildLedger(
-    requests,
+    [...requests, ...visitLeads.map((l) => l.request)],
     repliedIds,
     contractors,
     failuresByContractor
   );
 
   const details = buildLeadDetails(
-    requests.map(({ developer, ...r }) => ({ ...r, developerName: developer.name, developerEmail: developer.email })),
+    [
+      ...requests.map(({ developer, ...r }) => ({ ...r, developerName: developer.name, developerEmail: developer.email })),
+      ...visitLeads.map((l) => ({ ...l.request, developerName: l.developer.name, developerEmail: l.developer.email })),
+    ],
     repliedIds
   );
 
@@ -103,7 +130,10 @@ export async function GET(req: NextRequest) {
   }
 
   // Every month from the first lead ever (or this month) up to this month, newest first.
-  const months = monthKeysDescending(istMonthKey(earliest._min.createdAt ?? now), currentMonth);
+  const firstLead = [earliest._min.createdAt, earliestVisit._min.createdAt]
+    .filter((d): d is Date => d !== null)
+    .sort((a, b) => a.getTime() - b.getTime())[0];
+  const months = monthKeysDescending(istMonthKey(firstLead ?? now), currentMonth);
 
   return NextResponse.json({ month, months, rows, totals, details });
 }

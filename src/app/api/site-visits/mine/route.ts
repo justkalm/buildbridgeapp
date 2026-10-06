@@ -25,6 +25,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { applySiteVisitVisibility } from '@/lib/lead-limits';
+import { blurredLeadIdsFor } from '@/lib/quote-request-access';
 
 export async function GET() {
   const session = await auth();
@@ -105,8 +107,14 @@ export async function GET() {
     });
   }
 
+  // Site visit requests are leads like quote requests: on the free plan the
+  // ones past the monthly five are LOCKED for the contractor (no email, phone
+  // or note, and they cannot be answered). See applySiteVisitVisibility.
+  const lockedIds = isDeveloper ? new Set<string>() : await blurredLeadIdsFor(userId);
+
   return NextResponse.json(
-    visits.map((v) => ({
+    visits.map((v) => {
+      const row = {
       id: v.id,
       status: v.status,
       proposedSlots: v.proposedSlots,
@@ -131,6 +139,8 @@ export async function GET() {
         phone: isDeveloper && v.status !== 'CONFIRMED' ? null : v.contractor.phone,
       },
       developer: isDeveloper ? { name: v.developer.name } : { name: v.developer.name, email: v.developer.email },
-    }))
+      };
+      return isDeveloper ? row : applySiteVisitVisibility(lockedIds.has(v.id), row);
+    })
   );
 }

@@ -6,7 +6,7 @@ import { monthLabelOf, reportToText, type ContractorReport } from '@/lib/lead-re
 
 type Loaded = { contractor: { id: string; name: string; tier: 'LISTED' | 'PLUS' | 'PRO' }; month: string; report: ContractorReport };
 
-const STATUS_WORDS = { PENDING: 'Pending', CONTACTED: 'Contacted', QUOTED: 'Quoted', DECLINED: 'Declined' } as const;
+const STATUS_WORDS = { PENDING: 'Pending', CONTACTED: 'Contacted', QUOTED: 'Quoted', DECLINED: 'Declined', CLOSED: 'Closed' } as const;
 
 function whenIst(iso: string) {
   return new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
@@ -145,11 +145,11 @@ export default function ReportView({ contractorId, month }: { contractorId: stri
                       <td className="py-1.5 pr-3 whitespace-nowrap">{whenIst(l.receivedAt)}</td>
                       <td className="py-1.5 pr-3">{l.developerName}</td>
                       <td className="py-1.5 pr-3">{l.projectType}</td>
-                      <td className="py-1.5 pr-3">{l.location}</td>
+                      <td className="py-1.5 pr-3">{l.location || '-'}</td>
                       <td className="py-1.5 pr-3 whitespace-nowrap">{l.medium}</td>
                       <td className="py-1.5 whitespace-nowrap">
-                        {STATUS_WORDS[l.status]}
-                        {l.repliedInApp ? ', replied' : ''}
+                        {l.statusLabel ?? STATUS_WORDS[l.status]}
+                        {l.repliedInApp && !l.statusLabel ? ', replied' : ''}
                       </td>
                     </tr>
                   ))}

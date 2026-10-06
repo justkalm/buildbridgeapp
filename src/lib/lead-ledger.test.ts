@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildLeadDetails, buildLedger, leadDetailsToCsv, ledgerToCsv, monthKeysDescending, type LedgerContractor, type LedgerRequest } from './lead-ledger';
+import { buildLeadDetails, buildLedger, leadDetailsToCsv, ledgerToCsv, monthKeysDescending, siteVisitAsLead, type LedgerContractor, type LedgerRequest } from './lead-ledger';
 import { getMonthRange, istMonthKey } from './lead-limits';
 
 const free: LedgerContractor = { id: 'a', name: 'Alpha', tier: 'LISTED' };
@@ -85,8 +85,8 @@ describe('ledgerToCsv', () => {
     const csv = ledgerToCsv(rows, totals);
     expect(csv).toContain(`"'=HYPERLINK(""http://evil"")"`);
     expect(csv).toContain('"Rao, Sons ""Ltd"""');
-    expect(csv.split('\r\n')[0]).toBe('Contractor,Plan,Leads,Via quote form,Via message,Via project post,Failed emails,Replied,Marked contacted,Quoted,Declined,Still waiting,Over free cap');
-    expect(csv.trimEnd().split('\r\n').pop()).toBe('Total,,2,2,0,0,0,0,0,0,0,2,0');
+    expect(csv.split('\r\n')[0]).toBe('Contractor,Plan,Leads,Via quote form,Via message,Via project post,Via site visit,Failed emails,Replied,Marked contacted,Quoted,Declined,Still waiting,Over free cap');
+    expect(csv.trimEnd().split('\r\n').pop()).toBe('Total,,2,2,0,0,0,0,0,0,0,0,2,0');
   });
 });
 
@@ -157,5 +157,38 @@ describe('lead details', () => {
     expect(csv).toContain("'+cmd|calc");
     expect(csv).toContain('2026-10-01 00:00');
     expect(csv.split('\r\n')[0]).toBe('Contractor,Developer,Developer email,Medium,Status,Replied in app,Received (India time)');
+  });
+});
+
+describe('site visits are leads', () => {
+  const visit = (id: string, status: 'REQUESTED' | 'CONFIRMED' | 'DECLINED' | 'CANCELLED', answered: boolean) =>
+    siteVisitAsLead({ id, contractorId: 'a', status, createdAt: new Date('2026-10-02T10:00:00Z'), respondedAt: answered ? new Date('2026-10-03T10:00:00Z') : null });
+
+  it('turns a site visit into a lead with plain status words', () => {
+    expect(visit('v1', 'REQUESTED', false)).toMatchObject({ request: { kind: 'SITE_VISIT', status: 'PENDING', statusLabel: 'Visit requested' }, replied: false });
+    expect(visit('v2', 'CONFIRMED', true)).toMatchObject({ request: { status: 'CLOSED', statusLabel: 'Visit confirmed' }, replied: true });
+    expect(visit('v3', 'DECLINED', true).request.status).toBe('DECLINED');
+    expect(visit('v4', 'CANCELLED', false).request.status).toBe('CLOSED');
+  });
+
+  it('counts them in the ledger: leads, by site visit, replied, waiting, declined, and toward the free cap', () => {
+    const all = [req('q1', 'a'), req('q2', 'a'), req('q3', 'a'), req('q4', 'a'), ...['v1', 'v2', 'v3'].map((id, i) => visit(id, (['REQUESTED', 'CONFIRMED', 'DECLINED'] as const)[i], i > 0).request)];
+    const replied = new Set(['v2', 'v3']);
+    const { rows, totals } = buildLedger(all, replied, [free]);
+    expect(rows[0]).toMatchObject({ leads: 7, bySiteVisit: 3, byQuote: 4, replied: 2, declined: 1, waiting: 5, overFreeCap: 2 });
+    expect(totals.bySiteVisit).toBe(3);
+  });
+
+  it('a confirmed or cancelled visit is not waiting, quoted or declined', () => {
+    const { rows } = buildLedger([visit('v1', 'CONFIRMED', true).request, visit('v2', 'CANCELLED', false).request], new Set(['v1']), [free]);
+    expect(rows[0]).toMatchObject({ leads: 2, waiting: 0, quoted: 0, declined: 0, contacted: 0 });
+  });
+
+  it('shows up in the per-lead list as Site visit with its own status words', () => {
+    const v = visit('v1', 'CONFIRMED', true);
+    const d = buildLeadDetails([{ ...v.request, developerName: 'Dev', developerEmail: 'd@x.com' }], new Set(['v1']));
+    expect(d[0]).toMatchObject({ medium: 'Site visit', statusLabel: 'Visit confirmed', repliedInApp: true });
+    const csv = leadDetailsToCsv(d, [free]);
+    expect(csv).toContain('Site visit,Visit confirmed,Yes');
   });
 });

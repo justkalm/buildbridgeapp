@@ -21,6 +21,9 @@
 // the dashboard. That stops accidental double-submits and repeated nagging
 // without blocking a fresh request after a decline or cancellation.
 //
+// A site visit request counts as a lead toward the free plan's monthly five
+// (see src/lib/month-leads.ts); past that it is locked for the contractor.
+//
 // Same ordering as quote requests: the row is saved first, then the email
 // is attempted, and requestEmailSentAt records whether it went out.
 
@@ -32,6 +35,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { requireVerifiedDeveloperEmail } from '@/lib/require-verified-email';
 import { sendSiteVisitRequestEmail } from '@/lib/email';
 import { sendPush } from '@/lib/push';
+import { blurredLeadIdsFor } from '@/lib/quote-request-access';
 import { MAX_AHEAD_MS, MAX_SITES, MIN_NOTICE_MS, SLOT_COUNT, minSitesFor } from '@/lib/site-visits';
 
 const requestSchema = z.object({
@@ -158,13 +162,18 @@ export async function POST(req: NextRequest) {
     tag: `site-visit-${visit.id}`,
   });
 
+  // A site visit request is a lead. If it is past a free contractor's monthly
+  // five it is locked for them: the email leaves out the developer's own note
+  // (it can hold a phone number), exactly as the new-quote email leaves out
+  // the details of a blurred lead.
+  const locked = (await blurredLeadIdsFor(contractorId)).has(visit.id);
   const emailSent = await sendSiteVisitRequestEmail({
     toEmail: contractor.email,
     contractorName: contractor.name,
     developerName: developer.name,
     siteTitles: projectIds.map((id) => ownProjects.get(id)!),
     slots,
-    developerNote: note || null,
+    developerNote: locked ? null : note || null,
     dashboardUrl: `${baseUrl}/contractor/dashboard#site-visits`,
   });
   if (emailSent) {

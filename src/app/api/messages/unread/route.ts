@@ -32,6 +32,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { computeLeadVisibility, getMonthStart } from '@/lib/lead-limits';
+import { monthLeadsFor } from '@/lib/month-leads';
 
 export async function GET() {
   const session = await auth();
@@ -71,11 +72,7 @@ export async function GET() {
     });
     if (contractor?.tier === 'LISTED') {
       const monthStart = getMonthStart();
-      const thisMonth = await prisma.quoteRequest.findMany({
-        where: { contractorId: userId, createdAt: { gte: monthStart } },
-        select: { id: true, createdAt: true },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      });
+      const thisMonth = await monthLeadsFor(userId, monthStart);
       const visibility = computeLeadVisibility(contractor.tier, thisMonth);
       hidden = new Set(thisMonth.filter((r) => visibility.get(r.id) !== 'full').map((r) => r.id));
     }

@@ -15,8 +15,9 @@ import { computeLeadVisibility, LISTED_MONTHLY_LEAD_CAP } from './lead-limits';
 
 export type ReportRequest = {
   id: string;
-  status: 'PENDING' | 'CONTACTED' | 'QUOTED' | 'DECLINED';
-  kind?: 'QUOTE' | 'ENQUIRY' | 'PROJECT';
+  status: 'PENDING' | 'CONTACTED' | 'QUOTED' | 'DECLINED' | 'CLOSED';
+  kind?: 'QUOTE' | 'ENQUIRY' | 'PROJECT' | 'SITE_VISIT';
+  statusLabel?: string; // plain words for a site visit, e.g. "Visit confirmed"
   createdAt: Date;
   developerName: string;
   projectType: string;
@@ -29,8 +30,9 @@ export type ReportLead = {
   developerName: string;
   projectType: string;
   location: string;
-  medium: 'Quote form' | 'Message' | 'Project post';
+  medium: 'Quote form' | 'Message' | 'Project post' | 'Site visit';
   status: ReportRequest['status'];
+  statusLabel?: string;
   repliedInApp: boolean;
   contactsHidden: boolean; // beyond the free-plan cap this month
 };
@@ -53,7 +55,7 @@ export type ContractorReport = {
 };
 
 function mediumOf(kind: ReportRequest['kind']): ReportLead['medium'] {
-  return kind === 'ENQUIRY' ? 'Message' : kind === 'PROJECT' ? 'Project post' : 'Quote form';
+  return kind === 'ENQUIRY' ? 'Message' : kind === 'PROJECT' ? 'Project post' : kind === 'SITE_VISIT' ? 'Site visit' : 'Quote form';
 }
 
 // Counts by label, ignoring case and extra spaces, showing the first spelling
@@ -96,6 +98,7 @@ export function buildContractorReport(
       location: r.location,
       medium: mediumOf(r.kind),
       status: r.status,
+      statusLabel: r.statusLabel,
       repliedInApp: repliedRequestIds.has(r.id),
       contactsHidden: visibility.get(r.id) === 'blurred',
     }))
@@ -104,8 +107,10 @@ export function buildContractorReport(
   return {
     total: leads.length,
     byMedium: tally(leads.map((l) => l.medium)),
-    byLocation: tally(leads.map((l) => l.location)),
-    byProjectType: tally(leads.map((l) => l.projectType)),
+    // A site visit request has no project type or area of its own, so it is
+    // left out of these two tallies (it still counts in the medium tally).
+    byLocation: tally(leads.filter((l) => l.medium !== 'Site visit').map((l) => l.location)),
+    byProjectType: tally(leads.filter((l) => l.medium !== 'Site visit').map((l) => l.projectType)),
     repliedInApp: leads.filter((l) => l.repliedInApp).length,
     contacted: leads.filter((l) => l.status === 'CONTACTED').length,
     quoted: leads.filter((l) => l.status === 'QUOTED').length,

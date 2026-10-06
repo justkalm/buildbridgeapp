@@ -26,6 +26,7 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { computeLeadVisibility, getMonthStart } from '@/lib/lead-limits';
+import { monthLeadsFor } from '@/lib/month-leads';
 
 export type QuoteRequestParty = { role: 'DEVELOPER' | 'CONTRACTOR'; userId: string };
 
@@ -58,11 +59,7 @@ export async function getQuoteRequestParty(quoteRequestId: string): Promise<Quot
 
     if (contractor.tier === 'LISTED') {
       const monthStart = getMonthStart();
-      const thisMonthRequests = await prisma.quoteRequest.findMany({
-        where: { contractorId: userId, createdAt: { gte: monthStart } },
-        select: { id: true, createdAt: true },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      });
+      const thisMonthRequests = await monthLeadsFor(userId, monthStart);
       const visibility = computeLeadVisibility(contractor.tier, thisMonthRequests);
       // A request from a PRIOR month was never subject to blurring, so it
       // short-circuits to allowed.
@@ -83,7 +80,8 @@ export async function getQuoteRequestParty(quoteRequestId: string): Promise<Quot
   return null;
 }
 
-// Ids of this contractor's CURRENT-month leads that are blurred for them
+// Ids of this contractor's CURRENT-month leads (quote requests AND site visit
+// requests) that are blurred for them
 // (LISTED tier, over the monthly cap). Empty for PLUS/PRO. Used by list
 // views (the Messages inbox, unread counts) that need the same answer as
 // getQuoteRequestParty for many threads at once without a query each.
@@ -94,11 +92,7 @@ export async function blurredLeadIdsFor(contractorId: string): Promise<Set<strin
   });
   if (!contractor || contractor.tier !== 'LISTED') return new Set();
   const monthStart = getMonthStart();
-  const thisMonth = await prisma.quoteRequest.findMany({
-    where: { contractorId, createdAt: { gte: monthStart } },
-    select: { id: true, createdAt: true },
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-  });
+  const thisMonth = await monthLeadsFor(contractorId, monthStart);
   const visibility = computeLeadVisibility(contractor.tier, thisMonth);
   return new Set(thisMonth.filter((r) => visibility.get(r.id) !== 'full').map((r) => r.id));
 }

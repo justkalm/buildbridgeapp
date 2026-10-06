@@ -64,7 +64,7 @@ describe('buildContractorReport', () => {
   it('never carries developer email, phone or details (the shape has no such fields)', () => {
     const r = buildContractorReport([lead(1)], new Set(), 'LISTED', true);
     expect(Object.keys(r.leads[0]).sort()).toEqual(
-      ['contactsHidden', 'developerName', 'id', 'location', 'medium', 'projectType', 'receivedAt', 'repliedInApp', 'status'].sort()
+      ['contactsHidden', 'developerName', 'id', 'location', 'medium', 'projectType', 'receivedAt', 'repliedInApp', 'status', 'statusLabel'].sort()
     );
   });
 
@@ -76,5 +76,38 @@ describe('buildContractorReport', () => {
     expect(text).toContain('2 leads this month came after the 5 full leads');
     const none = reportToText(buildContractorReport([lead(1)], new Set(), 'PRO', true), 'Alpha', '2026-10');
     expect(none).not.toContain('came after');
+  });
+});
+
+describe('site visits in the contractor report', () => {
+  const visit = (i: number, over: Partial<ReportRequest> = {}): ReportRequest => ({
+    id: `visit-${i}`,
+    status: 'PENDING',
+    kind: 'SITE_VISIT',
+    statusLabel: 'Visit requested',
+    createdAt: new Date(Date.UTC(2026, 9, i + 1, 10)),
+    developerName: `Dev V${i}`,
+    projectType: 'Site visit request',
+    location: '',
+    ...over,
+  });
+
+  it('counts them as leads, with their own medium, and leaves them out of the area and work-type tallies', () => {
+    const r = buildContractorReport([lead(1), visit(2), visit(3, { status: 'CLOSED', statusLabel: 'Visit confirmed' })], new Set(['visit-3']), 'PRO', true);
+    expect(r.total).toBe(3);
+    expect(r.byMedium).toEqual([
+      { label: 'Site visit', count: 2 },
+      { label: 'Quote form', count: 1 },
+    ]);
+    expect(r.byLocation).toEqual([{ label: 'Thane', count: 1 }]);
+    expect(r.byProjectType).toEqual([{ label: 'Waterproofing', count: 1 }]);
+    expect(r.leads.find((l) => l.id === 'visit-3')).toMatchObject({ statusLabel: 'Visit confirmed', repliedInApp: true });
+  });
+
+  it('a site visit takes one of the free five, so the sixth lead overall is hidden', () => {
+    const mixed = [lead(1), lead(2), visit(3), visit(4), lead(5), visit(6)];
+    const r = buildContractorReport(mixed, new Set(), 'LISTED', true);
+    expect(r.hiddenCount).toBe(1);
+    expect(r.leads.find((l) => l.contactsHidden)?.id).toBe('visit-6');
   });
 });

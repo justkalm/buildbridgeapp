@@ -17,6 +17,7 @@ import { prisma } from '@/lib/prisma';
 import { sendNewQuoteToContractorEmail, sendQuoteRequestEmail } from '@/lib/email';
 import { sendPush } from '@/lib/push';
 import { computeLeadVisibility, getMonthStart, maskContactDetails } from '@/lib/lead-limits';
+import { monthLeadsFor } from '@/lib/month-leads';
 
 export type QuoteRequestFields = {
   projectType: string;
@@ -33,11 +34,7 @@ export async function isFullyVisibleLead(contractorId: string, quoteRequestId: s
   try {
     const [contractor, thisMonth] = await Promise.all([
       prisma.contractor.findUnique({ where: { id: contractorId }, select: { tier: true } }),
-      prisma.quoteRequest.findMany({
-        where: { contractorId, createdAt: { gte: getMonthStart() } },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-        select: { id: true },
-      }),
+      monthLeadsFor(contractorId, getMonthStart()),
     ]);
     if (!contractor) return false;
     return computeLeadVisibility(contractor.tier, thisMonth).get(quoteRequestId) === 'full';

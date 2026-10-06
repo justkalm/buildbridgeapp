@@ -10,6 +10,7 @@ import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { getMonthRange, istMonthKey } from '@/lib/lead-limits';
 import { buildContractorReport } from '@/lib/lead-report';
+import { siteVisitAsLead } from '@/lib/lead-ledger';
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminAuthenticated())) {
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Contractor not found' }, { status: 404 });
   }
 
-  const [requests, replied] = await Promise.all([
+  const [requests, replied, visits] = await Promise.all([
     prisma.quoteRequest.findMany({
       where: { contractorId, createdAt: { gte: range.start, lt: range.end } },
       select: {
@@ -50,11 +51,32 @@ export async function GET(req: NextRequest) {
       select: { quoteRequestId: true },
       distinct: ['quoteRequestId'],
     }),
+    // Site visit requests are leads too (they follow the same free-plan cap).
+    prisma.siteVisit.findMany({
+      where: { contractorId, createdAt: { gte: range.start, lt: range.end } },
+      select: {
+        id: true,
+        contractorId: true,
+        status: true,
+        createdAt: true,
+        respondedAt: true,
+        developer: { select: { name: true } },
+      },
+    }),
   ]);
+  const visitLeads = visits.map((v) => ({ ...siteVisitAsLead(v), developerName: v.developer.name }));
 
   const report = buildContractorReport(
-    requests.map(({ developer, ...r }) => ({ ...r, developerName: developer.name })),
-    new Set(replied.map((m) => m.quoteRequestId)),
+    [
+      ...requests.map(({ developer, ...r }) => ({ ...r, developerName: developer.name })),
+      ...visitLeads.map((l) => ({
+        ...l.request,
+        developerName: l.developerName,
+        projectType: 'Site visit request',
+        location: '',
+      })),
+    ],
+    new Set([...replied.map((m) => m.quoteRequestId), ...visitLeads.filter((l) => l.replied).map((l) => l.request.id)]),
     contractor.tier,
     month === currentMonth
   );

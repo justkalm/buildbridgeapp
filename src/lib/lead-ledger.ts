@@ -15,10 +15,13 @@ import { LISTED_MONTHLY_LEAD_CAP } from './lead-limits';
 export type LedgerRequest = {
   id: string;
   contractorId: string;
-  status: 'PENDING' | 'CONTACTED' | 'QUOTED' | 'DECLINED';
+  // CLOSED = a site visit that was confirmed or cancelled: counted as a lead,
+  // but neither waiting, declined nor quoted.
+  status: 'PENDING' | 'CONTACTED' | 'QUOTED' | 'DECLINED' | 'CLOSED';
   // How it arrived: QUOTE = the quote form on a profile, ENQUIRY = the
-  // Message button on a profile, PROJECT = a conversation from a project post.
-  kind?: 'QUOTE' | 'ENQUIRY' | 'PROJECT';
+  // Message button on a profile, PROJECT = a conversation from a project post,
+  // SITE_VISIT = a request to visit the contractor's projects.
+  kind?: 'QUOTE' | 'ENQUIRY' | 'PROJECT' | 'SITE_VISIT';
 };
 export type LedgerContractor = { id: string; name: string; tier: 'LISTED' | 'PLUS' | 'PRO' };
 
@@ -30,6 +33,7 @@ export type LedgerRow = {
   byQuote: number; // arrived through the quote form
   byEnquiry: number; // arrived through the Message button
   byProject: number; // arrived from a project post
+  bySiteVisit: number; // arrived as a site visit request
   emailFailed: number; // emails to this contractor that failed to send this month (Admin > Failed emails)
   replied: number;
   contacted: number; // contractor marked Contacted: spoke to them outside the app (their own say-so)
@@ -58,13 +62,14 @@ export function buildLedger(
     if (!c) continue;
     let row = rows.get(c.id);
     if (!row) {
-      row = { contractorId: c.id, name: c.name, tier: c.tier, leads: 0, byQuote: 0, byEnquiry: 0, byProject: 0, emailFailed: 0, replied: 0, contacted: 0, quoted: 0, declined: 0, waiting: 0, overFreeCap: 0 };
+      row = { contractorId: c.id, name: c.name, tier: c.tier, leads: 0, byQuote: 0, byEnquiry: 0, byProject: 0, bySiteVisit: 0, emailFailed: 0, replied: 0, contacted: 0, quoted: 0, declined: 0, waiting: 0, overFreeCap: 0 };
       rows.set(c.id, row);
     }
     const replied = repliedRequestIds.has(r.id);
     row.leads += 1;
     if (r.kind === 'ENQUIRY') row.byEnquiry += 1;
     else if (r.kind === 'PROJECT') row.byProject += 1;
+    else if (r.kind === 'SITE_VISIT') row.bySiteVisit += 1;
     else row.byQuote += 1;
     if (replied) row.replied += 1;
     if (r.status === 'CONTACTED') row.contacted += 1;
@@ -80,12 +85,13 @@ export function buildLedger(
   }
   list.sort((a, b) => b.leads - a.leads || a.name.localeCompare(b.name));
 
-  const totals: LedgerTotals = { leads: 0, byQuote: 0, byEnquiry: 0, byProject: 0, emailFailed: 0, replied: 0, contacted: 0, quoted: 0, declined: 0, waiting: 0, overFreeCap: 0 };
+  const totals: LedgerTotals = { leads: 0, byQuote: 0, byEnquiry: 0, byProject: 0, bySiteVisit: 0, emailFailed: 0, replied: 0, contacted: 0, quoted: 0, declined: 0, waiting: 0, overFreeCap: 0 };
   for (const row of list) {
     totals.leads += row.leads;
     totals.byQuote += row.byQuote;
     totals.byEnquiry += row.byEnquiry;
     totals.byProject += row.byProject;
+    totals.bySiteVisit += row.bySiteVisit;
     totals.emailFailed += row.emailFailed;
     totals.replied += row.replied;
     totals.contacted += row.contacted;
@@ -110,15 +116,15 @@ function csvCell(value: string | number): string {
 export function ledgerToCsv(rows: LedgerRow[], totals: LedgerTotals): string {
   const plan: Record<LedgerContractor['tier'], string> = { LISTED: 'Listed', PLUS: 'Plus', PRO: 'Pro' };
   const lines = [
-    ['Contractor', 'Plan', 'Leads', 'Via quote form', 'Via message', 'Via project post', 'Failed emails', 'Replied', 'Marked contacted', 'Quoted', 'Declined', 'Still waiting', 'Over free cap'],
+    ['Contractor', 'Plan', 'Leads', 'Via quote form', 'Via message', 'Via project post', 'Via site visit', 'Failed emails', 'Replied', 'Marked contacted', 'Quoted', 'Declined', 'Still waiting', 'Over free cap'],
   ];
   for (const r of rows) {
     lines.push(
-      [r.name, plan[r.tier], r.leads, r.byQuote, r.byEnquiry, r.byProject, r.emailFailed, r.replied, r.contacted, r.quoted, r.declined, r.waiting, r.overFreeCap].map(String)
+      [r.name, plan[r.tier], r.leads, r.byQuote, r.byEnquiry, r.byProject, r.bySiteVisit, r.emailFailed, r.replied, r.contacted, r.quoted, r.declined, r.waiting, r.overFreeCap].map(String)
     );
   }
   lines.push(
-    ['Total', '', totals.leads, totals.byQuote, totals.byEnquiry, totals.byProject, totals.emailFailed, totals.replied, totals.contacted, totals.quoted, totals.declined, totals.waiting, totals.overFreeCap].map(String)
+    ['Total', '', totals.leads, totals.byQuote, totals.byEnquiry, totals.byProject, totals.bySiteVisit, totals.emailFailed, totals.replied, totals.contacted, totals.quoted, totals.declined, totals.waiting, totals.overFreeCap].map(String)
   );
   return lines.map((line) => line.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
@@ -144,6 +150,7 @@ export function monthKeysDescending(firstKey: string, currentKey: string): strin
 // per-lead CSV: which developer sent it, through which medium, and how it
 // stands. Newest first.
 export type LeadDetailInput = LedgerRequest & {
+  statusLabel?: string; // plain words for a site visit, e.g. "Visit confirmed"
   createdAt: Date;
   developerName: string;
   developerEmail: string;
@@ -153,8 +160,9 @@ export type LeadDetail = {
   contractorId: string;
   developerName: string;
   developerEmail: string;
-  medium: 'Quote form' | 'Message' | 'Project post';
+  medium: 'Quote form' | 'Message' | 'Project post' | 'Site visit';
   status: LedgerRequest['status'];
+  statusLabel?: string;
   repliedInApp: boolean;
   createdAt: string; // ISO
 };
@@ -166,8 +174,9 @@ export function buildLeadDetails(requests: LeadDetailInput[], repliedRequestIds:
       contractorId: r.contractorId,
       developerName: r.developerName,
       developerEmail: r.developerEmail,
-      medium: (r.kind === 'ENQUIRY' ? 'Message' : r.kind === 'PROJECT' ? 'Project post' : 'Quote form') as LeadDetail['medium'],
+      medium: (r.kind === 'ENQUIRY' ? 'Message' : r.kind === 'PROJECT' ? 'Project post' : r.kind === 'SITE_VISIT' ? 'Site visit' : 'Quote form') as LeadDetail['medium'],
       status: r.status,
+      statusLabel: r.statusLabel,
       repliedInApp: repliedRequestIds.has(r.id),
       createdAt: r.createdAt.toISOString(),
     }))
@@ -179,6 +188,7 @@ const STATUS_WORDS: Record<LedgerRequest['status'], string> = {
   CONTACTED: 'Contacted',
   QUOTED: 'Quoted',
   DECLINED: 'Declined',
+  CLOSED: 'Closed',
 };
 
 export function leadDetailsToCsv(details: LeadDetail[], contractors: LedgerContractor[]): string {
@@ -186,7 +196,37 @@ export function leadDetailsToCsv(details: LeadDetail[], contractors: LedgerContr
   const lines = [['Contractor', 'Developer', 'Developer email', 'Medium', 'Status', 'Replied in app', 'Received (India time)']];
   for (const d of details) {
     const when = new Date(new Date(d.createdAt).getTime() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 16).replace('T', ' ');
-    lines.push([nameById.get(d.contractorId) ?? '', d.developerName, d.developerEmail, d.medium, STATUS_WORDS[d.status], d.repliedInApp ? 'Yes' : 'No', when]);
+    lines.push([nameById.get(d.contractorId) ?? '', d.developerName, d.developerEmail, d.medium, d.statusLabel ?? STATUS_WORDS[d.status], d.repliedInApp ? 'Yes' : 'No', when]);
   }
   return lines.map((line) => line.map(csvCell).join(',')).join('\r\n') + '\r\n';
+}
+
+// A site visit request, turned into the same shape as a quote request so the
+// ledger, the per-lead list and the contractor report can count it as a lead
+// (KALM site visits are leads and follow the free-plan cap). A visit counts as
+// "replied" once the contractor has answered it (respondedAt is set).
+export type SiteVisitInput = {
+  id: string;
+  contractorId: string;
+  status: 'REQUESTED' | 'CONFIRMED' | 'DECLINED' | 'CANCELLED';
+  createdAt: Date;
+  respondedAt: Date | null;
+};
+
+const VISIT_STATUS: Record<SiteVisitInput['status'], { status: LedgerRequest['status']; label: string }> = {
+  REQUESTED: { status: 'PENDING', label: 'Visit requested' },
+  CONFIRMED: { status: 'CLOSED', label: 'Visit confirmed' },
+  DECLINED: { status: 'DECLINED', label: 'Visit declined' },
+  CANCELLED: { status: 'CLOSED', label: 'Visit cancelled' },
+};
+
+export function siteVisitAsLead(v: SiteVisitInput): {
+  request: LedgerRequest & { createdAt: Date; statusLabel: string };
+  replied: boolean;
+} {
+  const mapped = VISIT_STATUS[v.status];
+  return {
+    request: { id: v.id, contractorId: v.contractorId, status: mapped.status, kind: 'SITE_VISIT', createdAt: v.createdAt, statusLabel: mapped.label },
+    replied: v.respondedAt !== null,
+  };
 }

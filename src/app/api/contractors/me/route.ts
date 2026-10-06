@@ -51,6 +51,7 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { applyLeadVisibility, getMonthStart, LISTED_MONTHLY_LEAD_CAP } from '@/lib/lead-limits';
+import { monthLeadsFor } from '@/lib/month-leads';
 import { sendReverifyRequestEmail } from '@/lib/email';
 import { normalizeLocation } from '@/lib/location';
 import { insuranceCoverLakhField, teamSizeField, teamSizeRangeError, tradeTypesField } from '@/lib/project-validation';
@@ -180,17 +181,14 @@ export async function GET() {
   // just reading the network tab to see contact info they haven't paid
   // for. A CSS blur alone would be purely cosmetic.
   const monthStart = getMonthStart();
-  // EVERY request of this month, oldest first, ids only. The list sent to the
+  // EVERY lead of this month (quote requests of any kind and site visit
+  // requests), oldest first, ids only. The list sent to the
   // dashboard (contractor.quoteRequests above) is cut to the newest 50, so it
   // cannot be used to decide which five are free: with more than 50 leads in a
   // month, the oldest ones would be missing and the wrong five would show in
   // full. This is the same month-wide query the other cap checks use
   // (src/lib/quote-request-access.ts, create-quote-request.ts).
-  const thisMonthRequests = await prisma.quoteRequest.findMany({
-    where: { contractorId, createdAt: { gte: monthStart } },
-    select: { id: true },
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-  });
+  const thisMonthRequests = await monthLeadsFor(contractorId, monthStart);
 
   // Which leads are full and which are blurred (and the stripping of email,
   // phone and long details from blurred ones) is src/lib/lead-limits.ts

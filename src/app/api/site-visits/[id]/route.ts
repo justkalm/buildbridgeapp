@@ -33,6 +33,7 @@ import {
   sendSiteVisitDeclinedEmail,
 } from '@/lib/email';
 import { sendPush } from '@/lib/push';
+import { blurredLeadIdsFor } from '@/lib/quote-request-access';
 
 // In-app notification bookkeeping (see the SiteVisit schema comment): the
 // contractor just acted, so the change is new for the developer and
@@ -60,6 +61,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   const { visit, party } = loaded;
   const userId = party === 'DEVELOPER' ? visit.developerId : visit.contractorId;
+
+  // A site visit request is a lead. On the free plan, requests past the
+  // monthly five are locked for the contractor: they cannot confirm, decline
+  // or cancel them until they upgrade (the developer can still cancel their
+  // own request). Same rule as a locked message thread.
+  if (party === 'CONTRACTOR' && (await blurredLeadIdsFor(visit.contractorId)).has(visit.id)) {
+    return NextResponse.json(
+      { error: 'This visit request is past the free leads on your plan this month. Upgrade to see and answer it.' },
+      { status: 403 }
+    );
+  }
 
   if (!(await checkRateLimit(`site-visit-update:${userId}`, { maxAttempts: 60, windowMs: 60 * 60 * 1000 }))) {
     return NextResponse.json({ error: 'Too many updates. Please try again later.' }, { status: 429 });

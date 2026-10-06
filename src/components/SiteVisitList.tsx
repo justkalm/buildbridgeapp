@@ -43,7 +43,10 @@ type Visit = {
   proposedSlots: string[];
   confirmedSlot: string | null;
   developerNote: string | null;
-  contactPhone: string;
+  contactPhone: string | null;
+  // Contractor side only: a request past the free plan's five leads a month.
+  // Its contact details are removed and it cannot be answered until upgrade.
+  locked?: boolean;
   meetingPoint: string | null;
   responseNote: string | null;
   cancelledBy: 'DEVELOPER' | 'CONTRACTOR' | null;
@@ -258,7 +261,7 @@ function VisitCard({
           {v.meetingPoint && <p className="text-stone whitespace-pre-wrap">Meet at: {v.meetingPoint}</p>}
           <p className="text-xs text-stone mt-1">
             {isContractor
-              ? `Developer's phone: ${v.contactPhone}${v.developer.email ? ` · ${v.developer.email}` : ''}`
+              ? v.contactPhone && `Developer's phone: ${v.contactPhone}${v.developer.email ? ` · ${v.developer.email}` : ''}`
               : v.contractor.phone && `Contractor's phone: ${v.contractor.phone}`}
           </p>
           {upcoming && (
@@ -280,10 +283,19 @@ function VisitCard({
               <li key={s}>{formatVisitTime(s)}</li>
             ))}
           </ul>
-          {isContractor && (
+          {isContractor && !v.locked && v.contactPhone && (
             <p className="text-xs text-stone mt-1">
               Phone: {v.contactPhone}
               {v.developer.email ? ` · ${v.developer.email}` : ''}
+            </p>
+          )}
+          {isContractor && v.locked && (
+            <p className="text-xs text-stone mt-2 border border-line rounded-[4px] bg-paper-dim px-3 py-2">
+              This request is past the free leads on your plan this month, so the developer&apos;s contact details are
+              hidden and it can&apos;t be answered yet.{' '}
+              <Link href="/pricing" className="underline underline-offset-2 text-ink">
+                See plans
+              </Link>
             </p>
           )}
         </div>
@@ -365,7 +377,7 @@ function VisitCard({
         </form>
       )}
 
-      {mode === 'idle' && (isContractor && v.status === 'REQUESTED' ? true : canCancel) && (
+      {mode === 'idle' && !v.locked && (isContractor && v.status === 'REQUESTED' ? true : canCancel) && (
         <div className="flex flex-wrap gap-2 mt-3">
           {isContractor && v.status === 'REQUESTED' && (
             <>

@@ -128,7 +128,8 @@ export const BLURRED_DETAILS_MAX_CHARS = 80;
 // Phone-like = eight or more DIGITS, with at most two separator characters
 // (space . - / or brackets) between digits, so "98200 12345", "98200/12345",
 // "+91 98200 12345" and "(022) 2345 6789" are caught, while "1200 - 1500 sqft"
-// (three characters between the groups) and plain dates are left alone.
+// (three characters between the groups), "1200-1500", "20000-25000" and plain
+// dates are left alone.
 // Digits in other scripts (Hindi, Marathi, Gujarati and so on) and hidden
 // zero-width characters are normalised first. Emails are caught as
 // "a@b.com", "a @ b . com", "a[at]b.com" and "a at b dot com".
@@ -139,24 +140,44 @@ export const BLURRED_DETAILS_MAX_CHARS = 80;
 // guarantee: unusual spellings can still get through, which is why blurred
 // leads also never carry the developer's email or phone fields at all.
 const MASK = '••••';
-const ZERO_WIDTH = /[\u200B-\u200D\u2060\uFEFF]/g;
+// Hidden characters that can sit between digits to break up a number. The
+// zero-width joiner (U+200D) is real punctuation inside Indic words, so it is
+// only removed when it sits between two digits (see below).
+const HIDDEN = /[\u200B\u200C\u2060\uFEFF\u00AD]/g;
+const JOINER_BETWEEN_DIGITS = /(?<=\d)\u200D(?=\d)/g;
 const NON_ASCII_DIGITS = /[\u0660-\u0669\u06F0-\u06F9\u0966-\u096F\u09E6-\u09EF\u0A66-\u0A6F\u0AE6-\u0AEF\u0B66-\u0B6F\u0BE6-\u0BEF\u0C66-\u0C6F\u0CE6-\u0CEF\u0D66-\u0D6F\uFF10-\uFF19]/g;
 const DIGIT_ZEROES = [0x0660, 0x06f0, 0x0966, 0x09e6, 0x0a66, 0x0ae6, 0x0b66, 0x0be6, 0x0c66, 0x0ce6, 0x0d66, 0xff10];
-const PHONE_LIKE = /\+?\d(?:[\s.\-/()]{0,2}\d){7,}/g;
-const DATE_LIKE = /^(?:\d{1,2}[-./]\d{1,2}[-./]\d{2,4}|\d{4}[-./]\d{1,2}[-./]\d{1,2})$/;
-const EMAIL_SYMBOL = /[\w.+-]+\s*(?:@|\[at\]|\(at\))\s*[\w-]+(?:\s*(?:\.|\[dot\]|\(dot\))\s*[\w-]+)+/gi;
-const EMAIL_WORDS = /[\w.+-]+\s+at\s+[\w-]+(?:\s+dot\s+[\w-]+)+/gi;
+// A phone-like run: starts where no other number is running (lookbehind) and
+// not at the start of a date (so "on 12/10/2026 9am" keeps its date).
+const DATE = String.raw`(?:\d{1,2}[-./]\d{1,2}[-./]\d{2,4}|\d{4}[-./]\d{1,2}[-./]\d{1,2})(?!\d)`;
+const PHONE_LIKE = new RegExp(String.raw`(?<!\d)(?!${DATE})\+?\d(?:[\s.\-/()]{0,2}\d){7,}`, 'g');
+// Plain figures that look like a phone but are a range ("1200-1500", "area
+// 2000/2500", "20000-25000"): two groups of 3 to 5 digits with one - or /.
+// A real mobile written in two halves ("98200-12345": starts 6 to 9, ten
+// digits) is still masked.
+const RANGE_LIKE = /^\d{3,5}[-/]\d{3,5}$/;
+const MOBILE_IN_TWO_HALVES = /^[6-9]\d{4}[-/]\d{5}$/;
+// The (?<![\w.+-]) lookbehind keeps these linear on long runs of letters: a
+// match can only start at the beginning of a word, not at every character.
+const EMAIL_SYMBOL = /(?<![\w.+-])[\w.+-]+\s*(?:@|\[at\]|\(at\))\s*[\w-]+(?:\s*(?:\.|\[dot\]|\(dot\))\s*[\w-]+)+/gi;
+const EMAIL_WORDS = /(?<![\w.+-])[\w.+-]+\s+at\s+[\w-]+(?:\s+dot\s+[\w-]+)+/gi;
+const EMAIL_AT_WORD = /(?<![\w.+-])[\w.+-]+\s+at\s+[\w-]+(?:\.[\w-]+)+/gi;
 
 export function maskContactDetails(text: string): string {
-  const plain = text.replace(ZERO_WIDTH, '').replace(NON_ASCII_DIGITS, (ch) => {
-    const code = ch.charCodeAt(0);
-    const zero = DIGIT_ZEROES.find((z) => code >= z && code <= z + 9);
-    return zero === undefined ? ch : String(code - zero);
-  });
+  const plain = text
+    .replace(NON_ASCII_DIGITS, (ch) => {
+      const code = ch.charCodeAt(0);
+      const zero = DIGIT_ZEROES.find((z) => code >= z && code <= z + 9);
+      return zero === undefined ? ch : String(code - zero);
+    })
+    .replace(HIDDEN, '')
+    .replace(JOINER_BETWEEN_DIGITS, '')
+    .replace(/\uFF20/g, '@');
   return plain
     .replace(EMAIL_SYMBOL, MASK)
     .replace(EMAIL_WORDS, MASK)
-    .replace(PHONE_LIKE, (run) => (DATE_LIKE.test(run.trim()) ? run : MASK));
+    .replace(EMAIL_AT_WORD, MASK)
+    .replace(PHONE_LIKE, (run) => (RANGE_LIKE.test(run) && !MOBILE_IN_TWO_HALVES.test(run) ? run : MASK));
 }
 
 function cutPreview(text: string): string {
@@ -201,4 +222,53 @@ export function applyLeadVisibility<T extends LeadRowInput>(
       leadVisibility: 'blurred' as const,
     } as LeadRowForContractor<T>;
   });
+}
+
+// ---------------------------------------------------------------------------
+// One month list for every kind of lead
+// ---------------------------------------------------------------------------
+// A lead is a quote request (any kind) OR a site visit request. The free-plan
+// cap counts them all in ONE list, oldest first, so the first five of the
+// month are full whichever way they arrived. Ids are unique across both tables
+// (cuids), so the list can be fed straight to computeLeadVisibility.
+export function mergeMonthLeads(
+  ...lists: { id: string; createdAt: Date }[][]
+): { id: string; createdAt: Date }[] {
+  return lists
+    .flat()
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+// ---------------------------------------------------------------------------
+// A site visit request, as a contractor may see it
+// ---------------------------------------------------------------------------
+// Same rule as a blurred quote request: the developer's NAME and the plain
+// facts of the visit (sites, offered times) stay, the developer's email, phone
+// and free-text note do not. The note is cut and masked like a message preview
+// because developers type numbers into it. Locked visits cannot be answered
+// (see src/app/api/site-visits/[id]/route.ts).
+type VisitForContractor = {
+  contactPhone: string | null;
+  developerNote: string | null;
+  developer: { name: string; email?: string | null };
+};
+
+export function applySiteVisitVisibility<T extends VisitForContractor>(
+  locked: boolean,
+  visit: T
+): Omit<T, 'contactPhone' | 'developerNote' | 'developer'> & {
+  contactPhone: string | null;
+  developerNote: string | null;
+  developer: { name: string; email?: string | null };
+  locked: boolean;
+} {
+  if (!locked) return { ...visit, locked: false };
+  const { developer, developerNote, contactPhone: _contactPhone, ...rest } = visit;
+  return {
+    ...rest,
+    contactPhone: null,
+    developerNote: developerNote ? cutPreview(maskContactDetails(developerNote)) : null,
+    developer: { name: developer.name },
+    locked: true,
+  } as never;
 }

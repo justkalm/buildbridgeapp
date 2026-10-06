@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyLeadVisibility, BLURRED_DETAILS_MAX_CHARS, maskContactDetails } from './lead-limits';
+import { applyLeadVisibility, applySiteVisitVisibility, BLURRED_DETAILS_MAX_CHARS, maskContactDetails, mergeMonthLeads } from './lead-limits';
 import { BLURRED_MESSAGE_NOTICE, notificationTextFor } from './notification-text';
 
 // What the contractor dashboard may receive. These tests exist because the
@@ -113,16 +113,30 @@ describe('maskContactDetails (the preview text of a blurred lead)', () => {
     for (const t of [
       '1200 - 1500 sqft', '3.5 - 4.5 Cr', '07-10-2026', '2026-10-07', '15.10.2026', '25,00,000', 'Rs. 1,25,00,000 budget',
       'size 30 x 40 (1200)', '40 - 50 lakh', 'G+14 tower', 'PIN 400001', 'meet at the site, look at plan. floors 12',
+      '1200-1500 sqft', 'Rs 50000-80000', '20000-25000', 'area 2000/2500', 'on 12/10/2026 9am', 'Hindi word with joiner: \u0915\u094D\u200D\u0937',
     ]) {
       expect(maskContactDetails(t)).toBe(t);
     }
   });
 
-  it('is fast on long input (no catastrophic backtracking)', () => {
-    const nasty = ('1 '.repeat(5000)) + 'a'.repeat(5000) + '@';
-    const t0 = Date.now();
-    maskContactDetails(nasty);
-    expect(Date.now() - t0).toBeLessThan(1500);
+  it('still masks a mobile written in two halves, even though two-part ranges are left alone', () => {
+    expect(maskContactDetails('ring 98200-12345 now')).toBe('ring •••• now');
+    expect(maskContactDetails('ring 98200/12345 now')).toBe('ring •••• now');
+  });
+
+  it('masks more email and number disguises', () => {
+    expect(maskContactDetails('mail rahul at gmail.com ok')).toBe('mail •••• ok');
+    expect(maskContactDetails('mail rahul\uFF20gmail.com ok')).toBe('mail •••• ok');
+    expect(maskContactDetails('ring 9820\u00AD012345 ok')).toBe('ring •••• ok');
+    expect(maskContactDetails('ring 9820\u200D012345 ok')).toBe('ring •••• ok');
+  });
+
+  it('is fast on long input: 20000 plain letters, and 20000 letters with an @ at the end (no catastrophic backtracking)', () => {
+    for (const nasty of ['a'.repeat(20000), 'a'.repeat(20000) + '@', '1 '.repeat(10000), 'a b '.repeat(5000)]) {
+      const t0 = Date.now();
+      maskContactDetails(nasty);
+      expect(Date.now() - t0).toBeLessThan(250);
+    }
   });
 
   it('leaves ordinary project figures alone', () => {
@@ -214,5 +228,60 @@ describe('push and email text for a new message (notificationTextFor)', () => {
     const { preview, title } = notificationTextFor(false, body, 'Fire safety');
     expect(preview).toContain('9820012345');
     expect(title).toBe('Fire safety');
+  });
+});
+
+describe('mergeMonthLeads: quote requests and site visits in one list', () => {
+  const at = (n: number) => new Date(Date.UTC(2026, 9, 1, n));
+  it('interleaves both kinds oldest first, ties by id', () => {
+    const merged = mergeMonthLeads(
+      [{ id: 'q-b', createdAt: at(5) }, { id: 'q-a', createdAt: at(1) }],
+      [{ id: 'v-a', createdAt: at(3) }, { id: 'v-b', createdAt: at(5) }]
+    );
+    expect(merged.map((m) => m.id)).toEqual(['q-a', 'v-a', 'q-b', 'v-b']);
+  });
+
+  it('the first five of the month are full whichever way they arrived, so a site visit uses one of them', () => {
+    const quotes = [1, 2, 3, 4].map((n) => ({ id: `q${n}`, createdAt: at(n * 2) }));
+    const visits = [{ id: 'v1', createdAt: at(3) }, { id: 'v2', createdAt: at(11) }];
+    const merged = mergeMonthLeads(quotes, visits);
+    const out = applyLeadVisibility('LISTED', monthStart, merged, [row(1, { id: 'q4' }), row(1, { id: 'v1' }), row(1, { id: 'v2' })]);
+    const byId = Object.fromEntries(out.map((r) => [r.id, r.leadVisibility]));
+    // order: q1(2h) q2(4h)... v1(3h) is the 2nd lead; q4(8h) is the 5th; v2(11h) is the 6th
+    expect(byId).toEqual({ q4: 'full', v1: 'full', v2: 'blurred' });
+  });
+});
+
+describe('applySiteVisitVisibility: a site visit as the contractor may see it', () => {
+  const visit = {
+    id: 'v1',
+    status: 'REQUESTED',
+    sites: ['Tower A'],
+    contactPhone: '9820012345',
+    developerNote: 'Please call me on 9820012345 or mail rahul@gmail.com about the visit '.repeat(3),
+    developer: { name: 'Rahul', email: 'rahul@gmail.com' },
+  };
+
+  it('an unlocked visit passes through untouched', () => {
+    const out = applySiteVisitVisibility(false, visit);
+    expect(out.locked).toBe(false);
+    expect(out.developer.email).toBe('rahul@gmail.com');
+    expect(out.contactPhone).toBe('9820012345');
+  });
+
+  it('a locked visit keeps the name and the facts but loses email, phone and the unmasked note', () => {
+    const out = applySiteVisitVisibility(true, visit);
+    expect(out.locked).toBe(true);
+    expect(out.developer).toEqual({ name: 'Rahul' });
+    expect(out.contactPhone).toBeNull();
+    expect(out.sites).toEqual(['Tower A']);
+    expect(out.developerNote!.length).toBeLessThanOrEqual(BLURRED_DETAILS_MAX_CHARS + 1);
+    const json = JSON.stringify(out);
+    expect(json).not.toContain('9820012345');
+    expect(json).not.toContain('rahul@gmail.com');
+  });
+
+  it('a locked visit with no note stays null', () => {
+    expect(applySiteVisitVisibility(true, { ...visit, developerNote: null }).developerNote).toBeNull();
   });
 });
