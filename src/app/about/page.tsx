@@ -28,6 +28,16 @@ const FOUNDERS = [
   },
 ];
 
+// Team members who are not co-founders. Bios stay role-based: no invented
+// background until real, verified specifics are provided.
+const TEAM = [
+  {
+    name: 'Anas Maklai',
+    role: 'Operations',
+    bio: 'Anas supports the day-to-day operations behind (kalm), helping keep things running smoothly for the developers and contractors who use the platform.',
+  },
+];
+
 function initials(name: string) {
   return name
     .split(' ')
@@ -68,6 +78,16 @@ export default function AboutPage() {
                 <h3 className="font-display text-lg text-ink mb-1 text-center">{f.name}</h3>
                 <p className="text-xs text-sage font-medium mb-4 tracking-wide uppercase text-center">{f.role}</p>
                 <p className="text-sm text-stone leading-relaxed text-left">{f.bio}</p>
+              </div>
+            ))}
+            {TEAM.map((t) => (
+              <div key={t.name} className="md:col-start-2">
+                <div className="w-20 h-20 rounded-full bg-ink text-paper font-display text-xl flex items-center justify-center mx-auto mb-5">
+                  {initials(t.name)}
+                </div>
+                <h3 className="font-display text-lg text-ink mb-1 text-center">{t.name}</h3>
+                <p className="text-xs text-sage font-medium mb-4 tracking-wide uppercase text-center">{t.role}</p>
+                <p className="text-sm text-stone leading-relaxed text-left">{t.bio}</p>
               </div>
             ))}
           </div>
