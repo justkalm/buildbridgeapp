@@ -6,12 +6,6 @@ import { useState } from 'react';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 
-const CONTACTS = [
-  { name: 'Moiz Patrawala', phone: '+91 77384 86780' },
-  { name: 'Hassan Birya', phone: '+91 70451 94451' },
-  { name: 'Anas Maklai', phone: '+91 98202 45024' },
-];
-
 export default function ContactPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -70,17 +64,6 @@ export default function ContactPage() {
           {/* Contact details */}
           <div>
             <h2 className="font-display text-xl text-ink mb-6">Reach out directly</h2>
-
-            <div className="flex flex-col gap-4 mb-8">
-              {CONTACTS.map((c) => (
-                <div key={c.name}>
-                  <p className="text-sm font-medium text-ink">{c.name}</p>
-                  <a href={`tel:${c.phone.replace(/\s/g, '')}`} className="text-sm text-stone hover:text-ink transition-colors">
-                    {c.phone}
-                  </a>
-                </div>
-              ))}
-            </div>
 
             <div className="flex flex-col gap-2 mb-8">
               <p className="text-xs text-stone uppercase tracking-wide mb-1">Email</p>
