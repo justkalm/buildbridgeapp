@@ -34,6 +34,7 @@ import {
   ALLOWED_TRANSITIONS,
   contractorActionLabel,
   contractorStatusLabel,
+  contractorUndoLabel,
   type QuoteStatus,
 } from '@/lib/quote-status';
 import { announceNotificationsChanged, useUnreadMessages } from '@/lib/use-unread-messages';
@@ -126,6 +127,7 @@ export default function ContractorDashboardPage() {
   const [me, setMe] = useState<ContractorMe | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<{ id: string; message: string } | null>(null);
+  const [confirming, setConfirming] = useState<{ id: string; next: 'PENDING' | 'DECLINED' } | null>(null);
   const isContractor =
     sessionStatus === 'authenticated' && (session?.user as { role?: string })?.role === 'contractor';
   const unread = useUnreadMessages(isContractor, 30_000);
@@ -148,13 +150,19 @@ export default function ContractorDashboardPage() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  async function changeStatus(r: QuoteRequestRow, next: Exclude<QuoteStatus, 'PENDING'>) {
-    if (
-      next === 'DECLINED' &&
-      !window.confirm(`Mark ${r.developer.name}'s request as not interested? They'll be emailed, and this can't be undone.`)
-    ) {
+  // Not interested and Undo ask "are you sure?" first, in the card itself
+  // (not window.confirm, which some phone browsers handle badly).
+  function requestStatusChange(r: QuoteRequestRow, next: QuoteStatus) {
+    if (next === 'DECLINED' || next === 'PENDING') {
+      setStatusError(null);
+      setConfirming({ id: r.id, next });
       return;
     }
+    void changeStatus(r, next);
+  }
+
+  async function changeStatus(r: QuoteRequestRow, next: QuoteStatus) {
+    setConfirming(null);
     setUpdatingId(r.id);
     setStatusError(null);
     try {
@@ -330,7 +338,7 @@ export default function ContractorDashboardPage() {
                 Tap <strong className="font-medium text-ink">Talking to them</strong>,{' '}
                 <strong className="font-medium text-ink">Quote sent</strong> or{' '}
                 <strong className="font-medium text-ink">Not interested</strong> to update an enquiry. The developer
-                is told each time. Chats are in{' '}
+                is told each time. Tapped the wrong one? Use <strong className="font-medium text-ink">Undo</strong>. Chats are in{' '}
                 <Link href="/messages" className="underline underline-offset-2 hover:text-ink">
                   Messages
                 </Link>
@@ -427,22 +435,57 @@ export default function ContractorDashboardPage() {
                         {r.developer.phone}
                       </a>
                     </div>
-                    {ALLOWED_TRANSITIONS[r.status].length > 0 && (
+                    {confirming?.id === r.id && ALLOWED_TRANSITIONS[r.status].includes(confirming.next) ? (
+                      <div role="group" aria-label="Confirm" className="mt-3 rounded-[6px] bg-paper border border-line p-3">
+                        <p className="text-xs text-ink mb-2.5">
+                          {confirming.next === 'PENDING'
+                            ? `Undo your update on ${r.developer.name}'s request? It goes back to New, and they'll be told the update was withdrawn.`
+                            : `Mark ${r.developer.name}'s request as not interested? They'll be emailed. You can still undo it.`}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => changeStatus(r, confirming.next)}
+                            disabled={updatingId === r.id}
+                            className="text-xs px-4 py-1.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors disabled:opacity-60"
+                          >
+                            {confirming.next === 'PENDING' ? 'Yes, undo' : 'Yes, not interested'}
+                          </button>
+                          <button
+                            onClick={() => setConfirming(null)}
+                            autoFocus
+                            className="text-xs px-4 py-1.5 rounded-full border border-line text-stone hover:border-ink hover:text-ink transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : ALLOWED_TRANSITIONS[r.status].length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-3">
                         {ALLOWED_TRANSITIONS[r.status].map((next) => {
-                          const action = next as Exclude<QuoteStatus, 'PENDING'>;
+                          if (next === 'PENDING') {
+                            return (
+                              <button
+                                key="undo"
+                                onClick={() => requestStatusChange(r, 'PENDING')}
+                                disabled={updatingId === r.id}
+                                className="text-xs px-4 py-1.5 rounded-full border border-line text-stone hover:border-ink hover:text-ink transition-colors disabled:opacity-60"
+                              >
+                                {contractorUndoLabel}
+                              </button>
+                            );
+                          }
                           return (
                             <button
-                              key={action}
-                              onClick={() => changeStatus(r, action)}
+                              key={next}
+                              onClick={() => requestStatusChange(r, next)}
                               disabled={updatingId === r.id}
                               className={
-                                action === 'DECLINED'
+                                next === 'DECLINED'
                                   ? 'text-xs px-4 py-1.5 rounded-full border border-line text-stone hover:border-danger hover:text-danger transition-colors disabled:opacity-60'
                                   : 'text-xs px-4 py-1.5 rounded-full bg-ink text-paper hover:bg-stone transition-colors disabled:opacity-60'
                               }
                             >
-                              {contractorActionLabel[action]}
+                              {contractorActionLabel[next]}
                             </button>
                           );
                         })}

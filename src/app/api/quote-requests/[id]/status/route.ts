@@ -1,7 +1,8 @@
 // src/app/api/quote-requests/[id]/status/route.ts
 //
 // PATCH: the contractor a quote request was sent to moves it along
-// (accept / mark quote sent / decline), and the developer is emailed.
+// (talking to them / quote sent / not interested, or Undo back to New),
+// and the developer is emailed.
 //
 // Contractor-only. The developer can't change status: it's the
 // contractor's answer, and a developer "accepting" on their behalf would
@@ -23,12 +24,13 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getQuoteRequestParty } from '@/lib/quote-request-access';
-import { canTransition, developerStatusLabel } from '@/lib/quote-status';
+import { canTransition, developerStatusLabel, developerUndoNotice } from '@/lib/quote-status';
 import { sendQuoteStatusEmail } from '@/lib/email';
 import { sendPush } from '@/lib/push';
 
 const statusSchema = z.object({
-  status: z.enum(['CONTACTED', 'QUOTED', 'DECLINED']),
+  // PENDING is the Undo move (back to New); see ALLOWED_TRANSITIONS.
+  status: z.enum(['PENDING', 'CONTACTED', 'QUOTED', 'DECLINED']),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -98,10 +100,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const baseUrl = process.env.NEXTAUTH_URL ?? '';
+  // An undo (back to New) is worded as a withdrawn update, so the developer
+  // isn't left with an earlier email that is no longer true.
+  const notice = next === 'PENDING' ? developerUndoNotice : developerStatusLabel[next];
   // Phone/browser notification alongside the email (owner's rule: every
   // notification goes by email and in the app). Never throws.
   await sendPush('DEVELOPER', current.developerId, {
-    title: `${current.contractor.name}: ${developerStatusLabel[next]}`,
+    title: `${current.contractor.name}: ${notice}`,
     body: `Your quote request for ${current.projectType}`,
     url: '/dashboard',
     tag: `quote-status-${id}`,
@@ -112,7 +117,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     toName: current.developer.name,
     contractorName: current.contractor.name,
     projectType: current.projectType,
-    statusLabel: developerStatusLabel[next],
+    statusLabel: notice,
     dashboardUrl: `${baseUrl}/dashboard`,
   });
 

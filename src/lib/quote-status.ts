@@ -7,19 +7,20 @@
 // move the server would reject, and the wording can't drift between the
 // developer's view and the contractor's.
 //
-// Moves are forward-only. A contractor can't un-decline or un-quote: the
-// developer has already been emailed about each change, so walking one
-// back would leave them with an email that's no longer true. If a
-// contractor genuinely changes their mind, the in-app thread is the place
-// to say so.
+// Moves go forward, plus one way back: Undo returns any answered request
+// to New (PENDING). It exists for mis-taps (owner's call, 10 Oct 2026).
+// The developer is told about an undo the same way as any other change, so
+// they are never left holding an email that is no longer true. Undo goes
+// back to New rather than to the previous status because the previous
+// status isn't stored; the contractor just taps the right button again.
 
 export type QuoteStatus = 'PENDING' | 'CONTACTED' | 'QUOTED' | 'DECLINED';
 
 export const ALLOWED_TRANSITIONS: Record<QuoteStatus, QuoteStatus[]> = {
   PENDING: ['CONTACTED', 'QUOTED', 'DECLINED'],
-  CONTACTED: ['QUOTED', 'DECLINED'],
-  QUOTED: [],
-  DECLINED: [],
+  CONTACTED: ['QUOTED', 'DECLINED', 'PENDING'],
+  QUOTED: ['PENDING'],
+  DECLINED: ['PENDING'],
 };
 
 export function canTransition(from: QuoteStatus, to: QuoteStatus): boolean {
@@ -43,13 +44,20 @@ export const contractorStatusLabel: Record<QuoteStatus, string> = {
   DECLINED: 'Not interested',
 };
 
+// Label on the Undo button (a move back to PENDING).
+export const contractorUndoLabel = 'Undo';
+
 // How the current status reads to the developer, on their dashboard and in
-// the status-change email. CONTACTED is worded as "Accepted" everywhere a
-// person sees it — see the QuoteRequestStatus comment in schema.prisma for
-// why the enum value itself kept its old name.
+// the status-change email. CONTACTED is worded "Contractor is in touch"
+// (not "Accepted", which read like a promise to do the job; owner's call,
+// 10 Oct 2026). The enum value itself kept its old name; see the
+// QuoteRequestStatus comment in schema.prisma.
 export const developerStatusLabel: Record<QuoteStatus, string> = {
   PENDING: 'Awaiting response',
-  CONTACTED: 'Accepted: contractor will be in touch',
+  CONTACTED: 'Contractor is in touch',
   QUOTED: 'Quote sent',
   DECLINED: 'Declined',
 };
+
+// What the developer is told when a contractor undoes an earlier update.
+export const developerUndoNotice = 'Earlier update withdrawn, awaiting response';
