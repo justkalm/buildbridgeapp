@@ -1,8 +1,8 @@
 // src/app/about/page.tsx
 //
-// Founder bios draw only on facts actually known to be true (the Northstar
-// Web connection between Moiz and Anas, Moiz's family manufacturing
-// business) plus each person's real role at (kalm) — no invented years of
+// Founder bios draw only on facts actually known to be true (Moiz's
+// Northstar Web work and family manufacturing business) plus each
+// person's real role at (kalm) — no invented years of
 // experience, past employers, or achievements. Hassan's bio is kept more
 // general since no verified background was available for him; expand it
 // with real specifics rather than invented ones if/when they're provided.
@@ -22,9 +22,9 @@ const FOUNDERS = [
     bio: "Hassan handles the legal and financial groundwork (kalm) is built on: the contracts, the compliance, the parts of a marketplace that have to be right before anything else can work.",
   },
   {
-    name: 'Anas Maklai',
+    name: 'Shaheer Motorwala',
     role: 'Co-founder, Marketing & Growth',
-    bio: "Anas co-founded Northstar Web alongside Moiz before the two of them started (kalm) together. He's focused on getting the platform in front of the developers and contractors who need it, and making sure growth doesn't come at the cost of what the Verified badge is supposed to mean.",
+    bio: "Shaheer is focused on getting the platform in front of the developers and contractors who need it, and making sure growth doesn't come at the cost of what the Verified badge is supposed to mean.",
   },
 ];
 
