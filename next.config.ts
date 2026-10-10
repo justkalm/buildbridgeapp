@@ -41,6 +41,14 @@ const securityHeaders = [
     key: 'Referrer-Policy',
     value: 'strict-origin-when-cross-origin',
   },
+  {
+    // Switches off the browser's camera, microphone and location for this
+    // site (and anything embedded in it). The site uses none of them, so if a
+    // script were ever injected it could not ask for them. Notifications,
+    // which the site does use, are not affected.
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=()',
+  },
   // Until launch, every response also says "don't list this" to search
   // engines, alongside the robots meta tag (see SEARCH_ENGINES_ALLOWED in
   // src/lib/site.ts). The header covers non-HTML responses too.
@@ -51,6 +59,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Stops every response announcing "X-Powered-By: Next.js" (tells an attacker
+  // which framework to aim at, and helps nobody else).
+  poweredByHeader: false,
   // DEVELOPMENT ONLY: lets a phone on the same Wi-Fi open the local dev
   // site at http://<this laptop's Wi-Fi address>:3000 for testing. Next.js
   // blocks dev-server requests from any host but localhost unless listed
