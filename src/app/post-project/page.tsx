@@ -115,9 +115,14 @@ export default function PostProjectPage() {
               We&apos;ll review the details and reach out once we&apos;ve matched you with a
               contractor.
             </p>
-            <Link href="/browse" className="text-ink font-medium text-sm mt-4 inline-block">
-              Browse contractors in the meantime →
-            </Link>
+            <div className="flex flex-wrap gap-x-5 gap-y-1 mt-4">
+              <Link href="/dashboard#projects" className="text-ink font-medium text-sm">
+                Follow its progress →
+              </Link>
+              <Link href="/browse" className="text-stone text-sm hover:text-ink">
+                Browse contractors in the meantime
+              </Link>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">

@@ -162,25 +162,25 @@ export default function SavedProjectsSection() {
   return (
     <section className="mb-10">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-        <h2 className="font-display font-light text-xl">Your projects</h2>
+        <h2 className="font-display font-light text-xl">Saved details</h2>
         {editing !== 'new' && (
           <button
             type="button"
             onClick={() => open('new')}
             className="text-xs font-medium px-4 py-2 rounded-full border border-line hover:border-ink"
           >
-            + Add a project
+            + Save details
           </button>
         )}
       </div>
       <p className="text-sm text-stone mb-4">
-        Save a project once, then pick it on any quote form instead of typing the details again.
+        Save a project&apos;s details once, then pick it on any quote form instead of typing them again.
       </p>
 
       {editing === 'new' && form}
 
       {projects !== null && projects.length === 0 && editing !== 'new' && (
-        <p className="text-sm text-stone">No saved projects yet.</p>
+        <p className="text-sm text-stone">Nothing saved yet.</p>
       )}
 
       <div className="flex flex-col gap-3">

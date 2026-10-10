@@ -17,6 +17,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import PostedProjectsSection from '@/components/PostedProjectsSection';
 import SavedProjectsSection from '@/components/SavedProjectsSection';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -409,6 +410,7 @@ export default function DashboardPage() {
         </div>
 
         <div role="tabpanel" id="panel-projects" aria-labelledby="tab-projects" hidden={tab !== 'projects'}>
+          <PostedProjectsSection />
           <SavedProjectsSection />
         </div>
 
