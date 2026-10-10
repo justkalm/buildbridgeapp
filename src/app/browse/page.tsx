@@ -212,21 +212,28 @@ function BrowsePageInner() {
       });
   }, [isDeveloper]);
 
-  // Every trade is offered, with how many contractors are listed in it,
-  // so a developer can see the whole range even where it's still empty.
+  // Only trades and areas with at least one listed contractor are offered,
+  // each with its count, so nobody picks a filter that leads to nothing
+  // (owner's call, 10 Oct 2026; it used to list all 20 trades and every area
+  // even when empty). A new trade or area appears the day a contractor in it
+  // goes live. Whatever is currently selected stays in the list even at zero,
+  // so a shared link or a narrowed search never shows a blank dropdown.
   // The counts and the city/area lists come from the server (facets), since
   // this page no longer holds the full list.
-  const tradeOptions = ALL_TRADES.map((trade) => ({
+  const tradeOptions = ALL_TRADES.filter(
+    (trade) => (facets?.tradeCounts[trade] ?? 0) > 0 || trade === selectedTrade
+  ).map((trade) => ({
     value: trade,
     label: `${trade} (${facets?.tradeCounts[trade] ?? 0})`,
   }));
 
   const availableCities = facets?.cities ?? [];
 
-  // Every Mumbai area is offered with its count, like the trades above
-  // ("Bandra (7)", "Dahisar (0)"). Mumbai is the only city for now, so the
-  // list isn't narrowed by city.
-  const availableAreas = (facets?.areas ?? []).map((a) => ({ value: a.name, label: `${a.name} (${a.count})` }));
+  // Areas work the same way ("Bandra (7)"). Mumbai is the only city for now,
+  // so the list isn't narrowed by city.
+  const availableAreas = (facets?.areas ?? [])
+    .filter((a) => a.count > 0 || a.name === selectedArea)
+    .map((a) => ({ value: a.name, label: `${a.name} (${a.count})` }));
 
   // One number for the phone "Filters" button badge. Sort isn't counted:
   // it reorders results rather than narrowing them, and it always has a
@@ -505,7 +512,6 @@ function BrowsePageInner() {
                           />
                         </div>
                         <p className="text-sm text-stone mb-3">
-                          <span aria-hidden="true">📍 </span>
                           <span className="sr-only">Location: </span>
                           {formatLocation(c.area, c.city)}
                           {c.yearsInBusiness ? ` · ${c.yearsInBusiness}+ years` : ''}

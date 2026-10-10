@@ -321,24 +321,19 @@ export default function ContractorProfilePage() {
                   <h1 className="font-display font-light text-[28px]">{contractor.name}</h1>
                   {isDemoLicense(contractor.licenseNumber) ? <DemoBadge /> : contractor.verificationStatus === 'VERIFIED' && <VerifiedBadge reviewPending={contractor.reverifyPending} />}
                 </div>
-                <div className="flex gap-4 flex-wrap text-[13.5px] text-stone mb-3">
-                  <span>
-                    <span aria-hidden="true">📍 </span>
-                    <span className="sr-only">Location: </span>
-                    {formatLocation(contractor.area, contractor.city)}
-                  </span>
-                  <span>
-                    <span aria-hidden="true">🏗️ </span>
-                    <span className="sr-only">Trades: </span>
-                    {tradesOf(contractor.tradeTypes).join(', ')}
-                  </span>
+                <p className="text-[13.5px] text-stone mb-3">
+                  <span className="sr-only">Location: </span>
+                  {formatLocation(contractor.area, contractor.city)}
+                  <span aria-hidden="true" className="mx-2 text-stone/50">·</span>
+                  <span className="sr-only">Trades: </span>
+                  {tradesOf(contractor.tradeTypes).join(', ')}
                   {contractor.yearsInBusiness ? (
-                    <span>
-                      <span aria-hidden="true">📅 </span>
+                    <>
+                      <span aria-hidden="true" className="mx-2 text-stone/50">·</span>
                       {contractor.yearsInBusiness}+ years in business
-                    </span>
+                    </>
                   ) : null}
-                </div>
+                </p>
                 {SHOW_RATINGS && contractor.reviewCount > 0 && (
                   <div className="flex items-center gap-2.5">
                     <ProfileStars rating={contractor.rating} className="text-ink text-base tracking-wide" />

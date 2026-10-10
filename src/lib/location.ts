@@ -52,7 +52,7 @@ export function normalizeLocation(input: string): string {
 // "Area, City" for display, coping with either part being blank. Signup
 // now requires both, but contractors who self-signed-up before that have
 // an empty city and area until they fill in their profile, and showing
-// "📍 , " for them looks broken.
+// a bare ", " for them looks broken.
 export function formatLocation(area: string, city: string): string {
   const parts = [area.trim(), city.trim()].filter(Boolean);
   return parts.length > 0 ? parts.join(', ') : 'Location not set';

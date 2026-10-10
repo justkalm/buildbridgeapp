@@ -26,6 +26,7 @@
 
 'use client';
 
+import { ChatLineIcon, LockLineIcon } from '@/components/LineIcons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Skeleton from '@/components/Skeleton';
@@ -99,9 +100,7 @@ function RowBody({ c, now }: { c: ConversationRow; now: number }) {
             }`}
           >
             {c.locked && (
-              <span aria-hidden="true" className="not-italic mr-1">
-                🔒
-              </span>
+              <LockLineIcon size={12} className="mr-1.5 -mt-0.5 align-middle" />
             )}
             {preview}
           </span>
@@ -183,9 +182,7 @@ export default function MessagesInbox({ viewerRole }: { viewerRole: 'DEVELOPER' 
   if (rows.length === 0) {
     return (
       <div className="border border-line rounded-[6px] px-5 py-10 text-center">
-        <span aria-hidden="true" className="block text-2xl mb-3">
-          💬
-        </span>
+        <ChatLineIcon size={26} className="block mx-auto mb-3 text-stone" />
         {viewerRole === 'DEVELOPER' ? (
           <>
             <p className="text-sm text-stone max-w-[360px] mx-auto mb-5">
