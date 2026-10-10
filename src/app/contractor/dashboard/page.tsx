@@ -38,6 +38,7 @@ import {
   type QuoteStatus,
 } from '@/lib/quote-status';
 import { announceNotificationsChanged, useUnreadMessages } from '@/lib/use-unread-messages';
+import { displayBudget } from '@/lib/budget';
 
 type QuoteRequestRow = {
   id: string;
@@ -377,7 +378,7 @@ export default function ContractorDashboardPage() {
                         <div>
                           <p className="font-medium text-sm">{r.developer.name}</p>
                           <p className="text-stone text-xs mt-0.5">
-                            {r.projectType} · {r.location} · {r.budgetRangeLabel}
+                            {r.projectType} · {r.location} · {displayBudget(r.budgetRangeLabel)}
                           </p>
                         </div>
                         <span className="text-xs text-stone">
@@ -411,7 +412,7 @@ export default function ContractorDashboardPage() {
                       <div>
                         <p className="font-medium text-sm">{r.developer.name}</p>
                         <p className="text-stone text-xs mt-0.5">
-                          {r.projectType} · {r.location} · {r.budgetRangeLabel}
+                          {r.projectType} · {r.location} · {displayBudget(r.budgetRangeLabel)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -528,7 +529,7 @@ export default function ContractorDashboardPage() {
                       <div>
                         <p className="font-medium text-sm">{a.projectPost.developer.name}</p>
                         <p className="text-stone text-xs mt-0.5">
-                          {a.projectPost.projectType} · {a.projectPost.location} · {a.projectPost.budgetRangeLabel}
+                          {a.projectPost.projectType} · {a.projectPost.location} · {displayBudget(a.projectPost.budgetRangeLabel)}
                         </p>
                       </div>
                       <span className="flex items-center gap-2 text-xs text-stone">

@@ -50,6 +50,7 @@ import MessagesComposer from '@/components/MessagesComposer';
 import { dayKey, formatClock, formatDayLabel } from '@/components/MessagesTime';
 import { announceNotificationsChanged } from '@/lib/use-unread-messages';
 import { contractorStatusLabel, developerStatusLabel, type QuoteStatus } from '@/lib/quote-status';
+import { displayBudget } from '@/lib/budget';
 
 const MESSAGES_POLL_MS = 5_000;
 const META_POLL_MS = 30_000;
@@ -379,7 +380,7 @@ export default function MessagesConversation({ id }: { id: string }) {
           {meta.quote && statusLabel && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
               <span className="text-[12px] text-stone truncate max-w-full">
-                {meta.quote.projectType} · {meta.quote.location} · {meta.quote.budgetRangeLabel}
+                {meta.quote.projectType} · {meta.quote.location} · {displayBudget(meta.quote.budgetRangeLabel)}
               </span>
               <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] ${statusStyle[meta.quote.status]}`}>
                 {statusLabel}

@@ -132,7 +132,7 @@ export function SavedProjectPicker({
 }
 
 /**
- * Optional budget in rupees: "Rs." fixed in front, digits grouped the
+ * Optional budget in rupees: "₹" fixed in front, digits grouped the
  * Indian way as you type (12,50,000), and the amount in lakh/crore words
  * underneath so nobody miscounts zeros. Also used by the saved-project
  * form on the dashboard.
@@ -153,7 +153,7 @@ export function BudgetInput({
         Estimated budget <span className="font-normal">(optional)</span>
       </label>
       <div className="flex items-center border border-line rounded-[4px] bg-paper focus-within:border-ink">
-        <span className="pl-3 pr-1.5 text-[13.5px] text-stone select-none" aria-hidden="true">Rs.</span>
+        <span className="pl-3 pr-1.5 text-[13.5px] text-stone select-none" aria-hidden="true">₹</span>
         <input
           id={id}
           type="text"

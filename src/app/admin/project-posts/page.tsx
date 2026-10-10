@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react';
 import AdminTabs from '@/components/AdminTabs';
+import { displayBudget } from '@/lib/budget';
 
 type Alert = {
   alertedAt: string;
@@ -140,7 +141,7 @@ export default function AdminProjectPostsPage() {
                   <div>
                     <p className="font-medium text-sm">{p.developer.name} ({p.developer.email})</p>
                     <p className="text-stone text-xs mt-0.5">
-                      {p.projectType} · {p.location} · {p.budgetRangeLabel} · {p.contactPhone}
+                      {p.projectType} · {p.location} · {displayBudget(p.budgetRangeLabel)} · {p.contactPhone}
                     </p>
                   </div>
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ${statusStyle[p.status]}`}>
