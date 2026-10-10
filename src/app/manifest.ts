@@ -4,7 +4,8 @@
 // an app (its own icon, no browser bars). It matters most on iPhone,
 // where Safari only allows notifications for sites added to the Home
 // Screen (iOS 16.4+); see src/components/PushPrompt.tsx. Icons live in
-// /public and use the brand mark "(k)" on ink.
+// /public and show the (kalm) wordmark in ink on white (drawn by
+// scripts/make-app-icons.cjs, same letters and brackets as the site).
 
 import type { MetadataRoute } from 'next';
 
