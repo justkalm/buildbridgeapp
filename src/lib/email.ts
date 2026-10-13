@@ -12,6 +12,13 @@ import { formatVisitTime } from '@/lib/site-visits';
 import { prisma } from '@/lib/prisma';
 import { displayBudget } from '@/lib/budget';
 
+// Sending address. Resend only delivers to the public from a domain verified
+// in its dashboard: justkalm.in is the verified one, so mail goes out as
+// connect@justkalm.in, which is also a real inbox, so replies reach us. Set
+// EMAIL_FROM in Vercel to change the sender without a code change. It must
+// be an address on a verified domain.
+const EMAIL_FROM = process.env.EMAIL_FROM || '(kalm) <connect@justkalm.in>';
+
 function getResendClient() {
   if (!process.env.RESEND_API_KEY) {
     throw new Error('RESEND_API_KEY is not set');
@@ -84,7 +91,7 @@ export async function sendQuoteRequestEmail(input: QuoteRequestEmailInput): Prom
       // the email address you signed up with. Once you verify your own
       // domain in Resend's dashboard, swap this to something like
       // "BuildBridge <quotes@yourdomain.com>" — see the deployment notes.
-      from: '(Kalm) <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: notifyAddress,
       subject: `New quote request for ${sanitizeSubject(input.contractorName)}`,
       html: `
@@ -145,7 +152,7 @@ export async function sendProjectPostAdminEmail(input: ProjectPostEmailInput): P
 
   try {
     const { error } = await getResendClient().emails.send({
-      from: '(Kalm) <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: notifyAddress,
       subject: `New project posted: ${sanitizeSubject(input.projectType)} in ${sanitizeSubject(input.location)}`,
       html: `
@@ -203,7 +210,7 @@ export async function sendProjectForReviewEmail(input: {
 
   try {
     const { error } = await getResendClient().emails.send({
-      from: '(kalm) <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: notifyAddress,
       subject: `${what} waiting for review: ${sanitizeSubject(input.projectTitle)}`,
       html: `
@@ -253,7 +260,7 @@ export async function sendReportEmail(input: {
 
   try {
     const { error } = await getResendClient().emails.send({
-      from: '(kalm) <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: notifyAddress,
       subject: `Content report: ${sanitizeSubject(input.reasonLabel)}`,
       html: `
@@ -303,7 +310,7 @@ type ProjectPostAlertEmailInput = {
 export async function sendProjectPostAlertEmail(input: ProjectPostAlertEmailInput): Promise<boolean> {
   try {
     const { error } = await getResendClient().emails.send({
-      from: '(Kalm) <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: input.toEmail,
       subject: `New lead: ${sanitizeSubject(input.projectType)} in ${sanitizeSubject(input.location)}`,
       html: `
@@ -379,7 +386,7 @@ export async function sendVerificationEmail(input: {
 }): Promise<boolean> {
   try {
     const { error } = await getResendClient().emails.send({
-      from: '(kalm) <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: input.toEmail,
       subject: 'Verify your (kalm) email',
       html: `
@@ -409,7 +416,7 @@ export async function sendPasswordResetEmail(input: {
 }): Promise<boolean> {
   try {
     const { error } = await getResendClient().emails.send({
-      from: '(kalm) <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: input.toEmail,
       subject: 'Reset your (kalm) password',
       html: `
@@ -448,7 +455,7 @@ export async function sendClaimAccountEmail(input: {
 }): Promise<boolean> {
   try {
     const { error } = await getResendClient().emails.send({
-      from: '(kalm) <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: input.toEmail,
       subject: 'Claim your (kalm) contractor listing',
       html: `
@@ -477,7 +484,7 @@ export async function sendClaimAccountEmail(input: {
 // (QUOTE_NOTIFICATION_EMAIL — same address used for quote-request
 // notifications, since it's the one inbox actually monitored right now).
 // replyTo is set to the sender's own email so replying in your inbox goes
-// straight back to them, not to onboarding@resend.dev.
+// straight back to them, not to the (kalm) sending address.
 export async function sendContactFormEmail(input: {
   name: string;
   email: string;
@@ -491,7 +498,7 @@ export async function sendContactFormEmail(input: {
 
   try {
     const { error } = await getResendClient().emails.send({
-      from: '(kalm) <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: notifyAddress,
       replyTo: input.email,
       subject: `New contact form message from ${sanitizeSubject(input.name)}`,
@@ -530,7 +537,7 @@ export async function sendQuoteStatusEmail(input: {
 }): Promise<boolean> {
   try {
     const { error } = await getResendClient().emails.send({
-      from: '(kalm) <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: input.toEmail,
       subject: `${sanitizeSubject(input.contractorName)} updated your quote request: ${sanitizeSubject(input.statusLabel)}`,
       html: `
@@ -569,7 +576,7 @@ export async function sendNewMessageEmail(input: {
 }): Promise<boolean> {
   try {
     const { error } = await getResendClient().emails.send({
-      from: '(kalm) <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: input.toEmail,
       subject: `New message from ${sanitizeSubject(input.fromName)} on (kalm)`,
       html: `
@@ -635,7 +642,7 @@ export async function sendSiteVisitRequestEmail(input: {
   dashboardUrl: string;
 }): Promise<boolean> {
   return sendSimple('site visit request', {
-    from: '(kalm) <onboarding@resend.dev>',
+    from: EMAIL_FROM,
     to: input.toEmail,
     subject: `${sanitizeSubject(input.developerName)} wants to visit ${input.siteTitles.length} of your sites`,
     html: `
@@ -668,7 +675,7 @@ export async function sendSiteVisitConfirmedEmail(input: {
   dashboardUrl: string;
 }): Promise<boolean> {
   return sendSimple('site visit confirmed', {
-    from: '(kalm) <onboarding@resend.dev>',
+    from: EMAIL_FROM,
     to: input.toEmail,
     subject: `Site visit confirmed: ${sanitizeSubject(formatVisitTime(input.slot))}`,
     html: `
@@ -698,7 +705,7 @@ export async function sendSiteVisitDeclinedEmail(input: {
   profileUrl: string;
 }): Promise<boolean> {
   return sendSimple('site visit declined', {
-    from: '(kalm) <onboarding@resend.dev>',
+    from: EMAIL_FROM,
     to: input.toEmail,
     subject: `${sanitizeSubject(input.contractorName)} can't do your site visit`,
     html: `
@@ -723,7 +730,7 @@ export async function sendSiteVisitCancelledEmail(input: {
   dashboardUrl: string;
 }): Promise<boolean> {
   return sendSimple('site visit cancelled', {
-    from: '(kalm) <onboarding@resend.dev>',
+    from: EMAIL_FROM,
     to: input.toEmail,
     subject: `Site visit cancelled by ${sanitizeSubject(input.cancelledByName)}`,
     html: `
@@ -758,7 +765,7 @@ export async function sendReverifyRequestEmail(input: {
     return false;
   }
   return sendSimple('re-verification request', {
-    from: '(kalm) <onboarding@resend.dev>',
+    from: EMAIL_FROM,
     to: notifyAddress,
     subject: `Re-check needed: ${sanitizeSubject(input.contractorName)} updated verified details`,
     html: `
@@ -802,7 +809,7 @@ export async function sendNewQuoteToContractorEmail(input: {
 }): Promise<boolean> {
   const lead = input.lead;
   return sendSimple('new quote request (contractor)', {
-    from: '(kalm) <onboarding@resend.dev>',
+    from: EMAIL_FROM,
     to: input.toEmail,
     ...(lead ? { replyTo: lead.developerEmail } : {}),
     subject: `New quote request: ${sanitizeSubject(input.projectType)} in ${sanitizeSubject(input.location)}`,
@@ -840,7 +847,7 @@ export async function sendQuoteReminderEmail(input: {
   dashboardUrl: string;
 }): Promise<boolean> {
   return sendSimple('quote reminder (contractor)', {
-    from: '(kalm) <onboarding@resend.dev>',
+    from: EMAIL_FROM,
     to: input.toEmail,
     subject: `Reminder: a developer is waiting for your reply (${sanitizeSubject(input.projectType)})`,
     html: `
@@ -865,7 +872,7 @@ export async function sendNoReplyNoticeEmail(input: {
   browseUrl: string;
 }): Promise<boolean> {
   return sendSimple('no reply notice (developer)', {
-    from: '(kalm) <onboarding@resend.dev>',
+    from: EMAIL_FROM,
     to: input.toEmail,
     subject: `No reply yet from ${sanitizeSubject(input.contractorName)}`,
     html: `
