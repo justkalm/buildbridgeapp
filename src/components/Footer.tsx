@@ -17,7 +17,7 @@ export default function Footer() {
           <div>
             <div className="mb-3.5 text-[20px]"><Wordmark /></div>
             <p className="text-sm leading-relaxed max-w-[260px]">
-              Connecting developers with licensed, verified contractors.
+              Connecting developers with verified contractors.
             </p>
           </div>
           <div>

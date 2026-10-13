@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Find a contractor',
-  description: 'Browse licensed, verified contractors by trade and area, and compare their completed projects.',
+  description: 'Browse verified contractors by trade and area, and compare their completed projects.',
 };
 
 export default function BrowseLayout({ children }: { children: React.ReactNode }) {

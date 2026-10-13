@@ -7,7 +7,6 @@ import Link from 'next/link';
 import ImageUpload from '@/components/ImageUpload';
 import AdminTabs from '@/components/AdminTabs';
 import TradeTypePicker from '@/components/TradeTypePicker';
-import { isPlaceholderLicense } from '@/lib/license';
 import { MUMBAI_CITY } from '@/lib/mumbai-areas';
 import AreaPicker from '@/components/AreaPicker';
 import { MAX_INSURANCE_COVER_LAKH, MAX_TEAM_SIZE, teamSizeRangeError } from '@/lib/project-validation';
@@ -204,7 +203,7 @@ export default function NewContractorPage() {
           </Link>
         </div>
         <p className="text-stone text-sm mb-8">
-          Only set status to Verified once you&apos;ve confirmed the license number.
+          Only set status to Verified once the documents, GSTIN and a direct conversation are done. A licence number is optional.
         </p>
 
         {success && (
@@ -241,8 +240,8 @@ export default function NewContractorPage() {
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="License number">
-              <input required value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} className={inputCls} />
+            <Field label="License number (optional)">
+              <input value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} className={inputCls} />
             </Field>
             <Field label="Verification status">
               <select
@@ -251,23 +250,8 @@ export default function NewContractorPage() {
                 className={inputCls}
               >
                 <option value="PENDING">Pending: not yet checked</option>
-                <option
-                  value="VERIFIED"
-                  disabled={isPlaceholderLicense(licenseNumber)}
-                  title={
-                    isPlaceholderLicense(licenseNumber)
-                      ? 'Enter the contractor\'s real license number before marking Verified.'
-                      : undefined
-                  }
-                >
-                  Verified: license confirmed
-                </option>
+                <option value="VERIFIED">Verified: documents, GSTIN and contact checked</option>
               </select>
-              {isPlaceholderLicense(licenseNumber) && (
-                <p className="text-xs text-danger mt-1">
-                  This looks like a placeholder license number. Enter the real one to enable Verified.
-                </p>
-              )}
             </Field>
           </div>
 

@@ -36,7 +36,7 @@ export default async function Home() {
           </div>
           <div className="md:col-span-5 md:pb-2">
             <p className="text-[17px] leading-relaxed text-stone max-w-[420px] mb-8">
-              Find licensed contractors in Mumbai, and see their finished work before you ask for a quote.
+              Find verified contractors in Mumbai, and see their finished work before you ask for a quote.
             </p>
             <div className="flex gap-4 flex-wrap">
               <Link
@@ -104,7 +104,7 @@ export default async function Home() {
               their word for it:
             </p>
             <ul className="text-[15.5px] leading-relaxed text-stone text-left mb-4 list-disc list-outside pl-5 space-y-1.5">
-              <li>Review copies of their license, GST, and registration documents</li>
+              <li>Review copies of their GST and registration documents, and their license where they hold one</li>
               <li>Check their GSTIN against the GST portal</li>
               <li>Speak with them directly, by phone or in person</li>
             </ul>

@@ -13,7 +13,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: '(kalm)',
     short_name: '(kalm)',
-    description: 'Connecting developers with licensed, verified contractors.',
+    description: 'Connecting developers with verified contractors.',
     start_url: '/',
     display: 'standalone',
     background_color: '#fafaf8',

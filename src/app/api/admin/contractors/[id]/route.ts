@@ -126,11 +126,11 @@ export async function DELETE(
 // to billing (see the zod comment in the create route for why).
 //
 // licenseNumber is editable here because self-signed-up contractors start
-// with a PENDING-* placeholder (src/lib/license.ts) and can't be marked
-// Verified until a real one is on file. Without this, admin would have no
-// way to ever verify them. Changing the license of an already-Verified
-// contractor drops them back to PENDING (unless this same request sets
-// VERIFIED), because the badge was earned against the old number.
+// with a PENDING-* placeholder (src/lib/license.ts) and a licence is an
+// optional extra, added when the contractor has one. It is NOT needed for
+// Verified. Changing the license of an already-Verified contractor drops
+// them back to PENDING (unless this same request sets VERIFIED), because
+// the number on the profile was checked against the old one.
 //
 // VERIFIED is also blocked while the contractor's city or area is blank.
 // Self-signed-up contractors used to start with an empty location (signup
@@ -249,10 +249,6 @@ export async function PATCH(
     }
   }
 
-  // The license the VERIFIED check below should look at: the new one if
-  // this request is setting it, otherwise the one on file.
-  const effectiveLicense = newLicense ?? existing.licenseNumber;
-
   const nextStatus: VerificationStatus | undefined = hasStatus
     ? (body.verificationStatus as VerificationStatus)
     : undefined;
@@ -268,23 +264,6 @@ export async function PATCH(
   const restampVerified =
     (existing.verificationStatus === 'VERIFIED' && (confirmReverify || licenseChanging) && nextStatus !== 'PENDING' && nextStatus !== 'REJECTED');
   const clearReverify = hasStatus || confirmReverify;
-
-  // A PENDING-* license number means no real license has been looked up
-  // yet (see src/lib/license.ts) — block flipping such a contractor to
-  // Verified even though this route can't fix the license itself.
-  if (
-    hasStatus &&
-    body.verificationStatus === 'VERIFIED' &&
-    isPlaceholderLicense(effectiveLicense)
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          'This contractor has a placeholder license number (no real license on file) and cannot be marked Verified. Add the real license number first.',
-      },
-      { status: 400 }
-    );
-  }
 
   // No location on file: see the comment above PATCH.
   if (

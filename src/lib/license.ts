@@ -5,14 +5,13 @@
 // generated `PENDING-<hex>` value in the licenseNumber column so the field
 // stays populated and unique while they haven't given us a real license yet.
 //
-// These placeholders must never be allowed to carry a VERIFIED status.
-// "Verified" is supposed to mean (kalm) reviewed the real license, GST, and
-// registration documents (see the badge copy on the homepage), and a
-// PENDING-* value means there is no real license number on file to review.
-// Both admin contractor routes (POST /api/admin/contractors and
-// PATCH /api/admin/contractors/[id]) and the admin UI check this constant
-// before allowing a VERIFIED status to be set, so keep the prefix and
-// predicate here as the single source of truth other code should import.
+// A PENDING-* value now simply means "no licence number on file". Most
+// contractors do not hold a licence, so a licence is an EXTRA check, not a
+// condition of being Verified (owner decision, 14 Oct 2026). Verified still
+// needs the three checks (documents, GSTIN, spoke to them). The placeholder
+// is never shown to the public: the profile hides the licence row, and the
+// admin sees "No licence on file". Keep the prefix and predicate here as the
+// single source of truth other code should import.
 
 export const PLACEHOLDER_LICENSE_PREFIX = 'PENDING-';
 

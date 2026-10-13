@@ -477,21 +477,16 @@ export default function ContractorProfilePage() {
           <div className="bg-paper border border-line rounded-md p-6 mb-5">
             <h4 className="font-display text-[15.5px] mb-4">Business Details</h4>
             <dl className="text-[13.5px]">
-              <div className="flex justify-between py-2.5 border-b border-line">
-                <dt className="text-stone">License Number</dt>
-                {/* Self-signed-up contractors get a placeholder
-                    'PENDING-<hex>' licenseNumber until admin records the
-                    real one (see the admin contractors route). Showing
-                    that raw placeholder to developers reads as a real
-                    license number, so it's hidden here — never rendered,
-                    not even truncated. Admin-side blocking of the
-                    placeholder is handled separately. */}
-                {isPlaceholderLicense(contractor.licenseNumber) ? (
-                  <dd className="text-xs text-stone italic">License details pending</dd>
-                ) : (
+              {/* A licence is optional (most contractors hold none). Self-signed-up
+                  contractors carry a hidden 'PENDING-<hex>' placeholder, which is
+                  never shown, not even truncated: with no real number the row is
+                  simply left out. */}
+              {!isPlaceholderLicense(contractor.licenseNumber) && (
+                <div className="flex justify-between py-2.5 border-b border-line">
+                  <dt className="text-stone">License Number</dt>
                   <dd className="text-xs font-medium">{contractor.licenseNumber}</dd>
-                )}
-              </div>
+                </div>
+              )}
               {(contractor.teamSizeMin || contractor.teamSizeMax) && (
                 <div className="flex justify-between py-2.5 border-b border-line">
                   <dt className="text-stone">Team Size</dt>

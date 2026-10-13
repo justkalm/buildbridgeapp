@@ -23,7 +23,7 @@ export const SITE_URL = process.env.NEXTAUTH_URL || 'https://kalm-gold.vercel.ap
 export const SITE_NAME = '(kalm)';
 
 export const SITE_DESCRIPTION =
-  'Find licensed, verified contractors for your project. See their completed work with photos, timelines and sizes, then request a quote or schedule a site visit.';
+  'Find verified contractors for your project. See their completed work with photos, timelines and sizes, then request a quote or schedule a site visit.';
 
 // Where a Pending contractor sends their licence, GST and registration
 // papers (shown on the contractor dashboard, src/components/OnboardingPanel.tsx).

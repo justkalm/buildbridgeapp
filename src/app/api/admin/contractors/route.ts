@@ -14,7 +14,8 @@ import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { ADMIN_SAFE_CONTRACTOR_SELECT } from '@/lib/admin-contractor-select';
 import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
-import { isPlaceholderLicense } from '@/lib/license';
+import crypto from 'crypto';
+import { PLACEHOLDER_LICENSE_PREFIX } from '@/lib/license';
 import { normalizeLocation } from '@/lib/location';
 import {
   insuranceCoverLakhField,
@@ -51,7 +52,9 @@ const contractorSchema = z.object({
   tradeTypes: tradeTypesField().refine((types) => types.length > 0, {
     message: 'Pick at least one trade and speciality',
   }),
-  licenseNumber: z.string().trim().min(1).max(100),
+  // Optional: most contractors have no licence. Left blank, a PENDING-<hex>
+  // placeholder is stored (the column is required and unique); see lib/license.ts.
+  licenseNumber: z.string().trim().max(100).optional(),
   verificationStatus: z.enum(['PENDING', 'VERIFIED', 'REJECTED']).default('PENDING'),
   // Manual override only — not tied to billing. Trial period means no
   // contractor is actually paying yet; this exists so tier display and
@@ -127,26 +130,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: rangeError }, { status: 400 });
   }
 
-  // A PENDING-* license number is a self-signup placeholder, not a real
-  // license we've reviewed against the license, GST, and registration
-  // documents, see src/lib/license.ts. Never let one be created already
-  // marked Verified.
-  if (data.verificationStatus === 'VERIFIED' && isPlaceholderLicense(data.licenseNumber)) {
-    return NextResponse.json(
-      {
-        error:
-          'This contractor has a placeholder license number (no real license on file) and cannot be marked Verified. Add the real license number first.',
-      },
-      { status: 400 }
-    );
-  }
+  const licenseNumber = data.licenseNumber || `${PLACEHOLDER_LICENSE_PREFIX}${crypto.randomBytes(6).toString('hex')}`;
 
   const existingLicense = await prisma.contractor.findUnique({
-    where: { licenseNumber: data.licenseNumber },
+    where: { licenseNumber },
   });
   if (existingLicense) {
     return NextResponse.json(
-      { error: `A contractor with license number ${data.licenseNumber} already exists` },
+      { error: `A contractor with license number ${licenseNumber} already exists` },
       { status: 400 }
     );
   }
@@ -163,7 +154,7 @@ export async function POST(req: NextRequest) {
       city: data.city,
       area: data.area,
       tradeTypes: data.tradeTypes,
-      licenseNumber: data.licenseNumber,
+      licenseNumber,
       verificationStatus: data.verificationStatus,
       verifiedAt: data.verificationStatus === 'VERIFIED' ? new Date() : null,
       tier: data.tier,

@@ -609,8 +609,6 @@ export default function AdminContractorsPage() {
                   // Every reason VERIFIED is blocked for this row, joined
                   // into one tooltip so both show when both apply.
                   const verifyBlockers = [
-                    placeholderLicense &&
-                      'no real license number on file (self-signup placeholder), so add their real license',
                     missingLocation &&
                       'no location on file, so they need to add their city and area in their profile',
                     c.verificationStatus !== 'VERIFIED' &&
@@ -632,13 +630,13 @@ export default function AdminContractorsPage() {
                         </div>
                       )}
                       {placeholderLicense ? (
-                        <div className="text-xs text-danger font-medium">
-                          No license on file{' '}
+                        <div className="text-xs text-stone">
+                          No licence on file (optional){' '}
                           <button
                             onClick={() => handleLicenseEdit(c)}
                             className="underline underline-offset-2 hover:text-ink"
                           >
-                            Add license
+                            Add licence
                           </button>
                         </div>
                       ) : (

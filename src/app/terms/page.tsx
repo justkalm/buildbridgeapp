@@ -27,7 +27,7 @@ export default function TermsPage() {
           <section>
             <h2 className="font-display text-xl mb-2">1. What (kalm) is</h2>
             <p className="text-stone">
-              (kalm) is a platform that connects property developers with licensed contractors.
+              (kalm) is a platform that connects property developers with verified contractors.
               We facilitate introductions and quote requests, and we are not a party to any
               agreement, contract, or transaction between a developer and a contractor.
             </p>
@@ -38,7 +38,8 @@ export default function TermsPage() {
             <p className="text-stone">
               You&apos;re responsible for the accuracy of information you provide, and for keeping
               your account credentials secure. Contractor listings marked &quot;Verified&quot; have had
-              their license number checked against the relevant state authority. This does not
+              their documents and GSTIN checked by (kalm). Where a contractor holds a license, its
+              number is checked against the relevant state authority too. This does not
               constitute a guarantee of workmanship, timeliness, or business conduct.
             </p>
           </section>
