@@ -3,6 +3,7 @@
 'use client';
 
 import { SHOW_RATINGS } from '@/lib/ratings';
+import { workedWithSummary } from '@/lib/worked-with';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -33,6 +34,7 @@ type Contractor = {
   yearsInBusiness: number | null;
   rating: number;
   reviewCount: number;
+  workedWith: string[]; // developers named on approved projects; empty for demos
   // licenseNumber intentionally NOT included — browse cards no longer
   // show it (see ShortlistButton-adjacent #15 cleanup), and the list API
   // (api/contractors/route.ts) stopped selecting it, so there's nothing
@@ -534,6 +536,15 @@ function BrowsePageInner() {
                             </span>
                           )}
                         </div>
+                        {c.workedWith.length > 0 && (() => {
+                          const { shown, more } = workedWithSummary(c.workedWith, 3);
+                          return (
+                            <p className="text-xs text-stone mb-3">
+                              Worked with <span className="text-ink">{shown}</span>
+                              {more > 0 && ` +${more} more`}
+                            </p>
+                          );
+                        })()}
                         <div className="flex gap-6 text-sm">
                           <div>
                             <span className="font-medium block">{c._count.projects}</span>

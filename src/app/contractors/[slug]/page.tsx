@@ -41,6 +41,7 @@ import ProfileImage from '@/components/ProfileImage';
 import ProfileStars from '@/components/ProfileStars';
 import ProfileReview from '@/components/ProfileReview';
 import { SHOW_RATINGS } from '@/lib/ratings';
+import { workedWithNames } from '@/lib/worked-with';
 import ProfileSkeleton from '@/components/ProfileSkeleton';
 import {
   EMPTY_QUOTE_DETAILS,
@@ -334,6 +335,14 @@ export default function ContractorProfilePage() {
                     </>
                   ) : null}
                 </p>
+                {(() => {
+                  const names = workedWithNames(contractor.projects, isDemoLicense(contractor.licenseNumber));
+                  return names.length > 0 ? (
+                    <p className="text-[13.5px] text-stone mb-3">
+                      Worked with <span className="text-ink">{names.join(', ')}</span>
+                    </p>
+                  ) : null;
+                })()}
                 {SHOW_RATINGS && contractor.reviewCount > 0 && (
                   <div className="flex items-center gap-2.5">
                     <ProfileStars rating={contractor.rating} className="text-ink text-base tracking-wide" />
@@ -438,9 +447,9 @@ export default function ContractorProfilePage() {
                         ].filter(Boolean).join(' · ')}
                       </p>
                     )}
-                    {SHOW_RATINGS && p.reviewRating ? (
+                    {p.reviewText?.trim() ? (
                       <div className="border-t border-line pt-3 mt-1">
-                        <ProfileReview rating={p.reviewRating} text={p.reviewText} developerName={p.developerName} />
+                        <ProfileReview text={p.reviewText} developerName={p.developerName} />
                       </div>
                     ) : null}
                     <div className="flex justify-between items-center pt-3 border-t border-line">

@@ -34,6 +34,7 @@
 // if it ever reaches tens of thousands, move the sort into SQL.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { workedWithNames } from '@/lib/worked-with';
 import { prisma } from '@/lib/prisma';
 import { isDemoLicense } from '@/lib/license';
 import { normalizeLocation } from '@/lib/location';
@@ -157,6 +158,12 @@ export async function GET(req: NextRequest) {
       yearsInBusiness: true,
       rating: true,
       reviewCount: true,
+      // Developer names only, for the "Worked with" line (see worked-with.ts).
+      projects: {
+        where: { approvalStatus: 'APPROVED', developerName: { not: null } },
+        select: { developerName: true },
+        orderBy: { createdAt: 'desc' },
+      },
       _count: { select: { projects: { where: { approvalStatus: 'APPROVED' } } } },
     },
   });
@@ -165,7 +172,10 @@ export async function GET(req: NextRequest) {
   const items = pageIds
     .map((id) => byId.get(id))
     .filter((c): c is NonNullable<typeof c> => !!c)
-    .map((c) => ({ ...c, isDemo: demoById.get(c.id) === true }));
+    .map(({ projects, ...c }) => {
+      const isDemo = demoById.get(c.id) === true;
+      return { ...c, isDemo, workedWith: workedWithNames(projects, isDemo) };
+    });
 
   const nextOffset = offset + items.length < total ? offset + items.length : null;
 
