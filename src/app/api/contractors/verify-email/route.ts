@@ -3,6 +3,7 @@
 // Mirrors src/app/api/developers/verify-email/route.ts exactly, against
 // the Contractor table instead.
 
+import { syncContractorToOps } from '@/lib/ops-sync';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
@@ -43,5 +44,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Announced to the Operations app only now that the email is proven.
+  syncContractorToOps(contractor.id, 'contractor.signed_up');
   return NextResponse.json({ ok: true });
 }

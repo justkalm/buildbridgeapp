@@ -12,6 +12,7 @@
 // visits or projects exist, until the caller sends the contractor's exact name as
 // confirmName (KALM-241). Every delete is also written to the moderation log.
 
+import { syncContractorToOps, syncContractorRemovedToOps } from '@/lib/ops-sync';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
@@ -96,6 +97,7 @@ export async function DELETE(
     if (deletedName === null) {
       return NextResponse.json({ error: 'Contractor not found' }, { status: 404 });
     }
+    syncContractorRemovedToOps(id);
     return NextResponse.json({ ok: true, deletedName });
   } catch (err) {
     if (err instanceof NeedsConfirmation) {
@@ -341,5 +343,7 @@ export async function PATCH(
     select: ADMIN_SAFE_CONTRACTOR_SELECT,
   });
 
+  // Only the plan is shown in the Operations app, so only a plan change is worth an event.
+  if (hasTier) syncContractorToOps(id, 'contractor.updated');
   return NextResponse.json({ ok: true, contractor: updated });
 }

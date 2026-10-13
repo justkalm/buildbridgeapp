@@ -46,6 +46,7 @@
 // editable through this route at all today — if that ever changes, they
 // belong in CREDENTIAL_FIELDS too.)
 
+import { syncContractorToOps } from '@/lib/ops-sync';
 import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
@@ -418,5 +419,13 @@ export async function PATCH(req: Request) {
     );
   }
 
+  // Only details the Operations app stores count; a bio-only edit is not news.
+  const opsChanged = (['name', 'phone', 'city', 'area', 'tradeTypes'] as const).some((field) => {
+    if (!(field in parsed.data)) return false;
+    let existing = current[field as keyof typeof current];
+    if ((field === 'city' || field === 'area') && typeof existing === 'string') existing = normalizeLocation(existing);
+    return valuesDiffer(parsed.data[field as keyof typeof parsed.data], existing);
+  });
+  if (opsChanged) syncContractorToOps(updated.id, 'contractor.updated');
   return NextResponse.json(updated);
 }

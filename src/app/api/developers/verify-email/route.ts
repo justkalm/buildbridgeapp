@@ -5,6 +5,7 @@
 // Expired or unknown tokens get the same generic error — no need to
 // distinguish "expired" from "never existed" for the person clicking it.
 
+import { syncDeveloperToOps } from '@/lib/ops-sync';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
@@ -45,5 +46,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Announced to the Operations app only now that the email is proven.
+  syncDeveloperToOps(developer.id, 'developer.signed_up');
   return NextResponse.json({ ok: true });
 }

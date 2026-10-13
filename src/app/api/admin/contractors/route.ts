@@ -8,6 +8,7 @@
 // (including phone) — this is the admin's own view, not the public browse
 // API, so the restrictions in src/app/api/contractors/route.ts don't apply.
 
+import { syncContractorToOps } from '@/lib/ops-sync';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
@@ -185,5 +186,6 @@ export async function POST(req: NextRequest) {
     select: { ...ADMIN_SAFE_CONTRACTOR_SELECT, projects: true },
   });
 
+  syncContractorToOps(contractor.id, 'contractor.updated');
   return NextResponse.json(contractor);
 }
