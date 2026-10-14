@@ -67,8 +67,8 @@ export default function ContactPage() {
 
             <div className="flex flex-col gap-2 mb-8">
               <p className="text-xs text-stone uppercase tracking-wide mb-1">Email</p>
-              <a href="mailto:justkalm26@gmail.com" className="text-sm text-ink hover:text-stone transition-colors">
-                justkalm26@gmail.com
+              <a href="mailto:connect@justkalm.in" className="text-sm text-ink hover:text-stone transition-colors">
+                connect@justkalm.in
               </a>
             </div>
 

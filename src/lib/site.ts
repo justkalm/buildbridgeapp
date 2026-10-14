@@ -32,4 +32,4 @@ export const SITE_DESCRIPTION =
 // With both empty the dashboard says nothing about where to send papers.
 // WhatsApp: digits with country code, no plus or spaces, e.g. '919800000000'.
 export const VERIFICATION_WHATSAPP = '';
-export const VERIFICATION_EMAIL = 'justkalm26@gmail.com';
+export const VERIFICATION_EMAIL = 'connect@justkalm.in';
