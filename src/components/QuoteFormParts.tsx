@@ -17,6 +17,7 @@
 import { useEffect, useState } from 'react';
 import { MAX_BUDGET_RUPEES, digitsOnly, rupeesInWords } from '@/lib/budget';
 import { MAX_BUILT_UP_AREA_SQFT } from '@/lib/project-fields';
+import { VERIFICATION_EMAIL } from '@/lib/site';
 import type { SavedProjectClient } from '@/lib/saved-projects';
 
 export type QuoteDetails = {
@@ -233,6 +234,10 @@ export function QuoteDetailsFields({
           rows={3}
           className={`${inputClass} resize-y`}
         />
+        <p className="text-[11.5px] text-stone mt-1">
+          Have a BOQ or drawings? After you send this, email them to {VERIFICATION_EMAIL} and name the contractor.
+          We pass them only to that contractor.
+        </p>
       </div>
       <div>
         <label htmlFor="quote-phone" className={labelClass}>Phone number</label>

@@ -52,6 +52,7 @@ import {
   useQuoteFormData,
   type QuoteDetails,
 } from '@/components/QuoteFormParts';
+import { VERIFICATION_EMAIL } from '@/lib/site';
 import ProfileQuoteBar, { ProfileQuoteBarSpacer } from '@/components/ProfileQuoteBar';
 import { isPlaceholderLicense, isDemoLicense } from '@/lib/license';
 import { formatLocation } from '@/lib/location';
@@ -578,6 +579,10 @@ export default function ContractorProfilePage() {
                     we have no real response data yet. */}
                 <ul className="text-stone mt-3 list-disc pl-5 space-y-1">
                   <li>You will get an email each time {contractor.name} updates your request.</li>
+                  <li>
+                    Have a BOQ or drawings? Email them to {VERIFICATION_EMAIL} with {contractor.name} in the
+                    subject, and we will pass them on to {contractor.name} only.
+                  </li>
                   <li>
                     You can write to them any time in{' '}
                     <Link href="/messages" className="underline underline-offset-2 hover:text-ink">

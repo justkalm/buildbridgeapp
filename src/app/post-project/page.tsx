@@ -22,7 +22,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -35,6 +35,72 @@ import { digitsOnly } from '@/lib/budget';
 import { MAX_BUILT_UP_AREA_SQFT, NEEDED_BY_OPTIONS } from '@/lib/project-fields';
 
 const inputCls = 'w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink';
+
+// A dropdown that opens a tick list, because a project often needs several
+// trades and a plain <select> picks only one. Closes on a click elsewhere or
+// the Escape key.
+function TradePicker({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const summary =
+    value.length === 0
+      ? 'Choose trades'
+      : value.length <= 2
+        ? value.join(', ')
+        : `${value.slice(0, 2).join(', ')} +${value.length - 2} more`;
+
+  return (
+    <div ref={boxRef} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="trade-picker-list"
+        onClick={() => setOpen((o) => !o)}
+        className={`${inputCls} flex items-center justify-between gap-2 text-left ${value.length === 0 ? 'text-stone' : ''}`}
+      >
+        <span className="truncate">{summary}</span>
+        <span aria-hidden="true" className="text-stone text-xs">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div
+          id="trade-picker-list"
+          className="absolute z-20 mt-1 w-full max-h-64 overflow-auto border border-line rounded-[4px] bg-paper shadow-sm p-1"
+        >
+          {TRADES.map((t) => {
+            const on = value.includes(t.trade);
+            return (
+              <label key={t.trade} className="flex items-center gap-2.5 px-2.5 py-2 text-sm rounded-[4px] cursor-pointer hover:bg-paper-dim">
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={() => onChange(on ? value.filter((x) => x !== t.trade) : [...value, t.trade])}
+                />
+                {t.trade}
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function PostProjectPage() {
   const { status: sessionStatus, data: session } = useSession();
@@ -173,25 +239,8 @@ export default function PostProjectPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Which trades do you need?</label>
-              <p className="text-xs text-stone mb-2">Pick every trade you are hiring for on this project.</p>
-              <div className="flex flex-wrap gap-2">
-                {TRADES.map((t) => {
-                  const on = trades.includes(t.trade);
-                  return (
-                    <button
-                      key={t.trade}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => setTrades((cur) => (on ? cur.filter((x) => x !== t.trade) : [...cur, t.trade]))}
-                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                        on ? 'bg-ink text-paper border-ink' : 'bg-paper text-ink border-line hover:border-ink'
-                      }`}
-                    >
-                      {t.trade}
-                    </button>
-                  );
-                })}
-              </div>
+              <p className="text-xs text-stone mb-2">Tick every trade you are hiring for on this project.</p>
+              <TradePicker value={trades} onChange={setTrades} />
             </div>
             <div>
               <label htmlFor="post-area" className="block text-sm font-medium mb-1.5">
