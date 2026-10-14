@@ -27,6 +27,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { SHOW_PLANS } from '@/lib/plans';
 import ProfileMessageButton from '@/components/ProfileMessageButton';
 import { announceNotificationsChanged } from '@/lib/use-unread-messages';
 import {
@@ -291,10 +292,10 @@ function VisitCard({
           )}
           {isContractor && v.locked && (
             <p className="text-xs text-stone mt-2 border border-line rounded-[4px] bg-paper-dim px-3 py-2">
-              This request is past the free leads on your plan this month, so the developer&apos;s contact details are
+              This request is past your free leads this month, so the developer&apos;s contact details are
               hidden and it can&apos;t be answered yet.{' '}
-              <Link href="/pricing" className="underline underline-offset-2 text-ink">
-                See plans
+              <Link href={SHOW_PLANS ? '/pricing' : '/contact'} className="underline underline-offset-2 text-ink">
+                {SHOW_PLANS ? 'See plans' : 'Contact us'}
               </Link>
             </p>
           )}

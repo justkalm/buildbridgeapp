@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import Wordmark from '@/components/Wordmark';
 import { useSession } from 'next-auth/react';
+import { SHOW_PLANS } from '@/lib/plans';
 
 export default function Footer() {
   const { status, data: session } = useSession();
@@ -34,7 +35,9 @@ export default function Footer() {
             <ul className="flex flex-col gap-3">
               <li><Link href="/signup" className="text-sm hover:text-ink transition-colors">Register as Developer</Link></li>
               <li><Link href="/contractor/signup" className="text-sm hover:text-ink transition-colors">List Your Business</Link></li>
-              <li><Link href="/pricing" className="text-sm hover:text-ink transition-colors">Pricing</Link></li>
+              {SHOW_PLANS && (
+                <li><Link href="/pricing" className="text-sm hover:text-ink transition-colors">Pricing</Link></li>
+              )}
             </ul>
           </div>
           <div>

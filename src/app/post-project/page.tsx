@@ -29,6 +29,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { normalizeLocation } from '@/lib/location';
+import { VERIFICATION_EMAIL } from '@/lib/site';
 
 const inputCls = 'w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink';
 
@@ -115,6 +116,10 @@ export default function PostProjectPage() {
               We&apos;ll review the details and reach out once we&apos;ve matched you with a
               contractor.
             </p>
+            <p className="text-stone text-sm mt-2">
+              Have a BOQ or drawings? Email them to {VERIFICATION_EMAIL} with your project type and
+              location. We share them only with the contractors we match you with.
+            </p>
             <div className="flex flex-wrap gap-x-5 gap-y-1 mt-4">
               <Link href="/dashboard#projects" className="text-ink font-medium text-sm">
                 Follow its progress →
@@ -157,7 +162,9 @@ export default function PostProjectPage() {
                 <option>Under ₹50 L</option>
                 <option>₹50 L – ₹1 Cr</option>
                 <option>₹1 Cr – ₹3 Cr</option>
-                <option>₹3 Cr+</option>
+                <option>₹3 Cr – ₹10 Cr</option>
+                <option>₹10 Cr – ₹25 Cr</option>
+                <option>₹25 Cr+</option>
               </select>
             </div>
             <div>
@@ -167,9 +174,13 @@ export default function PostProjectPage() {
                 rows={4}
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
-                placeholder="Scope of work, timeline, anything a contractor would need to know"
+                placeholder="Scope of work, built-up area in sq ft, timeline, anything a contractor would need to know"
                 className={inputCls}
               />
+              <p className="text-xs text-stone mt-1.5">
+                Have a BOQ or drawings? Email them to {VERIFICATION_EMAIL} after you submit, with your project
+                type and location. We share them only with the contractors we match you with.
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Phone</label>

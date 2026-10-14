@@ -33,6 +33,7 @@
 // only the page being sent is fetched in full. Fine for thousands of rows;
 // if it ever reaches tens of thousands, move the sort into SQL.
 
+import { SHOW_PLANS } from '@/lib/plans';
 import { NextRequest, NextResponse } from 'next/server';
 import { workedWithNames } from '@/lib/worked-with';
 import { prisma } from '@/lib/prisma';
@@ -78,7 +79,9 @@ export async function GET(req: NextRequest) {
       licenseNumber: true,
       _count: { select: { projects: { where: { approvalStatus: 'APPROVED' } } } },
     },
-    orderBy: [{ tier: 'desc' }, { rating: 'desc' }, { id: 'asc' }],
+    orderBy: SHOW_PLANS
+      ? [{ tier: 'desc' }, { rating: 'desc' }, { id: 'asc' }]
+      : [{ rating: 'desc' }, { id: 'asc' }],
   });
 
   const light = rows.map((r) => ({
@@ -130,8 +133,10 @@ export async function GET(req: NextRequest) {
   matches = [...matches].sort((a, b) => {
     const emptyDiff = Number(a.projects === 0) - Number(b.projects === 0);
     if (emptyDiff !== 0) return emptyDiff;
-    const tierDiff = TIER_RANK[a.tier] - TIER_RANK[b.tier];
-    if (tierDiff !== 0) return tierDiff;
+    if (SHOW_PLANS) {
+      const tierDiff = TIER_RANK[a.tier] - TIER_RANK[b.tier];
+      if (tierDiff !== 0) return tierDiff;
+    }
     if (sort === 'experience') return b.years - a.years;
     if (sort === 'projects') return b.projects - a.projects;
     return `${a.city}${a.area}`.localeCompare(`${b.city}${b.area}`);

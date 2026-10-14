@@ -29,6 +29,7 @@
 import { ChatLineIcon, LockLineIcon } from '@/components/LineIcons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { SHOW_PLANS } from '@/lib/plans';
 import Skeleton from '@/components/Skeleton';
 import MessagesAvatar from '@/components/MessagesAvatar';
 import { formatRelativeShort } from '@/components/MessagesTime';
@@ -68,7 +69,7 @@ function RowBody({ c, now }: { c: ConversationRow; now: number }) {
   const hasUnread = c.unread > 0 && !c.locked;
   const time = formatRelativeShort(c.lastMessage?.createdAt ?? c.lastActivityAt, now);
   const preview = c.locked
-    ? 'Locked lead. Upgrade to read.'
+    ? SHOW_PLANS ? 'Locked lead. Upgrade to read.' : 'Locked lead. Contact us to read.'
     : c.lastMessage
       ? `${c.lastMessage.fromMe ? 'You: ' : ''}${c.lastMessage.body}`
       : 'No messages yet';
@@ -210,9 +211,9 @@ export default function MessagesInbox({ viewerRole }: { viewerRole: 'DEVELOPER' 
         <li key={c.id} className="border-b border-line">
           {c.locked ? (
             <Link
-              href="/pricing"
+              href={SHOW_PLANS ? '/pricing' : '/contact'}
               className="flex items-start gap-3.5 py-4 px-1 opacity-70 hover:opacity-100 transition-opacity"
-              aria-label={`${c.otherParty.name}, ${c.title}. Locked lead. Upgrade to read.`}
+              aria-label={`${c.otherParty.name}, ${c.title}. Locked lead. ${SHOW_PLANS ? 'Upgrade' : 'Contact us'} to read.`}
             >
               <RowBody c={c} now={now} />
             </Link>

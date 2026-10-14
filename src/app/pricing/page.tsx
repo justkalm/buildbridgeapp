@@ -14,6 +14,8 @@
 // actually integrated.
 
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { SHOW_PLANS } from '@/lib/plans';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 
@@ -59,6 +61,8 @@ const TIERS = [
 ];
 
 export default function PricingPage() {
+  // Hidden during the pilot (see src/lib/plans.ts).
+  if (!SHOW_PLANS) redirect('/');
   return (
     <>
       <Nav />

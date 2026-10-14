@@ -3,6 +3,7 @@
 'use client';
 
 import { SHOW_RATINGS } from '@/lib/ratings';
+import { SHOW_PLANS } from '@/lib/plans';
 import { workedWithSummary } from '@/lib/worked-with';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -498,7 +499,7 @@ function BrowsePageInner() {
                                 text gives screen readers the same
                                 explanation, since title isn't reliably
                                 announced. */}
-                            {(c.tier === 'PLUS' || c.tier === 'PRO') && (
+                            {SHOW_PLANS && (c.tier === 'PLUS' || c.tier === 'PRO') && (
                               <span
                                 title="Paid listing. Shown higher in results."
                                 className="inline-flex items-center text-[11px] text-stone bg-paper-dim border border-line rounded-full px-2.5 py-1"

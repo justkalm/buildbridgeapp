@@ -29,6 +29,7 @@ import SiteVisitList from '@/components/SiteVisitList';
 import Nav from '@/components/Nav';
 import OnboardingPanel from '@/components/OnboardingPanel';
 import Footer from '@/components/Footer';
+import { SHOW_PLANS } from '@/lib/plans';
 import Skeleton from '@/components/Skeleton';
 import {
   ALLOWED_TRANSITIONS,
@@ -260,9 +261,11 @@ export default function ContractorDashboardPage() {
                 {me.verificationStatus === 'VERIFIED' && <span aria-hidden>✓&nbsp;</span>}
                 {verification.label}
               </span>
-              <span className="text-stone">
-                {tierLabel[me.tier]} · Free trial
-              </span>
+              {SHOW_PLANS && (
+                <span className="text-stone">
+                  {tierLabel[me.tier]} · Free trial
+                </span>
+              )}
             </p>
             {me.verificationStatus !== 'PENDING' && (
               <details className="mt-1.5 text-xs text-stone max-w-[520px]">
@@ -365,7 +368,11 @@ export default function ContractorDashboardPage() {
                   <div
                     key={r.id}
                     role="group"
-                    aria-label={r.isNew ? 'New locked lead. Upgrade to see details.' : 'Locked lead. Upgrade to see details.'}
+                    aria-label={
+                      SHOW_PLANS
+                        ? r.isNew ? 'New locked lead. Upgrade to see details.' : 'Locked lead. Upgrade to see details.'
+                        : r.isNew ? 'New locked lead. Contact us to see details.' : 'Locked lead. Contact us to see details.'
+                    }
                     className="border border-line rounded-[6px] p-4 relative overflow-hidden"
                   >
                     {r.isNew && (
@@ -395,13 +402,15 @@ export default function ContractorDashboardPage() {
                       <div className="text-center px-4">
                         <p className="text-sm font-medium mb-1">You&apos;ve used your free leads this month</p>
                         <p className="text-xs text-stone mb-3">
-                          Upgrade to see full details for every lead, not just the first {me.leadLimit?.cap}.
+                          {SHOW_PLANS
+                            ? `Upgrade to see full details for every lead, not just the first ${me.leadLimit?.cap}.`
+                            : `Get in touch and we will unlock the rest of your leads. You see the first ${me.leadLimit?.cap} in full each month.`}
                         </p>
                         <Link
-                          href="/pricing"
+                          href={SHOW_PLANS ? '/pricing' : '/contact'}
                           className="inline-flex items-center justify-center text-xs px-4 py-2 rounded-full bg-ink text-paper hover:bg-stone transition-colors"
                         >
-                          See upgrade options
+                          {SHOW_PLANS ? 'See upgrade options' : 'Contact us'}
                         </Link>
                       </div>
                     </div>
