@@ -30,6 +30,9 @@ import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { normalizeLocation } from '@/lib/location';
 import { VERIFICATION_EMAIL } from '@/lib/site';
+import { TRADES } from '@/lib/trade-types';
+import { digitsOnly } from '@/lib/budget';
+import { MAX_BUILT_UP_AREA_SQFT, NEEDED_BY_OPTIONS } from '@/lib/project-fields';
 
 const inputCls = 'w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink';
 
@@ -39,7 +42,10 @@ export default function PostProjectPage() {
 
   const [projectType, setProjectType] = useState('');
   const [location, setLocation] = useState('');
-  const [budgetRangeLabel, setBudgetRangeLabel] = useState('Under ₹50 L');
+  const [trades, setTrades] = useState<string[]>([]);
+  const [areaDigits, setAreaDigits] = useState('');
+  const [neededBy, setNeededBy] = useState('');
+  const [budgetRangeLabel, setBudgetRangeLabel] = useState('Not sure yet');
   const [details, setDetails] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -68,15 +74,28 @@ export default function PostProjectPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
     setNeedsVerification(false);
+    if (trades.length === 0) {
+      setError('Pick at least one trade you need.');
+      return;
+    }
+    setSubmitting(true);
 
     try {
       const res = await fetch('/api/project-posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectType, location, budgetRangeLabel, details, contactPhone }),
+        body: JSON.stringify({
+          projectType,
+          location,
+          budgetRangeLabel,
+          details,
+          contactPhone,
+          trades,
+          neededBy,
+          builtUpAreaSqft: areaDigits ? Number(areaDigits) : null,
+        }),
       });
 
       if (res.ok) {
@@ -153,12 +172,69 @@ export default function PostProjectPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">Estimated budget</label>
+              <label className="block text-sm font-medium mb-1.5">Which trades do you need?</label>
+              <p className="text-xs text-stone mb-2">Pick every trade you are hiring for on this project.</p>
+              <div className="flex flex-wrap gap-2">
+                {TRADES.map((t) => {
+                  const on = trades.includes(t.trade);
+                  return (
+                    <button
+                      key={t.trade}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setTrades((cur) => (on ? cur.filter((x) => x !== t.trade) : [...cur, t.trade]))}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                        on ? 'bg-ink text-paper border-ink' : 'bg-paper text-ink border-line hover:border-ink'
+                      }`}
+                    >
+                      {t.trade}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <label htmlFor="post-area" className="block text-sm font-medium mb-1.5">
+                Built-up area in sq ft <span className="font-normal text-stone">(optional)</span>
+              </label>
+              <input
+                id="post-area"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                value={areaDigits ? Number(areaDigits).toLocaleString('en-IN') : ''}
+                onChange={(e) => {
+                  const next = digitsOnly(e.target.value);
+                  if (!next || Number(next) <= MAX_BUILT_UP_AREA_SQFT) setAreaDigits(next);
+                }}
+                placeholder="e.g. 30,000"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label htmlFor="post-needed-by" className="block text-sm font-medium mb-1.5">When do you need the contractor?</label>
+              <select
+                id="post-needed-by"
+                required
+                value={neededBy}
+                onChange={(e) => setNeededBy(e.target.value)}
+                className={inputCls}
+              >
+                <option value="" disabled>Choose one</option>
+                {NEEDED_BY_OPTIONS.map((o) => (
+                  <option key={o}>{o}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Estimated budget for this work</label>
+              <p className="text-xs text-stone mb-2">For the trades you picked above, not the whole building.</p>
               <select
                 value={budgetRangeLabel}
                 onChange={(e) => setBudgetRangeLabel(e.target.value)}
                 className={inputCls}
               >
+                <option>Not sure yet</option>
                 <option>Under ₹50 L</option>
                 <option>₹50 L – ₹1 Cr</option>
                 <option>₹1 Cr – ₹3 Cr</option>
@@ -174,7 +250,7 @@ export default function PostProjectPage() {
                 rows={4}
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
-                placeholder="Scope of work, built-up area in sq ft, timeline, anything a contractor would need to know"
+                placeholder="Scope of work, anything a contractor would need to know"
                 className={inputCls}
               />
               <p className="text-xs text-stone mt-1.5">

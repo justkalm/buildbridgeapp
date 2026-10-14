@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import AdminTabs from '@/components/AdminTabs';
 import { displayBudget } from '@/lib/budget';
+import { formatArea, formatTrades } from '@/lib/project-fields';
 
 type Alert = {
   alertedAt: string;
@@ -24,6 +25,9 @@ type ProjectPostRow = {
   projectType: string;
   location: string;
   budgetRangeLabel: string;
+  builtUpAreaSqft: number | null;
+  trades: string[];
+  neededBy: string | null;
   details: string;
   contactPhone: string;
   status: 'NEW' | 'MATCHED' | 'CLOSED';
@@ -141,8 +145,14 @@ export default function AdminProjectPostsPage() {
                   <div>
                     <p className="font-medium text-sm">{p.developer.name} ({p.developer.email})</p>
                     <p className="text-stone text-xs mt-0.5">
-                      {p.projectType} · {p.location} · {displayBudget(p.budgetRangeLabel)} · {p.contactPhone}
+                      {p.projectType} · {p.location} · {displayBudget(p.budgetRangeLabel)}
+                      {formatArea(p.builtUpAreaSqft) ? ` · ${formatArea(p.builtUpAreaSqft)}` : ''} · {p.contactPhone}
                     </p>
+                    {(formatTrades(p.trades) || p.neededBy) && (
+                      <p className="text-xs mt-0.5">
+                        <span className="text-stone">Needs:</span> {[formatTrades(p.trades), p.neededBy].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
                   </div>
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ${statusStyle[p.status]}`}>
                     {p.status}

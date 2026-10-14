@@ -40,12 +40,14 @@ import {
 } from '@/lib/quote-status';
 import { announceNotificationsChanged, useUnreadMessages } from '@/lib/use-unread-messages';
 import { displayBudget } from '@/lib/budget';
+import { formatArea, formatTrades } from '@/lib/project-fields';
 
 type QuoteRequestRow = {
   id: string;
   projectType: string;
   location: string;
   budgetRangeLabel: string;
+  builtUpAreaSqft: number | null;
   details: string;
   status: QuoteStatus;
   createdAt: string;
@@ -66,6 +68,9 @@ type ProjectAlertRow = {
     projectType: string;
     location: string;
     budgetRangeLabel: string;
+    builtUpAreaSqft: number | null;
+    trades: string[];
+    neededBy: string | null;
     details: string;
     contactPhone: string;
     developer: { name: string; email: string };
@@ -385,7 +390,7 @@ export default function ContractorDashboardPage() {
                         <div>
                           <p className="font-medium text-sm">{r.developer.name}</p>
                           <p className="text-stone text-xs mt-0.5">
-                            {r.projectType} · {r.location} · {displayBudget(r.budgetRangeLabel)}
+                            {r.projectType} · {r.location} · {displayBudget(r.budgetRangeLabel)}{formatArea(r.builtUpAreaSqft) ? ` · ${formatArea(r.builtUpAreaSqft)}` : ''}
                           </p>
                         </div>
                         <span className="text-xs text-stone">
@@ -421,7 +426,7 @@ export default function ContractorDashboardPage() {
                       <div>
                         <p className="font-medium text-sm">{r.developer.name}</p>
                         <p className="text-stone text-xs mt-0.5">
-                          {r.projectType} · {r.location} · {displayBudget(r.budgetRangeLabel)}
+                          {r.projectType} · {r.location} · {displayBudget(r.budgetRangeLabel)}{formatArea(r.builtUpAreaSqft) ? ` · ${formatArea(r.builtUpAreaSqft)}` : ''}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -539,7 +544,13 @@ export default function ContractorDashboardPage() {
                         <p className="font-medium text-sm">{a.projectPost.developer.name}</p>
                         <p className="text-stone text-xs mt-0.5">
                           {a.projectPost.projectType} · {a.projectPost.location} · {displayBudget(a.projectPost.budgetRangeLabel)}
+                          {formatArea(a.projectPost.builtUpAreaSqft) ? ` · ${formatArea(a.projectPost.builtUpAreaSqft)}` : ''}
                         </p>
+                        {(formatTrades(a.projectPost.trades) || a.projectPost.neededBy) && (
+                          <p className="text-stone text-xs mt-0.5">
+                            {[formatTrades(a.projectPost.trades), a.projectPost.neededBy].filter(Boolean).join(' · ')}
+                          </p>
+                        )}
                       </div>
                       <span className="flex items-center gap-2 text-xs text-stone">
                         {a.isNew && <span className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-ink text-paper">New</span>}

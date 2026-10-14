@@ -27,6 +27,8 @@ import { sendProjectPostAdminEmail } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { requireVerifiedDeveloperEmail } from '@/lib/require-verified-email';
 import { normalizeLocation } from '@/lib/location';
+import { MAX_BUILT_UP_AREA_SQFT, MAX_TRADES_PER_POST, NEEDED_BY_OPTIONS } from '@/lib/project-fields';
+import { ALL_TRADES } from '@/lib/trade-types';
 
 const projectPostSchema = z.object({
   projectType: z.string().trim().min(1).max(200),
@@ -34,6 +36,16 @@ const projectPostSchema = z.object({
   budgetRangeLabel: z.string().trim().min(1).max(100),
   details: z.string().trim().min(1).max(2000),
   contactPhone: z.string().trim().min(6).max(20),
+  // Pilot fields (migration 9b). Area is optional; at least one trade is
+  // required and each must be a real trade name; the timing must be one of
+  // the options on the form.
+  builtUpAreaSqft: z.number().int().min(1).max(MAX_BUILT_UP_AREA_SQFT).nullish(),
+  trades: z
+    .array(z.string().refine((t) => ALL_TRADES.includes(t), { message: 'Pick trades from the list' }))
+    .min(1, 'Pick at least one trade')
+    .max(MAX_TRADES_PER_POST)
+    .transform((list) => Array.from(new Set(list))),
+  neededBy: z.enum(NEEDED_BY_OPTIONS, { message: 'Tell us when you need the contractor' }),
 });
 
 export async function POST(req: NextRequest) {
@@ -83,7 +95,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Account not found' }, { status: 401 });
   }
 
-  const { projectType, location, budgetRangeLabel, details, contactPhone } = parsed.data;
+  const { projectType, location, budgetRangeLabel, details, contactPhone, builtUpAreaSqft, trades, neededBy } = parsed.data;
 
   // Write first, email second — see file header comment.
   const projectPost = await prisma.projectPost.create({
@@ -94,6 +106,9 @@ export async function POST(req: NextRequest) {
       budgetRangeLabel,
       details,
       contactPhone,
+      builtUpAreaSqft: builtUpAreaSqft ?? null,
+      trades,
+      neededBy,
     },
   });
 
@@ -105,6 +120,9 @@ export async function POST(req: NextRequest) {
     location,
     budgetRangeLabel,
     details,
+    builtUpAreaSqft: builtUpAreaSqft ?? null,
+    trades,
+    neededBy,
   });
 
   if (emailSent) {

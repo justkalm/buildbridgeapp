@@ -11,6 +11,7 @@ import { Resend } from 'resend';
 import { formatVisitTime } from '@/lib/site-visits';
 import { prisma } from '@/lib/prisma';
 import { displayBudget } from '@/lib/budget';
+import { formatArea, formatTrades } from '@/lib/project-fields';
 
 // Sending address. Resend only delivers to the public from a domain verified
 // in its dashboard: justkalm.in is the verified one, so mail goes out as
@@ -70,6 +71,7 @@ type QuoteRequestEmailInput = {
   projectType: string;
   location: string;
   budgetRangeLabel: string;
+  builtUpAreaSqft?: number | null;
   details: string;
 };
 
@@ -105,6 +107,7 @@ export async function sendQuoteRequestEmail(input: QuoteRequestEmailInput): Prom
             <tr><td style="padding: 8px 0; color: #666;">Project type</td><td style="padding: 8px 0;">${escapeHtml(input.projectType)}</td></tr>
             <tr><td style="padding: 8px 0; color: #666;">Location</td><td style="padding: 8px 0;">${escapeHtml(input.location)}</td></tr>
             <tr><td style="padding: 8px 0; color: #666;">Budget</td><td style="padding: 8px 0;">${escapeHtml(displayBudget(input.budgetRangeLabel))}</td></tr>
+            ${formatArea(input.builtUpAreaSqft) ? `<tr><td style="padding: 8px 0; color: #666;">Built-up area</td><td style="padding: 8px 0;">${escapeHtml(formatArea(input.builtUpAreaSqft) ?? '')}</td></tr>` : ''}
           </table>
 
           <p style="color: #666; margin-bottom: 4px;">Details</p>
@@ -132,6 +135,9 @@ type ProjectPostEmailInput = {
   projectType: string;
   location: string;
   budgetRangeLabel: string;
+  builtUpAreaSqft?: number | null;
+  trades?: string[];
+  neededBy?: string | null;
   details: string;
 };
 
@@ -166,6 +172,9 @@ export async function sendProjectPostAdminEmail(input: ProjectPostEmailInput): P
             <tr><td style="padding: 8px 0; color: #666;">Project type</td><td style="padding: 8px 0;">${escapeHtml(input.projectType)}</td></tr>
             <tr><td style="padding: 8px 0; color: #666;">Location</td><td style="padding: 8px 0;">${escapeHtml(input.location)}</td></tr>
             <tr><td style="padding: 8px 0; color: #666;">Budget</td><td style="padding: 8px 0;">${escapeHtml(displayBudget(input.budgetRangeLabel))}</td></tr>
+            ${formatArea(input.builtUpAreaSqft) ? `<tr><td style="padding: 8px 0; color: #666;">Built-up area</td><td style="padding: 8px 0;">${escapeHtml(formatArea(input.builtUpAreaSqft) ?? '')}</td></tr>` : ''}
+            ${formatTrades(input.trades) ? `<tr><td style="padding: 8px 0; color: #666;">Trades needed</td><td style="padding: 8px 0;">${escapeHtml(formatTrades(input.trades))}</td></tr>` : ''}
+            ${input.neededBy ? `<tr><td style="padding: 8px 0; color: #666;">Needed</td><td style="padding: 8px 0;">${escapeHtml(input.neededBy)}</td></tr>` : ''}
           </table>
 
           <p style="color: #666; margin-bottom: 4px;">Details</p>
@@ -296,6 +305,9 @@ type ProjectPostAlertEmailInput = {
   projectType: string;
   location: string;
   budgetRangeLabel: string;
+  builtUpAreaSqft?: number | null;
+  trades?: string[];
+  neededBy?: string | null;
   details: string;
 };
 
@@ -322,6 +334,9 @@ export async function sendProjectPostAlertEmail(input: ProjectPostAlertEmailInpu
             <tr><td style="padding: 8px 0; color: #666; width: 140px;">Project type</td><td style="padding: 8px 0;">${escapeHtml(input.projectType)}</td></tr>
             <tr><td style="padding: 8px 0; color: #666;">Location</td><td style="padding: 8px 0;">${escapeHtml(input.location)}</td></tr>
             <tr><td style="padding: 8px 0; color: #666;">Budget</td><td style="padding: 8px 0;">${escapeHtml(displayBudget(input.budgetRangeLabel))}</td></tr>
+            ${formatArea(input.builtUpAreaSqft) ? `<tr><td style="padding: 8px 0; color: #666;">Built-up area</td><td style="padding: 8px 0;">${escapeHtml(formatArea(input.builtUpAreaSqft) ?? '')}</td></tr>` : ''}
+            ${formatTrades(input.trades) ? `<tr><td style="padding: 8px 0; color: #666;">Trades needed</td><td style="padding: 8px 0;">${escapeHtml(formatTrades(input.trades))}</td></tr>` : ''}
+            ${input.neededBy ? `<tr><td style="padding: 8px 0; color: #666;">Needed</td><td style="padding: 8px 0;">${escapeHtml(input.neededBy)}</td></tr>` : ''}
           </table>
 
           <p style="color: #666; margin-bottom: 4px;">Details</p>
@@ -804,6 +819,7 @@ export async function sendNewQuoteToContractorEmail(input: {
     developerEmail: string;
     developerPhone: string;
     budgetRangeLabel: string;
+    builtUpAreaSqft?: number | null;
     details: string;
   };
 }): Promise<boolean> {
@@ -824,6 +840,7 @@ export async function sendNewQuoteToContractorEmail(input: {
           <tr><td style="padding: 6px 0; color: #666; width: 110px;">From</td><td style="padding: 6px 0;">${escapeHtml(lead.developerName)} (${escapeHtml(lead.developerEmail)})</td></tr>
           <tr><td style="padding: 6px 0; color: #666;">Phone</td><td style="padding: 6px 0;">${escapeHtml(lead.developerPhone)}</td></tr>
           <tr><td style="padding: 6px 0; color: #666;">Budget</td><td style="padding: 6px 0;">${escapeHtml(displayBudget(lead.budgetRangeLabel))}</td></tr>
+          ${formatArea(lead.builtUpAreaSqft) ? `<tr><td style="padding: 6px 0; color: #666;">Built-up area</td><td style="padding: 6px 0;">${escapeHtml(formatArea(lead.builtUpAreaSqft) ?? '')}</td></tr>` : ''}
         </table>
         <p style="color: #666; margin-bottom: 4px;">Details</p>
         <p style="white-space: pre-wrap; margin-top: 0;">${escapeHtml(lead.details)}</p>

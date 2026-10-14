@@ -41,6 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           projectType: true,
           location: true,
           budgetRangeLabel: true,
+          builtUpAreaSqft: true,
           details: true,
           contactPhone: true,
         },
@@ -91,6 +92,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         projectType: post.projectType,
         location: post.location,
         budgetRangeLabel: post.budgetRangeLabel,
+        builtUpAreaSqft: post.builtUpAreaSqft,
         details: post.details,
         contactPhone: post.contactPhone,
         // Started by the contractor, so it's already seen on their side.

@@ -16,11 +16,13 @@
 
 import { useEffect, useState } from 'react';
 import { MAX_BUDGET_RUPEES, digitsOnly, rupeesInWords } from '@/lib/budget';
+import { MAX_BUILT_UP_AREA_SQFT } from '@/lib/project-fields';
 import type { SavedProjectClient } from '@/lib/saved-projects';
 
 export type QuoteDetails = {
   location: string;
   budgetDigits: string; // digits only; '' = no budget given
+  areaDigits: string; // built-up area in sq ft, digits only; '' = not given
   details: string;
   contactPhone: string;
   saveProject: boolean;
@@ -30,6 +32,7 @@ export type QuoteDetails = {
 export const EMPTY_QUOTE_DETAILS: QuoteDetails = {
   location: '',
   budgetDigits: '',
+  areaDigits: '',
   details: '',
   contactPhone: '',
   saveProject: false,
@@ -41,6 +44,7 @@ export function quoteDetailsBody(d: QuoteDetails) {
   return {
     location: d.location,
     budgetAmount: d.budgetDigits ? Number(d.budgetDigits) : null,
+    builtUpAreaSqft: d.areaDigits ? Number(d.areaDigits) : null,
     details: d.details,
     contactPhone: d.contactPhone,
     saveAsProject: d.saveProject && d.projectName.trim() ? { name: d.projectName.trim() } : null,
@@ -200,6 +204,24 @@ export function QuoteDetailsFields({
         />
       </div>
       <BudgetInput id="quote-budget" digits={value.budgetDigits} onChange={(d) => set('budgetDigits', d)} />
+      <div>
+        <label htmlFor="quote-area" className={labelClass}>
+          Built-up area in sq ft <span className="font-normal">(optional)</span>
+        </label>
+        <input
+          id="quote-area"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          value={value.areaDigits ? Number(value.areaDigits).toLocaleString('en-IN') : ''}
+          onChange={(e) => {
+            const next = digitsOnly(e.target.value);
+            if (!next || Number(next) <= MAX_BUILT_UP_AREA_SQFT) set('areaDigits', next);
+          }}
+          placeholder="e.g. 30,000"
+          className={inputClass}
+        />
+      </div>
       <div>
         <label htmlFor="quote-details" className={labelClass}>Project details</label>
         <textarea

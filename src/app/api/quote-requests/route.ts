@@ -36,6 +36,7 @@ import { createSavedProject } from '@/lib/saved-projects';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { requireVerifiedDeveloperEmail } from '@/lib/require-verified-email';
 import { MAX_BUDGET_RUPEES, formatBudgetLabel } from '@/lib/budget';
+import { MAX_BUILT_UP_AREA_SQFT } from '@/lib/project-fields';
 
 const quoteRequestSchema = z.object({
   contractorId: z.string().min(1),
@@ -45,6 +46,8 @@ const quoteRequestSchema = z.object({
   // text ("Rs. 12,50,000" or "Not specified") is built here, not sent by
   // the browser, so its format is always the same. See src/lib/budget.ts.
   budgetAmount: z.number().int().min(1).max(MAX_BUDGET_RUPEES).nullish(),
+  // Optional built-up area in sq ft (migration 9b).
+  builtUpAreaSqft: z.number().int().min(1).max(MAX_BUILT_UP_AREA_SQFT).nullish(),
   details: z.string().trim().min(1).max(2000),
   contactPhone: z.string().trim().min(6).max(20),
   // Optional: also keep these details as a saved project under this name.
@@ -101,7 +104,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { contractorId, projectType, location, budgetAmount, details, contactPhone, saveAsProject } = parsed.data;
+  const { contractorId, projectType, location, budgetAmount, builtUpAreaSqft, details, contactPhone, saveAsProject } = parsed.data;
   const budgetRangeLabel = formatBudgetLabel(budgetAmount);
 
   const contractor = await prisma.contractor.findUnique({
@@ -130,7 +133,7 @@ export async function POST(req: NextRequest) {
   const result = await createQuoteRequest({
     developer,
     contractor,
-    fields: { projectType, location, budgetRangeLabel, details, contactPhone },
+    fields: { projectType, location, budgetRangeLabel, builtUpAreaSqft: builtUpAreaSqft ?? null, details, contactPhone },
   });
 
   // "Save these details as a project" on the form. Saving is a bonus: if it

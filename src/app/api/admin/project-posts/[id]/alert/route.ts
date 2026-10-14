@@ -115,6 +115,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         projectType: projectPost.projectType,
         location: projectPost.location,
         budgetRangeLabel: projectPost.budgetRangeLabel,
+        builtUpAreaSqft: projectPost.builtUpAreaSqft,
+        trades: projectPost.trades,
+        neededBy: projectPost.neededBy,
         details: projectPost.details,
       })
     )

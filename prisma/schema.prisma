@@ -413,6 +413,7 @@ model QuoteRequest {
   projectType    String
   location       String
   budgetRangeLabel String // e.g. "₹1 Cr – ₹3 Cr" — stored as the label shown, not a numeric range, since this is what the notification email should read naturally
+  builtUpAreaSqft Int? // optional, sq ft (migration 9b); copied from the post for kind PROJECT
   details        String
   contactPhone   String // developer's number, captured at request time even if it's already on their account — keeps the record self-contained
 
@@ -493,6 +494,14 @@ model ProjectPost {
   budgetRangeLabel String
   details          String
   contactPhone     String // same reasoning as QuoteRequest.contactPhone — self-contained record
+
+  // Added 15 Oct 2026 for the pilot (migration 9b). All optional, so posts
+  // made before then stay valid: built-up area in sq ft, the trades the
+  // developer needs (names from src/lib/trade-types.ts), and "when do you
+  // need the contractor" (one of NEEDED_BY_OPTIONS in src/lib/project-fields.ts).
+  builtUpAreaSqft Int?
+  trades          String[]
+  neededBy        String?
 
   status ProjectPostStatus @default(NEW)
 

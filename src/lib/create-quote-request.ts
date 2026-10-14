@@ -23,6 +23,7 @@ export type QuoteRequestFields = {
   projectType: string;
   location: string;
   budgetRangeLabel: string;
+  builtUpAreaSqft?: number | null;
   details: string;
   contactPhone: string;
 };
@@ -80,6 +81,7 @@ export async function createQuoteRequest({
                 developerEmail: developer.email,
                 developerPhone: fields.contactPhone,
                 budgetRangeLabel: fields.budgetRangeLabel,
+                builtUpAreaSqft: fields.builtUpAreaSqft,
                 details: fields.details,
               }
             : undefined,
