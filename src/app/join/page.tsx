@@ -185,7 +185,7 @@ export default function JoinPage() {
           bio: bio || undefined,
           logoUrl: logoUrl || undefined,
           tradeTypes,
-          gstNumber: gstNumber || undefined,
+          gstNumber,
           licenceNumber: licenceNumber || undefined,
           hasInsurance,
           projects: projects.map((p) => ({
@@ -290,9 +290,9 @@ export default function JoinPage() {
               </p>
               <div>
                 <label htmlFor="join-gst" className="block text-sm font-medium mb-1.5">
-                  GST number <span className="text-stone font-normal">(optional)</span>
+                  GST number
                 </label>
-                <input id="join-gst" type="text" maxLength={20} value={gstNumber}
+                <input id="join-gst" type="text" required maxLength={20} value={gstNumber}
                   onChange={(e) => setGstNumber(e.target.value)} placeholder="27ABCDE1234F1Z5"
                   autoCapitalize="characters" className={inputClass} />
               </div>

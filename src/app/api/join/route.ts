@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       bio: data.bio ?? null,
       logoUrl: data.logoUrl ?? null,
       tradeTypes: data.tradeTypes,
-      gstNumber: data.gstNumber ?? null,
+      gstNumber: data.gstNumber,
       licenceNumber: data.licenceNumber ?? null,
       hasInsurance: data.hasInsurance,
       projects: data.projects.map((p) => ({

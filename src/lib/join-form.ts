@@ -96,13 +96,14 @@ export const joinFormSchema = z.object({
   tradeTypes: tradeTypesField().refine((types) => types.length > 0, {
     message: 'Pick your trade and at least one speciality',
   }),
+  // Required (owner, 16 Oct 2026): developers want GST invoices.
   gstNumber: z
     .string()
     .trim()
     .max(20)
-    .optional()
-    .transform((v) => (v ? v.replace(/\s+/g, '').toUpperCase() : undefined))
-    .refine((v) => v === undefined || GSTIN_PATTERN.test(v), {
+    .transform((v) => v.replace(/\s+/g, '').toUpperCase())
+    .refine((v) => v.length > 0, { message: 'GST number is required' })
+    .refine((v) => v.length === 0 || GSTIN_PATTERN.test(v), {
       message: 'A GST number is 15 letters and digits, for example 27ABCDE1234F1Z5',
     }),
   licenceNumber: optionalText(100),

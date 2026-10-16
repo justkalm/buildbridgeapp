@@ -12,6 +12,7 @@ const valid = {
   area: 'Andheri West',
   tradeTypes: ['Demolition'],
   hasInsurance: true,
+  gstNumber: '27ABCDE1234F1Z5',
   projects: [
     { ...DETAILS, name: 'Tower A', developerName: 'Some Developer', imageUrls: [BLOB, BLOB2] },
     { ...DETAILS, name: 'Tower B', imageUrls: [BLOB, BLOB2] },
@@ -27,16 +28,19 @@ describe('joinFormSchema', () => {
     if (r.success) expect(r.data.gstNumber).toBe('27ABCDE1234F1Z5');
   });
   it('treats blank optional fields as not given', () => {
-    const r = joinFormSchema.safeParse({ ...valid, bio: '  ', gstNumber: '', licenceNumber: '' });
+    const r = joinFormSchema.safeParse({ ...valid, bio: '  ', licenceNumber: '' });
     expect(r.success).toBe(true);
     if (r.success) {
       expect(r.data.bio).toBeUndefined();
-      expect(r.data.gstNumber).toBeUndefined();
       expect(r.data.licenceNumber).toBeUndefined();
     }
   });
-  it('refuses a GST number of the wrong shape', () => {
+  it('refuses a missing or wrongly shaped GST number', () => {
     expect(joinFormSchema.safeParse({ ...valid, gstNumber: '12345' }).success).toBe(false);
+    expect(joinFormSchema.safeParse({ ...valid, gstNumber: '' }).success).toBe(false);
+    const { gstNumber: _omit, ...noGst } = valid;
+    void _omit;
+    expect(joinFormSchema.safeParse(noGst).success).toBe(false);
   });
   it('refuses photos that are not on our own storage', () => {
     const outside = {
