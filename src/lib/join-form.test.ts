@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { JOIN_MAX_PROJECTS, joinFormSchema, readJoinProjects } from './join-form';
+import { JOIN_MAX_PROJECTS, JOIN_MIN_PROJECTS, joinFormSchema, readJoinProjects } from './join-form';
 
 const BLOB = 'https://abc123.public.blob.vercel-storage.com/join/photo-x.jpg';
+const BLOB2 = 'https://abc123.public.blob.vercel-storage.com/join/photo-y.jpg';
 
 const valid = {
   businessName: 'Test Builders',
@@ -9,7 +10,12 @@ const valid = {
   email: 'test@example.com',
   area: 'Andheri West',
   tradeTypes: ['Demolition'],
-  projects: [{ name: 'Tower A', developerName: 'Some Developer', imageUrls: [BLOB] }],
+  hasInsurance: true,
+  projects: [
+    { name: 'Tower A', developerName: 'Some Developer', imageUrls: [BLOB, BLOB2] },
+    { name: 'Tower B', imageUrls: [BLOB, BLOB2] },
+    { name: 'Tower C', imageUrls: [BLOB, BLOB2] },
+  ],
   consent: true,
 };
 
@@ -32,7 +38,10 @@ describe('joinFormSchema', () => {
     expect(joinFormSchema.safeParse({ ...valid, gstNumber: '12345' }).success).toBe(false);
   });
   it('refuses photos that are not on our own storage', () => {
-    const outside = { ...valid, projects: [{ name: 'X', imageUrls: ['https://example.com/a.jpg'] }] };
+    const outside = {
+      ...valid,
+      projects: [...valid.projects.slice(1), { name: 'X', imageUrls: [BLOB, 'https://example.com/a.jpg'] }],
+    };
     expect(joinFormSchema.safeParse(outside).success).toBe(false);
     expect(joinFormSchema.safeParse({ ...valid, logoUrl: 'https://example.com/logo.png' }).success).toBe(false);
   });
@@ -52,8 +61,19 @@ describe('joinFormSchema', () => {
     expect(joinFormSchema.safeParse({ ...valid, logoUrl: other }).success).toBe(false);
   });
   it('caps the number of projects', () => {
-    const many = Array.from({ length: JOIN_MAX_PROJECTS + 1 }, (_, i) => ({ name: `P${i}`, imageUrls: [] }));
+    const many = Array.from({ length: JOIN_MAX_PROJECTS + 1 }, (_, i) => ({ name: `P${i}`, imageUrls: [BLOB, BLOB2] }));
     expect(joinFormSchema.safeParse({ ...valid, projects: many }).success).toBe(false);
+  });
+  it('needs at least 3 projects, each with at least 2 photos', () => {
+    expect(joinFormSchema.safeParse({ ...valid, projects: valid.projects.slice(0, JOIN_MIN_PROJECTS - 1) }).success).toBe(false);
+    const onePhoto = [...valid.projects.slice(1), { name: 'Tower D', imageUrls: [BLOB] }];
+    expect(joinFormSchema.safeParse({ ...valid, projects: onePhoto }).success).toBe(false);
+  });
+  it('needs the insurance yes or no', () => {
+    const { hasInsurance: _omit, ...noAnswer } = valid;
+    void _omit;
+    expect(joinFormSchema.safeParse(noAnswer).success).toBe(false);
+    expect(joinFormSchema.safeParse({ ...valid, hasInsurance: false }).success).toBe(true);
   });
 });
 

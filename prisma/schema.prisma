@@ -805,6 +805,7 @@ model ContractorApplication {
   tradeTypes    String[]
   gstNumber     String?
   licenceNumber String?
+  hasInsurance  Boolean // the yes/no tick; the amount is asked later, on the listing
   projects      Json     @default("[]")
 
   consentAt DateTime // the "you may use these details for my listing" tick

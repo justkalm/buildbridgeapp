@@ -16,8 +16,13 @@ import { tradeTypesField } from '@/lib/project-validation';
 import { normalizeLocation } from '@/lib/location';
 import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
 
-export const JOIN_MAX_PROJECTS = 10;
-export const JOIN_MAX_PHOTOS_PER_PROJECT = 10;
+// Owner's rule (16 Oct 2026): every contractor lists 3 to 5 projects, each
+// with photos. 2 photos minimum (finished work plus one during the work, so
+// the job is plainly theirs), 6 at most.
+export const JOIN_MIN_PROJECTS = 3;
+export const JOIN_MAX_PROJECTS = 5;
+export const JOIN_MIN_PHOTOS_PER_PROJECT = 2;
+export const JOIN_MAX_PHOTOS_PER_PROJECT = 6;
 export const JOIN_MAX_BIO = 1000;
 
 // A GSTIN is 15 letters and digits (2-digit state code, PAN, entity number,
@@ -56,6 +61,7 @@ export const joinProjectSchema = z.object({
   developerName: optionalText(200),
   imageUrls: z
     .array(blobUrl)
+    .min(JOIN_MIN_PHOTOS_PER_PROJECT, `Add at least ${JOIN_MIN_PHOTOS_PER_PROJECT} photos to each project`)
     .max(JOIN_MAX_PHOTOS_PER_PROJECT, `Up to ${JOIN_MAX_PHOTOS_PER_PROJECT} photos per project`),
 });
 
@@ -87,8 +93,10 @@ export const joinFormSchema = z.object({
       message: 'A GST number is 15 letters and digits, for example 27ABCDE1234F1Z5',
     }),
   licenceNumber: optionalText(100),
+  hasInsurance: z.boolean({ message: 'Tell us whether you have insurance (Yes or No)' }),
   projects: z
     .array(joinProjectSchema)
+    .min(JOIN_MIN_PROJECTS, `List at least ${JOIN_MIN_PROJECTS} projects`)
     .max(JOIN_MAX_PROJECTS, `Up to ${JOIN_MAX_PROJECTS} projects`),
   consent: z.literal(true, { message: 'Please tick the box to let us use these details' }),
 });

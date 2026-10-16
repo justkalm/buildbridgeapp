@@ -4,8 +4,9 @@
 // the team sends this link on WhatsApp or email, the contractor fills it in
 // on their phone, and admin turns it into a listing by hand from
 // /admin/applications. The fields are the ones the owner listed: business
-// name, phone, email, bio, logo, trades, GST, licence, and for each project
-// its name, the developer it was for and its photos. Area is asked as well,
+// name, phone, email, bio, logo, trades, GST, licence (optional), an
+// insurance yes/no, and 3 to 5 projects, each with its name, the developer
+// it was for and 2 to 6 photos (owner's rule, 16 Oct 2026). Area is asked as well,
 // because a listing can't go live or be verified without one.
 //
 // Photos upload as soon as they are picked (ImageUpload, pointed at
@@ -25,7 +26,13 @@ import ImageUpload from '@/components/ImageUpload';
 import TradeTypePicker from '@/components/TradeTypePicker';
 import { normalizeLocation } from '@/lib/location';
 import { tradeOf } from '@/lib/trade-types';
-import { JOIN_MAX_BIO, JOIN_MAX_PHOTOS_PER_PROJECT, JOIN_MAX_PROJECTS } from '@/lib/join-form';
+import {
+  JOIN_MAX_BIO,
+  JOIN_MAX_PHOTOS_PER_PROJECT,
+  JOIN_MAX_PROJECTS,
+  JOIN_MIN_PHOTOS_PER_PROJECT,
+  JOIN_MIN_PROJECTS,
+} from '@/lib/join-form';
 
 const UPLOAD_URL = '/api/join/upload';
 
@@ -46,7 +53,10 @@ export default function JoinPage() {
   const [tradeTypes, setTradeTypes] = useState<string[]>([]);
   const [gstNumber, setGstNumber] = useState('');
   const [licenceNumber, setLicenceNumber] = useState('');
-  const [projects, setProjects] = useState<ProjectDraft[]>([emptyProject()]);
+  const [projects, setProjects] = useState<ProjectDraft[]>(() =>
+    Array.from({ length: JOIN_MIN_PROJECTS }, emptyProject)
+  );
+  const [hasInsurance, setHasInsurance] = useState<boolean | null>(null);
   const [consent, setConsent] = useState(false);
 
   // Counts uploads in flight across every ImageUpload on the page.
@@ -82,11 +92,21 @@ export default function JoinPage() {
       return;
     }
 
-    // A project row with photos or a developer but no name is almost
-    // certainly a slip, so ask rather than quietly dropping the photos.
-    const unnamed = projects.find((p) => !p.name.trim() && (p.imageUrls.length > 0 || p.developerName.trim()));
-    if (unnamed) {
-      setError('Give each project a name, or remove the empty one.');
+    if (hasInsurance === null) {
+      setError('Tell us whether you have insurance (Yes or No).');
+      return;
+    }
+
+    // Every project box shown must be complete: there are only ever 3 to 5,
+    // and all of them are required.
+    const unnamedIndex = projects.findIndex((p) => !p.name.trim());
+    if (unnamedIndex !== -1) {
+      setError(`Give project ${unnamedIndex + 1} a name.`);
+      return;
+    }
+    const fewPhotosIndex = projects.findIndex((p) => p.imageUrls.length < JOIN_MIN_PHOTOS_PER_PROJECT);
+    if (fewPhotosIndex !== -1) {
+      setError(`Add at least ${JOIN_MIN_PHOTOS_PER_PROJECT} photos to project ${fewPhotosIndex + 1}.`);
       return;
     }
 
@@ -105,13 +125,12 @@ export default function JoinPage() {
           tradeTypes,
           gstNumber: gstNumber || undefined,
           licenceNumber: licenceNumber || undefined,
-          projects: projects
-            .filter((p) => p.name.trim())
-            .map((p) => ({
-              name: p.name,
-              developerName: p.developerName || undefined,
-              imageUrls: p.imageUrls,
-            })),
+          hasInsurance,
+          projects: projects.map((p) => ({
+            name: p.name,
+            developerName: p.developerName || undefined,
+            imageUrls: p.imageUrls,
+          })),
           consent,
         }),
       });
@@ -202,33 +221,55 @@ export default function JoinPage() {
             <fieldset className="flex flex-col gap-4 pt-6 border-t border-line">
               <legend className="font-display text-base mb-1">Registration</legend>
               <p className="text-xs text-stone -mt-2">
-                Optional, but we check these before we mark a listing Verified.
+                We check these before we mark a listing Verified.
               </p>
               <div>
-                <label htmlFor="join-gst" className="block text-sm font-medium mb-1.5">GST number</label>
+                <label htmlFor="join-gst" className="block text-sm font-medium mb-1.5">
+                  GST number <span className="text-stone font-normal">(optional)</span>
+                </label>
                 <input id="join-gst" type="text" maxLength={20} value={gstNumber}
                   onChange={(e) => setGstNumber(e.target.value)} placeholder="27ABCDE1234F1Z5"
                   autoCapitalize="characters" className={inputClass} />
               </div>
               <div>
-                <label htmlFor="join-licence" className="block text-sm font-medium mb-1.5">Licence number</label>
+                <label htmlFor="join-licence" className="block text-sm font-medium mb-1.5">
+                  Licence number <span className="text-stone font-normal">(optional)</span>
+                </label>
                 <input id="join-licence" type="text" maxLength={100} value={licenceNumber}
                   onChange={(e) => setLicenceNumber(e.target.value)} className={inputClass} />
+              </div>
+              <div role="radiogroup" aria-labelledby="join-insurance-label">
+                <p id="join-insurance-label" className="block text-sm font-medium mb-1.5">
+                  Do you have insurance for your work?
+                </p>
+                <div className="flex gap-2">
+                  {([true, false] as const).map((value) => (
+                    <button key={String(value)} type="button" role="radio" aria-checked={hasInsurance === value}
+                      onClick={() => setHasInsurance(value)}
+                      className={`text-sm px-5 py-2 rounded-full border ${
+                        hasInsurance === value ? 'border-ink bg-ink text-paper' : 'border-line bg-paper hover:border-ink'
+                      }`}>
+                      {value ? 'Yes' : 'No'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </fieldset>
 
             <fieldset className="flex flex-col gap-4 pt-6 border-t border-line">
               <legend className="font-display text-base mb-1">Your projects</legend>
               <p className="text-xs text-stone -mt-2">
-                Projects with photos get more enquiries. Add the developer you did it for, unless
-                they asked not to be named.
+                List {JOIN_MIN_PROJECTS} to {JOIN_MAX_PROJECTS} projects you have done. For each one add at
+                least {JOIN_MIN_PHOTOS_PER_PROJECT} photos (up to {JOIN_MAX_PHOTOS_PER_PROJECT}): one of the
+                finished work and one taken during the work is ideal. Add the developer you did it for,
+                unless they asked not to be named.
               </p>
 
               {projects.map((project, index) => (
                 <div key={index} className="border border-line rounded-md p-4 flex flex-col gap-3 bg-paper">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Project {index + 1}</span>
-                    {projects.length > 1 && (
+                    {projects.length > JOIN_MIN_PROJECTS && (
                       <button type="button" onClick={() => setProjects((p) => p.filter((_, i) => i !== index))}
                         className="text-xs font-medium text-danger">
                         Remove
@@ -257,6 +298,10 @@ export default function JoinPage() {
                       ))}
                     </div>
                   )}
+                  <p className={`text-xs ${project.imageUrls.length >= JOIN_MIN_PHOTOS_PER_PROJECT ? 'text-sage' : 'text-stone'}`}>
+                    {project.imageUrls.length} of {JOIN_MAX_PHOTOS_PER_PROJECT} photos
+                    {project.imageUrls.length < JOIN_MIN_PHOTOS_PER_PROJECT && `, at least ${JOIN_MIN_PHOTOS_PER_PROJECT} needed`}
+                  </p>
                   {project.imageUrls.length < JOIN_MAX_PHOTOS_PER_PROJECT && (
                     <ImageUpload
                       key={project.imageUrls.length}

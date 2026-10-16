@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
       tradeTypes: data.tradeTypes,
       gstNumber: data.gstNumber ?? null,
       licenceNumber: data.licenceNumber ?? null,
+      hasInsurance: data.hasInsurance,
       projects: data.projects.map((p) => ({
         name: p.name,
         ...(p.developerName ? { developerName: p.developerName } : {}),

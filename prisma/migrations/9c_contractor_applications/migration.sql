@@ -19,6 +19,7 @@ CREATE TABLE "ContractorApplication" (
     "tradeTypes" TEXT[],
     "gstNumber" TEXT,
     "licenceNumber" TEXT,
+    "hasInsurance" BOOLEAN NOT NULL,
     "projects" JSONB NOT NULL DEFAULT '[]',
     "consentAt" TIMESTAMP(3) NOT NULL,
     "status" "ContractorApplicationStatus" NOT NULL DEFAULT 'NEW',

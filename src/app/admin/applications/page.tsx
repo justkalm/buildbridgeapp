@@ -27,6 +27,7 @@ type ApplicationRow = {
   tradeTypes: string[];
   gstNumber: string | null;
   licenceNumber: string | null;
+  hasInsurance: boolean;
   projects: { name: string; developerName?: string; imageUrls: string[] }[];
   status: Status;
   adminNote: string | null;
@@ -152,6 +153,7 @@ export default function AdminApplicationsPage() {
                 <dt className="text-stone">Email</dt><dd className="break-all">{r.email}</dd>
                 <dt className="text-stone">GST</dt><dd>{r.gstNumber ?? 'Not given'}</dd>
                 <dt className="text-stone">Licence</dt><dd>{r.licenceNumber ?? 'Not given'}</dd>
+                <dt className="text-stone">Insurance</dt><dd>{r.hasInsurance ? 'Yes (ask for the cover amount)' : 'No'}</dd>
                 <dt className="text-stone">Specialities</dt>
                 <dd>{r.tradeTypes.map(specialityLabel).join(', ')}</dd>
               </dl>

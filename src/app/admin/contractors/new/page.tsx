@@ -61,7 +61,12 @@ export default function NewContractorPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // The /join form this listing is being made from, if any.
-  const [fromApplication, setFromApplication] = useState<{ id: string; businessName: string; gstNumber: string | null } | null>(null);
+  const [fromApplication, setFromApplication] = useState<{
+    id: string;
+    businessName: string;
+    gstNumber: string | null;
+    hasInsurance: boolean;
+  } | null>(null);
 
   // True while a ?from= form is loading, so the prefill can't overwrite
   // something admin has already started typing.
@@ -87,6 +92,7 @@ export default function NewContractorPage() {
           tradeTypes: string[];
           gstNumber: string | null;
           licenceNumber: string | null;
+          hasInsurance: boolean;
           projects: { name: string; developerName?: string; imageUrls: string[] }[];
         }) => {
           setName(a.businessName);
@@ -103,7 +109,7 @@ export default function NewContractorPage() {
           setProjects(
             a.projects.map((p) => ({ ...emptyProject(), title: p.name, developerName: p.developerName ?? '', imageUrls: p.imageUrls }))
           );
-          setFromApplication({ id: a.id, businessName: a.businessName, gstNumber: a.gstNumber });
+          setFromApplication({ id: a.id, businessName: a.businessName, gstNumber: a.gstNumber, hasInsurance: a.hasInsurance });
         }
       )
       .catch(() => setError('Could not load that join form. Your admin session may have expired.'))
@@ -283,6 +289,9 @@ export default function NewContractorPage() {
             {fromApplication.gstNumber && (
               <> GST number they gave, for the GSTIN check: <span className="font-medium">{fromApplication.gstNumber}</span>.</>
             )}
+            {fromApplication.hasInsurance
+              ? ' They say they have insurance: ask for the cover amount before filling it in.'
+              : ' They say they have no insurance.'}
           </div>
         )}
         {success && (
