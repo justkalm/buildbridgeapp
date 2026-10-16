@@ -45,6 +45,9 @@ export default function AdminApplicationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Status | 'ALL'>('NEW');
   const [busyId, setBusyId] = useState<string | null>(null);
+  // The form whose "Delete for good?" question is showing (asked in the
+  // card, not a browser pop-up).
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/applications')
@@ -66,6 +69,24 @@ export default function AdminApplicationsPage() {
       setRows((all) => all?.map((r) => (r.id === id ? { ...r, status } : r)) ?? null);
     } catch {
       setError('Could not update that form. Please try again.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteForGood(id: string) {
+    setBusyId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/applications/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error);
+      }
+      setRows((all) => all?.filter((r) => r.id !== id) ?? null);
+      setConfirmDeleteId(null);
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : 'Could not delete that form. Please try again.');
     } finally {
       setBusyId(null);
     }
@@ -180,7 +201,32 @@ export default function AdminApplicationsPage() {
                     Move back to New
                   </button>
                 )}
+                {confirmDeleteId !== r.id && (
+                  <button type="button" onClick={() => setConfirmDeleteId(r.id)}
+                    className="text-sm text-danger px-2 py-2 ml-auto">
+                    Delete
+                  </button>
+                )}
               </div>
+              {confirmDeleteId === r.id && (
+                <div className="mt-3 bg-danger-soft border border-danger rounded-md p-3 text-sm">
+                  <p className="mb-2">
+                    Delete this form and its logo and photos for good? This can&apos;t be undone.
+                    {r.status === 'ADDED' &&
+                      ' It is marked Added: if its listing uses these same photos, they will disappear from the listing too.'}
+                  </p>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={busyId === r.id} onClick={() => deleteForGood(r.id)}
+                      className="text-sm font-medium bg-danger text-paper rounded-full px-4 py-1.5 disabled:opacity-60">
+                      Yes, delete
+                    </button>
+                    <button type="button" onClick={() => setConfirmDeleteId(null)}
+                      className="text-sm border border-line bg-white rounded-full px-4 py-1.5">
+                      Keep it
+                    </button>
+                  </div>
+                </div>
+              )}
             </article>
           ))}
         </div>

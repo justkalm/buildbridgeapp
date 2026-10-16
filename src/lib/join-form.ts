@@ -6,9 +6,10 @@
 // hand. Shared by the API route (the real check) and the page (limits shown
 // to the person, so they hear about a problem before they press Send).
 //
-// Every image URL must point at our own Vercel Blob store (see
-// src/lib/validate-image-url.ts for why), so a hand-made request can't slip
-// an outside image into an application.
+// Every image URL must point at a Vercel Blob store (see
+// src/lib/validate-image-url.ts for why) AND sit in the join/ folder that
+// /api/join/upload writes to, so a hand-made request can't slip an outside
+// image, or some other file on Blob, into an application.
 
 import { z } from 'zod';
 import { tradeTypesField } from '@/lib/project-validation';
@@ -24,11 +25,23 @@ export const JOIN_MAX_BIO = 1000;
 // slips; admin still checks it on the GST portal before verifying.
 const GSTIN_PATTERN = /^[0-9]{2}[A-Z0-9]{13}$/;
 
+function isJoinUploadUrl(url: string): boolean {
+  if (!isOwnBlobImageUrl(url)) return false;
+  return new URL(url).pathname.startsWith('/join/');
+}
+
 const blobUrl = z
   .string()
   .trim()
   .max(1000)
-  .refine(isOwnBlobImageUrl, { message: 'Please upload the photo again.' });
+  .refine(isJoinUploadUrl, { message: 'Please upload the photo again.' });
+
+// Digits, spaces, '+', '-' and brackets only, with 10 to 15 digits (an
+// Indian mobile is 10, or 12 with the 91 in front).
+const PHONE_CHARS = /^[0-9+\-\s()]+$/;
+function digitCount(v: string): number {
+  return v.replace(/[^0-9]/g, '').length;
+}
 
 const optionalText = (max: number) =>
   z
@@ -50,7 +63,13 @@ export type JoinProject = z.infer<typeof joinProjectSchema>;
 
 export const joinFormSchema = z.object({
   businessName: z.string().trim().min(1, 'Business name is required').max(200),
-  phone: z.string().trim().min(7, 'Enter a valid phone number').max(20),
+  phone: z
+    .string()
+    .trim()
+    .max(20)
+    .refine((v) => PHONE_CHARS.test(v) && digitCount(v) >= 10 && digitCount(v) <= 15, {
+      message: 'Enter a valid phone number, for example +91 98200 12345',
+    }),
   email: z.string().trim().email('Enter a valid email address').max(320),
   area: z.string().trim().min(1, 'Area is required').max(100).transform(normalizeLocation),
   bio: optionalText(JOIN_MAX_BIO),
@@ -76,8 +95,17 @@ export const joinFormSchema = z.object({
 
 export type JoinFormInput = z.infer<typeof joinFormSchema>;
 
-/** Reads the stored projects JSON back safely (old or odd rows become []). */
-export function readJoinProjects(value: unknown): JoinProject[] {
-  const parsed = z.array(joinProjectSchema).safeParse(value);
+// Looser than joinProjectSchema on purpose: rows were checked when they
+// came in, and if the rules above get stricter later, older rows should
+// still show their projects rather than quietly showing none.
+const storedProjectSchema = z.object({
+  name: z.string(),
+  developerName: z.string().optional(),
+  imageUrls: z.array(z.string()).catch([]),
+});
+
+/** Reads the stored projects JSON back safely (odd rows become []). */
+export function readJoinProjects(value: unknown): z.infer<typeof storedProjectSchema>[] {
+  const parsed = z.array(storedProjectSchema).safeParse(value);
   return parsed.success ? parsed.data : [];
 }

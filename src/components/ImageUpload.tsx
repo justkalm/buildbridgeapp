@@ -34,7 +34,39 @@ type ImageUploadProps = {
   // this from a contractor-facing page so the request is checked against
   // contractor session instead of the admin cookie.
   uploadUrl?: string;
+  // Shrink big photos in the browser before sending (used by the /join form,
+  // which contractors fill in on their phones). Vercel refuses request
+  // bodies over 4.5MB, and many phone camera photos are bigger than that.
+  shrinkLargePhotos?: boolean;
 };
+
+// Vercel's request body limit is 4.5MB; stay safely under it.
+const MAX_SEND_BYTES = 4 * 1024 * 1024;
+const SHRINK_ABOVE_BYTES = 2 * 1024 * 1024;
+const MAX_SIDE_PX = 2000;
+
+// Redraws the photo at most 2000px on its longest side as a JPEG. Returns
+// the original file if it is already small, or if the browser can't do it
+// (then the size check below still gives a clear message).
+async function shrinkPhoto(file: File): Promise<File> {
+  if (file.size <= SHRINK_ABOVE_BYTES) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE_PX / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+  } catch {
+    return file;
+  }
+}
 
 export default function ImageUpload({
   label,
@@ -42,27 +74,38 @@ export default function ImageUpload({
   onChange,
   onUploadStateChange,
   uploadUrl = '/api/admin/upload',
+  shrinkLargePhotos = false,
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const picked = e.target.files?.[0];
+    if (!picked) return;
 
     setError(null);
     setUploading(true);
     onUploadStateChange?.(true);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
+      const file = shrinkLargePhotos ? await shrinkPhoto(picked) : picked;
+      if (shrinkLargePhotos && file.size > MAX_SEND_BYTES) {
+        setError('This photo is too large. Please pick a smaller one (under 4MB).');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
       const res = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
       });
-      const data = await res.json();
+      if (res.status === 413) {
+        setError('This photo is too large. Please pick a smaller one (under 4MB).');
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         setError(data.error ?? 'Upload failed');

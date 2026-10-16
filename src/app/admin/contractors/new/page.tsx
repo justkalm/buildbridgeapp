@@ -63,9 +63,16 @@ export default function NewContractorPage() {
   // The /join form this listing is being made from, if any.
   const [fromApplication, setFromApplication] = useState<{ id: string; businessName: string; gstNumber: string | null } | null>(null);
 
+  // True while a ?from= form is loading, so the prefill can't overwrite
+  // something admin has already started typing.
+  const [prefilling, setPrefilling] = useState(false);
+
   useEffect(() => {
     const fromId = new URLSearchParams(window.location.search).get('from');
     if (!fromId) return;
+    // 0ms timer rather than an inline call: setting state synchronously in
+    // an effect is a lint error in this repo (react-hooks/set-state-in-effect).
+    const start = setTimeout(() => setPrefilling(true), 0);
     fetch(`/api/admin/applications/${encodeURIComponent(fromId)}`)
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then(
@@ -90,7 +97,8 @@ export default function NewContractorPage() {
           setLogoUrl(a.logoUrl);
           setTradeTypes(a.tradeTypes);
           setPickerKey((k) => k + 1); // the picker reads `selected` only when it mounts
-          setGstRegistered(!!a.gstNumber);
+          // GST registered stays unticked: the number they gave is only a
+          // claim until admin checks it on the GST portal (see the banner).
           setLicenseNumber(a.licenceNumber ?? '');
           setProjects(
             a.projects.map((p) => ({ ...emptyProject(), title: p.name, developerName: p.developerName ?? '', imageUrls: p.imageUrls }))
@@ -98,7 +106,11 @@ export default function NewContractorPage() {
           setFromApplication({ id: a.id, businessName: a.businessName, gstNumber: a.gstNumber });
         }
       )
-      .catch(() => setError('Could not load that join form. Your admin session may have expired.'));
+      .catch(() => setError('Could not load that join form. Your admin session may have expired.'))
+      .finally(() => {
+        clearTimeout(start);
+        setPrefilling(false);
+      });
   }, []);
 
 
@@ -284,6 +296,9 @@ export default function NewContractorPage() {
           </div>
         )}
 
+        {prefilling ? (
+          <p className="text-sm text-stone">Loading the join form…</p>
+        ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-5 bg-paper border border-line rounded-md p-6">
           <Field label="Business name">
             <input required value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
@@ -475,6 +490,7 @@ export default function NewContractorPage() {
             {submitting ? 'Adding…' : 'Add Contractor'}
           </button>
         </form>
+        )}
       </div>
     </main>
   );

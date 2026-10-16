@@ -5,9 +5,11 @@
 // /admin/applications. It never creates a Contractor, an account or
 // anything public: a person checks every one and adds the listing by hand.
 //
-// No sign-in, so the limits protect it: 5 sends an hour per IP, and 100 a
-// day across the whole site (a spread-out flood can fill admin's list but
-// not without end). Rules for every field live in src/lib/join-form.ts.
+// No sign-in, so the limits protect it: 15 sends an hour per IP (a whole
+// meeting room on one Wi-Fi shares an IP, so not lower), and 100 a day
+// across the whole site (a spread-out flood can fill admin's list but not
+// without end). Both are counted only after the fields pass, so a typo
+// doesn't use up a try. Rules for every field live in src/lib/join-form.ts.
 // The admin email is best effort: a failed email is logged (Failed emails
 // tab) and the form still counts as sent, because the row is already saved.
 
@@ -26,11 +28,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
 
-  const ip = getClientIp(req);
-  if (!(await checkRateLimit(`join-form:${ip}`, { maxAttempts: 5, windowMs: HOUR }))) {
-    return NextResponse.json({ error: 'Too many forms sent. Please try again later.' }, { status: 429 });
-  }
-
   let body: unknown;
   try {
     body = await req.json();
@@ -43,8 +40,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 });
   }
 
-  // Checked after the fields, so a typo doesn't use up a slot of the
-  // site-wide daily cap.
+  const ip = getClientIp(req);
+  if (!(await checkRateLimit(`join-form:${ip}`, { maxAttempts: 15, windowMs: HOUR }))) {
+    return NextResponse.json({ error: 'Too many forms sent. Please try again later.' }, { status: 429 });
+  }
   if (!(await checkRateLimit('join-form:all', { maxAttempts: 100, windowMs: 24 * HOUR }))) {
     return NextResponse.json(
       { error: 'We have had a lot of forms today. Please try again tomorrow or message us on WhatsApp.' },

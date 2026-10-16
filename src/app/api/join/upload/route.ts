@@ -5,12 +5,15 @@
 // PNG or WebP only, 5MB cap, file content must match the declared type),
 // but nobody is signed in here, so the limits do the protecting instead:
 //
-//   - per IP: 60 uploads an hour. One contractor with 10 projects and a few
-//     photos each fits; a script does not get far.
+//   - per IP: 150 uploads an hour. Set high on purpose: at an onboarding
+//     meeting everyone on the venue Wi-Fi (or one mobile network's shared
+//     address) counts as one IP, and one contractor can send dozens.
 //   - whole site: 600 uploads a day across everyone. Uploads cost real Blob
 //     storage, and a spread-out attack (many IPs) would slip under the
-//     per-IP limit, so this caps the worst case. If a busy onboarding day
-//     ever hits it, raise the number here.
+//     per-IP limit, so this caps the worst case. Counted only for a file
+//     that passed every check, just before it is stored, so junk requests
+//     can't use the day's allowance up. If a busy onboarding day ever hits
+//     it, raise the number here.
 //
 // The returned URL only becomes part of an application when /api/join
 // accepts it (which checks it is on our own Blob store). A photo uploaded
@@ -34,14 +37,8 @@ export async function POST(req: NextRequest) {
   }
 
   const ip = getClientIp(req);
-  if (!(await checkRateLimit(`join-upload:${ip}`, { maxAttempts: 60, windowMs: HOUR }))) {
+  if (!(await checkRateLimit(`join-upload:${ip}`, { maxAttempts: 150, windowMs: HOUR }))) {
     return NextResponse.json({ error: 'Too many uploads. Please try again later.' }, { status: 429 });
-  }
-  if (!(await checkRateLimit('join-upload:all', { maxAttempts: 600, windowMs: 24 * HOUR }))) {
-    return NextResponse.json(
-      { error: 'Uploads are paused for today. Please send your photos to us on WhatsApp instead.' },
-      { status: 429 }
-    );
   }
 
   let formData: FormData;
@@ -68,6 +65,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: 'File content does not match a valid image of the declared type' },
       { status: 400 }
+    );
+  }
+
+  if (!(await checkRateLimit('join-upload:all', { maxAttempts: 600, windowMs: 24 * HOUR }))) {
+    return NextResponse.json(
+      { error: 'Uploads are paused for today. Please send your photos to us on WhatsApp instead.' },
+      { status: 429 }
     );
   }
 

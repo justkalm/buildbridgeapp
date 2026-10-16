@@ -41,6 +41,16 @@ describe('joinFormSchema', () => {
     expect(joinFormSchema.safeParse({ ...valid, tradeTypes: [] }).success).toBe(false);
     expect(joinFormSchema.safeParse({ ...valid, businessName: ' ' }).success).toBe(false);
   });
+  it('checks the phone number looks like one', () => {
+    expect(joinFormSchema.safeParse({ ...valid, phone: 'aaaaaaa' }).success).toBe(false);
+    expect(joinFormSchema.safeParse({ ...valid, phone: '12345' }).success).toBe(false);
+    expect(joinFormSchema.safeParse({ ...valid, phone: '98200 12345' }).success).toBe(true);
+    expect(joinFormSchema.safeParse({ ...valid, phone: '+91-98200-12345' }).success).toBe(true);
+  });
+  it('only takes photos from the join upload folder', () => {
+    const other = 'https://abc123.public.blob.vercel-storage.com/some-listing-photo.jpg';
+    expect(joinFormSchema.safeParse({ ...valid, logoUrl: other }).success).toBe(false);
+  });
   it('caps the number of projects', () => {
     const many = Array.from({ length: JOIN_MAX_PROJECTS + 1 }, (_, i) => ({ name: `P${i}`, imageUrls: [] }));
     expect(joinFormSchema.safeParse({ ...valid, projects: many }).success).toBe(false);

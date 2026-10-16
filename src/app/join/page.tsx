@@ -190,7 +190,7 @@ export default function JoinPage() {
                   placeholder="What you do, how long you have been doing it, the kind of projects you take on" />
               </div>
               <ImageUpload label="Logo (optional)" value={logoUrl} onChange={setLogoUrl}
-                onUploadStateChange={onUploadState} uploadUrl={UPLOAD_URL} />
+                onUploadStateChange={onUploadState} uploadUrl={UPLOAD_URL} shrinkLargePhotos />
             </fieldset>
 
             <fieldset className="pt-6 border-t border-line">
@@ -264,7 +264,7 @@ export default function JoinPage() {
                       value={null}
                       onChange={(url) => url && addPhoto(index, url)}
                       onUploadStateChange={onUploadState}
-                      uploadUrl={UPLOAD_URL}
+                      uploadUrl={UPLOAD_URL} shrinkLargePhotos
                     />
                   )}
                 </div>

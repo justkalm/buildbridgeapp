@@ -3,6 +3,11 @@
 // One contractor onboarding form (from /join). Admin only.
 //   GET   - the form, used to prefill "Add a Contractor".
 //   PATCH - change its status (NEW, ADDED, REJECTED) and/or the admin note.
+//   DELETE - remove the form for good, with its logo and photos on Blob
+//            (for spam, or when a contractor asks us to delete their
+//            details). Only files in the join/ folder are deleted, so a
+//            form made into a listing should be deleted only if the
+//            listing's photos were re-uploaded; see the admin page warning.
 // Nothing here creates or changes a Contractor: the listing is still made
 // with the normal Add a Contractor form.
 
@@ -12,6 +17,7 @@ import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { readJoinProjects } from '@/lib/join-form';
 import { rejectCrossOrigin } from '@/lib/same-origin';
+import { del } from '@vercel/blob';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdminAuthenticated())) {
@@ -61,4 +67,41 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     select: { id: true, status: true, adminNote: true },
   });
   return NextResponse.json(updated);
+}
+
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const blocked = rejectCrossOrigin(req);
+  if (blocked) return blocked;
+  if (!(await isAdminAuthenticated())) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+  const { id } = await params;
+  const row = await prisma.contractorApplication.findUnique({ where: { id } });
+  if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const urls = [row.logoUrl, ...readJoinProjects(row.projects).flatMap((p) => p.imageUrls)].filter(
+    (u): u is string => {
+      if (!u) return false;
+      try {
+        return new URL(u).pathname.startsWith('/join/');
+      } catch {
+        return false;
+      }
+    }
+  );
+
+  // Files first: if Blob fails, the row stays and admin can try again,
+  // rather than the row going and the photos staying public with nothing
+  // pointing at them.
+  if (urls.length > 0) {
+    try {
+      await del(urls);
+    } catch (err) {
+      console.error('Failed to delete join form files from Vercel Blob:', err);
+      return NextResponse.json({ error: 'Could not delete the photos. Please try again.' }, { status: 500 });
+    }
+  }
+
+  await prisma.contractorApplication.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
 }
