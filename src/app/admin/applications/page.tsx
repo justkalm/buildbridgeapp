@@ -212,8 +212,7 @@ export default function AdminApplicationsPage() {
                 <div className="mt-3 bg-danger-soft border border-danger rounded-md p-3 text-sm">
                   <p className="mb-2">
                     Delete this form and its logo and photos for good? This can&apos;t be undone.
-                    {r.status === 'ADDED' &&
-                      ' It is marked Added: if its listing uses these same photos, they will disappear from the listing too.'}
+                    {r.status === 'ADDED' && ' Photos its listing still shows are kept.'}
                   </p>
                   <div className="flex gap-2">
                     <button type="button" disabled={busyId === r.id} onClick={() => deleteForGood(r.id)}

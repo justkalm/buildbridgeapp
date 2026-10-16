@@ -5,9 +5,10 @@
 //   PATCH - change its status (NEW, ADDED, REJECTED) and/or the admin note.
 //   DELETE - remove the form for good, with its logo and photos on Blob
 //            (for spam, or when a contractor asks us to delete their
-//            details). Only files in the join/ folder are deleted, so a
-//            form made into a listing should be deleted only if the
-//            listing's photos were re-uploaded; see the admin page warning.
+//            details). Only files in the join/ folder are deleted, and
+//            never one a listing still uses: "Add as contractor" copies the
+//            same URLs onto the Contractor and its Projects, so deleting
+//            those would take the photos off the live listing.
 // Nothing here creates or changes a Contractor: the listing is still made
 // with the normal Add a Contractor form.
 
@@ -90,12 +91,23 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
   );
 
+  // Keep any file a listing still shows.
+  let keep = new Set<string>();
+  if (urls.length > 0) {
+    const [logos, projects] = await Promise.all([
+      prisma.contractor.findMany({ where: { logoUrl: { in: urls } }, select: { logoUrl: true } }),
+      prisma.project.findMany({ where: { imageUrls: { hasSome: urls } }, select: { imageUrls: true } }),
+    ]);
+    keep = new Set([...logos.map((c) => c.logoUrl), ...projects.flatMap((p) => p.imageUrls)].filter((u): u is string => !!u));
+  }
+  const toDelete = urls.filter((u) => !keep.has(u));
+
   // Files first: if Blob fails, the row stays and admin can try again,
   // rather than the row going and the photos staying public with nothing
   // pointing at them.
-  if (urls.length > 0) {
+  if (toDelete.length > 0) {
     try {
-      await del(urls);
+      await del(toDelete);
     } catch (err) {
       console.error('Failed to delete join form files from Vercel Blob:', err);
       return NextResponse.json({ error: 'Could not delete the photos. Please try again.' }, { status: 500 });
@@ -103,5 +115,5 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   }
 
   await prisma.contractorApplication.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, keptForListing: urls.length - toDelete.length });
 }

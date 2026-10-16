@@ -34,22 +34,23 @@ type ImageUploadProps = {
   // this from a contractor-facing page so the request is checked against
   // contractor session instead of the admin cookie.
   uploadUrl?: string;
-  // Shrink big photos in the browser before sending (used by the /join form,
-  // which contractors fill in on their phones). Vercel refuses request
-  // bodies over 4.5MB, and many phone camera photos are bigger than that.
+  // Redraw every photo in the browser before sending (used by the /join
+  // form, which contractors fill in on their phones). Two reasons: Vercel
+  // refuses request bodies over 4.5MB and many phone photos are bigger, and
+  // redrawing drops the photo's hidden details (EXIF), which often include
+  // the GPS position where it was taken. The files end up on public URLs.
   shrinkLargePhotos?: boolean;
 };
 
 // Vercel's request body limit is 4.5MB; stay safely under it.
 const MAX_SEND_BYTES = 4 * 1024 * 1024;
-const SHRINK_ABOVE_BYTES = 2 * 1024 * 1024;
 const MAX_SIDE_PX = 2000;
 
-// Redraws the photo at most 2000px on its longest side as a JPEG. Returns
-// the original file if it is already small, or if the browser can't do it
-// (then the size check below still gives a clear message).
+// Redraws the photo at most 2000px on its longest side: PNG stays PNG (a
+// logo keeps its see-through parts), everything else becomes JPEG. Returns
+// the original file only if the browser can't do it (then the size check
+// below still gives a clear message).
 async function shrinkPhoto(file: File): Promise<File> {
-  if (file.size <= SHRINK_ABOVE_BYTES) return file;
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, MAX_SIDE_PX / Math.max(bitmap.width, bitmap.height));
@@ -60,9 +61,11 @@ async function shrinkPhoto(file: File): Promise<File> {
     if (!ctx) return file;
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82));
-    if (!blob || blob.size >= file.size) return file;
-    return new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+    const asPng = file.type === 'image/png';
+    const type = asPng ? 'image/png' : 'image/jpeg';
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, 0.82));
+    if (!blob) return file;
+    return new File([blob], asPng ? 'photo.png' : 'photo.jpg', { type });
   } catch {
     return file;
   }
