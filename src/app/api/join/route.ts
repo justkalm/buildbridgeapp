@@ -67,6 +67,9 @@ export async function POST(req: NextRequest) {
       projects: data.projects.map((p) => ({
         name: p.name,
         ...(p.developerName ? { developerName: p.developerName } : {}),
+        area: p.area,
+        builtUpAreaSqft: p.builtUpAreaSqft,
+        siteVisitPossible: p.siteVisitPossible,
         imageUrls: p.imageUrls,
       })),
       consentAt: new Date(),

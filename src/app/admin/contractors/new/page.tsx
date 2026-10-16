@@ -93,7 +93,7 @@ export default function NewContractorPage() {
           gstNumber: string | null;
           licenceNumber: string | null;
           hasInsurance: boolean;
-          projects: { name: string; developerName?: string; imageUrls: string[] }[];
+          projects: { name: string; developerName?: string; builtUpAreaSqft?: number; imageUrls: string[] }[];
         }) => {
           setName(a.businessName);
           setPhone(a.phone);
@@ -107,7 +107,13 @@ export default function NewContractorPage() {
           // claim until admin checks it on the GST portal (see the banner).
           setLicenseNumber(a.licenceNumber ?? '');
           setProjects(
-            a.projects.map((p) => ({ ...emptyProject(), title: p.name, developerName: p.developerName ?? '', imageUrls: p.imageUrls }))
+            a.projects.map((p) => ({
+              ...emptyProject(),
+              title: p.name,
+              developerName: p.developerName ?? '',
+              squareFeet: p.builtUpAreaSqft ? String(p.builtUpAreaSqft) : '',
+              imageUrls: p.imageUrls,
+            }))
           );
           setFromApplication({ id: a.id, businessName: a.businessName, gstNumber: a.gstNumber, hasInsurance: a.hasInsurance });
         }
@@ -292,6 +298,7 @@ export default function NewContractorPage() {
             {fromApplication.hasInsurance
               ? ' They say they have insurance: ask for the cover amount before filling it in.'
               : ' They say they have no insurance.'}
+            {' '}Each project&apos;s location and site-visit answer are on the Join forms page: listings have no place for them yet.
           </div>
         )}
         {success && (

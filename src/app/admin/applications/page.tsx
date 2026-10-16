@@ -13,6 +13,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import AdminTabs from '@/components/AdminTabs';
 import { specialityLabel } from '@/lib/trade-types';
+import { formatArea } from '@/lib/project-fields';
 
 type Status = 'NEW' | 'ADDED' | 'REJECTED';
 
@@ -28,7 +29,14 @@ type ApplicationRow = {
   gstNumber: string | null;
   licenceNumber: string | null;
   hasInsurance: boolean;
-  projects: { name: string; developerName?: string; imageUrls: string[] }[];
+  projects: {
+    name: string;
+    developerName?: string;
+    area?: string;
+    builtUpAreaSqft?: number;
+    siteVisitPossible?: boolean;
+    imageUrls: string[];
+  }[];
   status: Status;
   adminNote: string | null;
   createdAt: string;
@@ -166,6 +174,19 @@ export default function AdminApplicationsPage() {
                       <p className="text-sm font-medium">
                         {p.name}
                         {p.developerName && <span className="text-stone font-normal"> for {p.developerName}</span>}
+                      </p>
+                      <p className="text-xs text-stone">
+                        {[
+                          p.area,
+                          p.builtUpAreaSqft ? formatArea(p.builtUpAreaSqft) : null,
+                          p.siteVisitPossible === undefined
+                            ? null
+                            : p.siteVisitPossible
+                              ? 'Site visit: can arrange'
+                              : 'Site visit: no',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </p>
                       {p.imageUrls.length > 0 ? (
                         <div className="flex flex-wrap gap-2 mt-2">

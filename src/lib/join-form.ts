@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { tradeTypesField } from '@/lib/project-validation';
 import { normalizeLocation } from '@/lib/location';
 import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
+import { MAX_BUILT_UP_AREA_SQFT } from '@/lib/project-fields';
 
 // Owner's rule (16 Oct 2026): every contractor lists 3 to 5 projects, each
 // with photos. 2 photos minimum (finished work plus one during the work, so
@@ -59,6 +60,18 @@ const optionalText = (max: number) =>
 export const joinProjectSchema = z.object({
   name: z.string().trim().min(1, 'Each project needs a name').max(200),
   developerName: optionalText(200),
+  // Where the project is (area, as on the rest of the site), its built-up
+  // area, and whether the contractor can arrange a site visit there (the
+  // building's owner has to agree, so it's "can you arrange", not "is it
+  // possible"). Owner's rule, 16 Oct 2026. The live Project has no place
+  // for location or the visit answer yet, so admin sees them here only.
+  area: z.string().trim().min(1, 'Pick where each project is').max(100).transform(normalizeLocation),
+  builtUpAreaSqft: z
+    .number({ message: 'Enter the built-up area of each project in sq ft' })
+    .int('Built-up area must be a whole number of sq ft')
+    .positive('Enter the built-up area of each project in sq ft')
+    .max(MAX_BUILT_UP_AREA_SQFT, 'That built-up area looks too large. Check for extra zeros.'),
+  siteVisitPossible: z.boolean({ message: 'Tell us for each project whether you can arrange a site visit' }),
   imageUrls: z
     .array(blobUrl)
     .min(JOIN_MIN_PHOTOS_PER_PROJECT, `Add at least ${JOIN_MIN_PHOTOS_PER_PROJECT} photos to each project`)
@@ -109,6 +122,9 @@ export type JoinFormInput = z.infer<typeof joinFormSchema>;
 const storedProjectSchema = z.object({
   name: z.string(),
   developerName: z.string().optional(),
+  area: z.string().optional(),
+  builtUpAreaSqft: z.number().optional(),
+  siteVisitPossible: z.boolean().optional(),
   imageUrls: z.array(z.string()).catch([]),
 });
 

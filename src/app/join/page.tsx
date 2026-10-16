@@ -39,9 +39,52 @@ const UPLOAD_URL = '/api/join/upload';
 const inputClass =
   'w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink';
 
-type ProjectDraft = { name: string; developerName: string; imageUrls: string[] };
+type ProjectDraft = {
+  name: string;
+  developerName: string;
+  area: string;
+  builtUpArea: string; // as typed; sent as a whole number
+  siteVisitPossible: boolean | null;
+  imageUrls: string[];
+};
 
-const emptyProject = (): ProjectDraft => ({ name: '', developerName: '', imageUrls: [] });
+const emptyProject = (): ProjectDraft => ({
+  name: '',
+  developerName: '',
+  area: '',
+  builtUpArea: '',
+  siteVisitPossible: null,
+  imageUrls: [],
+});
+
+// "45,000" or "45000 sq ft" both read as 45000.
+function sqftOf(typed: string): number {
+  return Number(typed.replace(/[^0-9]/g, ''));
+}
+
+function YesNo({
+  value,
+  onChange,
+  labelledBy,
+}: {
+  value: boolean | null;
+  onChange: (v: boolean) => void;
+  labelledBy: string;
+}) {
+  return (
+    <div role="radiogroup" aria-labelledby={labelledBy} className="flex gap-2">
+      {([true, false] as const).map((option) => (
+        <button key={String(option)} type="button" role="radio" aria-checked={value === option}
+          onClick={() => onChange(option)}
+          className={`text-sm px-5 py-2 rounded-full border ${
+            value === option ? 'border-ink bg-ink text-paper' : 'border-line bg-paper hover:border-ink'
+          }`}>
+          {option ? 'Yes' : 'No'}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function JoinPage() {
   const [businessName, setBusinessName] = useState('');
@@ -69,7 +112,11 @@ export default function JoinPage() {
     setUploading((n) => Math.max(0, n + (isUploading ? 1 : -1)));
   }
 
-  function updateProject(index: number, field: 'name' | 'developerName', value: string) {
+  function updateProject<K extends 'name' | 'developerName' | 'area' | 'builtUpArea' | 'siteVisitPossible'>(
+    index: number,
+    field: K,
+    value: ProjectDraft[K]
+  ) {
     setProjects((p) => p.map((proj, i) => (i === index ? { ...proj, [field]: value } : proj)));
   }
 
@@ -104,6 +151,21 @@ export default function JoinPage() {
       setError(`Give project ${unnamedIndex + 1} a name.`);
       return;
     }
+    const noAreaIndex = projects.findIndex((p) => !p.area.trim());
+    if (noAreaIndex !== -1) {
+      setError(`Pick where project ${noAreaIndex + 1} is.`);
+      return;
+    }
+    const noSqftIndex = projects.findIndex((p) => !(sqftOf(p.builtUpArea) > 0));
+    if (noSqftIndex !== -1) {
+      setError(`Enter the built-up area of project ${noSqftIndex + 1} in sq ft.`);
+      return;
+    }
+    const noVisitIndex = projects.findIndex((p) => p.siteVisitPossible === null);
+    if (noVisitIndex !== -1) {
+      setError(`Tell us whether you can arrange a site visit at project ${noVisitIndex + 1}.`);
+      return;
+    }
     const fewPhotosIndex = projects.findIndex((p) => p.imageUrls.length < JOIN_MIN_PHOTOS_PER_PROJECT);
     if (fewPhotosIndex !== -1) {
       setError(`Add at least ${JOIN_MIN_PHOTOS_PER_PROJECT} photos to project ${fewPhotosIndex + 1}.`);
@@ -129,6 +191,9 @@ export default function JoinPage() {
           projects: projects.map((p) => ({
             name: p.name,
             developerName: p.developerName || undefined,
+            area: normalizeLocation(p.area),
+            builtUpAreaSqft: sqftOf(p.builtUpArea),
+            siteVisitPossible: p.siteVisitPossible,
             imageUrls: p.imageUrls,
           })),
           consent,
@@ -238,21 +303,11 @@ export default function JoinPage() {
                 <input id="join-licence" type="text" maxLength={100} value={licenceNumber}
                   onChange={(e) => setLicenceNumber(e.target.value)} className={inputClass} />
               </div>
-              <div role="radiogroup" aria-labelledby="join-insurance-label">
+              <div>
                 <p id="join-insurance-label" className="block text-sm font-medium mb-1.5">
                   Do you have insurance for your work?
                 </p>
-                <div className="flex gap-2">
-                  {([true, false] as const).map((value) => (
-                    <button key={String(value)} type="button" role="radio" aria-checked={hasInsurance === value}
-                      onClick={() => setHasInsurance(value)}
-                      className={`text-sm px-5 py-2 rounded-full border ${
-                        hasInsurance === value ? 'border-ink bg-ink text-paper' : 'border-line bg-paper hover:border-ink'
-                      }`}>
-                      {value ? 'Yes' : 'No'}
-                    </button>
-                  ))}
-                </div>
+                <YesNo value={hasInsurance} onChange={setHasInsurance} labelledBy="join-insurance-label" />
               </div>
             </fieldset>
 
@@ -283,6 +338,28 @@ export default function JoinPage() {
                     aria-label={`Project ${index + 1} developer`}
                     onChange={(e) => updateProject(index, 'developerName', e.target.value)}
                     placeholder="Developer you worked with" className={inputClass} />
+                  <div>
+                    <label htmlFor={`join-project-area-${index}`} className="block text-xs text-stone mb-1">
+                      Where is it?
+                    </label>
+                    <AreaPicker id={`join-project-area-${index}`} value={project.area}
+                      onChange={(v) => updateProject(index, 'area', v)} className={inputClass} />
+                  </div>
+                  <div>
+                    <label htmlFor={`join-project-sqft-${index}`} className="block text-xs text-stone mb-1">
+                      Built-up area in sq ft (a rough figure is fine)
+                    </label>
+                    <input id={`join-project-sqft-${index}`} type="text" inputMode="numeric" maxLength={12}
+                      value={project.builtUpArea} placeholder="e.g. 45000"
+                      onChange={(e) => updateProject(index, 'builtUpArea', e.target.value)} className={inputClass} />
+                  </div>
+                  <div>
+                    <p id={`join-project-visit-${index}`} className="block text-xs text-stone mb-1">
+                      Can you arrange a site visit here for a developer?
+                    </p>
+                    <YesNo value={project.siteVisitPossible} labelledBy={`join-project-visit-${index}`}
+                      onChange={(v) => updateProject(index, 'siteVisitPossible', v)} />
+                  </div>
 
                   {project.imageUrls.length > 0 && (
                     <div className="flex flex-wrap gap-2">
