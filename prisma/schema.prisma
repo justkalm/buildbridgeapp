@@ -777,3 +777,49 @@ model SavedProject {
 
   @@index([developerId])
 }
+
+// Contractor details sent in through the no-login form at /join (16 Oct
+// 2026, migration 9c). The team shares the /join link on WhatsApp or email
+// at onboarding meetings; the contractor fills it in on their phone, and
+// admin reads it at /admin/applications and turns it into a real listing
+// with "Add a Contractor" (which can prefill from here). Nothing in this
+// table is public, and nothing here creates a Contractor or an account by
+// itself: a person always checks it first.
+//
+// projects is JSON, not its own table: it is only ever read back whole to
+// show admin and to prefill the new-contractor form. Shape (checked by
+// src/lib/join-form.ts on the way in):
+//   [{ name: string, developerName?: string, imageUrls: string[] }]
+// Logo and photo URLs are Vercel Blob URLs from /api/join/upload. They are
+// public URLs (same as every listing photo), but nobody is given them
+// until admin copies them onto a listing.
+model ContractorApplication {
+  id String @id @default(cuid())
+
+  businessName  String
+  phone         String
+  email         String
+  area          String
+  bio           String?
+  logoUrl       String?
+  tradeTypes    String[]
+  gstNumber     String?
+  licenceNumber String?
+  projects      Json     @default("[]")
+
+  consentAt DateTime // the "you may use these details for my listing" tick
+
+  status    ContractorApplicationStatus @default(NEW)
+  adminNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+enum ContractorApplicationStatus {
+  NEW // just sent in
+  ADDED // admin made a listing from it
+  REJECTED // not taken forward (spam, duplicate, not a fit)
+}

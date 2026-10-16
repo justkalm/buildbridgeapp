@@ -1,0 +1,303 @@
+// src/app/join/page.tsx
+//
+// The contractor onboarding form (16 Oct 2026). No account and no password:
+// the team sends this link on WhatsApp or email, the contractor fills it in
+// on their phone, and admin turns it into a listing by hand from
+// /admin/applications. The fields are the ones the owner listed: business
+// name, phone, email, bio, logo, trades, GST, licence, and for each project
+// its name, the developer it was for and its photos. Area is asked as well,
+// because a listing can't go live or be verified without one.
+//
+// Photos upload as soon as they are picked (ImageUpload, pointed at
+// /api/join/upload), so pressing Send only carries the photo URLs. Send is
+// disabled while any upload is still running, otherwise that photo would be
+// dropped. Field rules match src/lib/join-form.ts, which the API applies.
+
+'use client';
+
+import { useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import Nav from '@/components/Nav';
+import Footer from '@/components/Footer';
+import AreaPicker from '@/components/AreaPicker';
+import ImageUpload from '@/components/ImageUpload';
+import TradeTypePicker from '@/components/TradeTypePicker';
+import { normalizeLocation } from '@/lib/location';
+import { tradeOf } from '@/lib/trade-types';
+import { JOIN_MAX_BIO, JOIN_MAX_PHOTOS_PER_PROJECT, JOIN_MAX_PROJECTS } from '@/lib/join-form';
+
+const UPLOAD_URL = '/api/join/upload';
+
+const inputClass =
+  'w-full px-3.5 py-2.5 border border-line rounded-[4px] text-sm bg-paper focus:outline-none focus:ring-2 focus:ring-ink';
+
+type ProjectDraft = { name: string; developerName: string; imageUrls: string[] };
+
+const emptyProject = (): ProjectDraft => ({ name: '', developerName: '', imageUrls: [] });
+
+export default function JoinPage() {
+  const [businessName, setBusinessName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [area, setArea] = useState('');
+  const [bio, setBio] = useState('');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [tradeTypes, setTradeTypes] = useState<string[]>([]);
+  const [gstNumber, setGstNumber] = useState('');
+  const [licenceNumber, setLicenceNumber] = useState('');
+  const [projects, setProjects] = useState<ProjectDraft[]>([emptyProject()]);
+  const [consent, setConsent] = useState(false);
+
+  // Counts uploads in flight across every ImageUpload on the page.
+  const [uploading, setUploading] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  function onUploadState(isUploading: boolean) {
+    setUploading((n) => Math.max(0, n + (isUploading ? 1 : -1)));
+  }
+
+  function updateProject(index: number, field: 'name' | 'developerName', value: string) {
+    setProjects((p) => p.map((proj, i) => (i === index ? { ...proj, [field]: value } : proj)));
+  }
+
+  function addPhoto(index: number, url: string) {
+    setProjects((p) => p.map((proj, i) => (i === index ? { ...proj, imageUrls: [...proj.imageUrls, url] } : proj)));
+  }
+
+  function removePhoto(index: number, url: string) {
+    setProjects((p) =>
+      p.map((proj, i) => (i === index ? { ...proj, imageUrls: proj.imageUrls.filter((u) => u !== url) } : proj))
+    );
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (tradeTypes.filter((t) => tradeOf(t) !== null).length === 0) {
+      setError('Pick your trade and tick at least one speciality.');
+      return;
+    }
+
+    // A project row with photos or a developer but no name is almost
+    // certainly a slip, so ask rather than quietly dropping the photos.
+    const unnamed = projects.find((p) => !p.name.trim() && (p.imageUrls.length > 0 || p.developerName.trim()));
+    if (unnamed) {
+      setError('Give each project a name, or remove the empty one.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessName,
+          phone,
+          email,
+          area: normalizeLocation(area),
+          bio: bio || undefined,
+          logoUrl: logoUrl || undefined,
+          tradeTypes,
+          gstNumber: gstNumber || undefined,
+          licenceNumber: licenceNumber || undefined,
+          projects: projects
+            .filter((p) => p.name.trim())
+            .map((p) => ({
+              name: p.name,
+              developerName: p.developerName || undefined,
+              imageUrls: p.imageUrls,
+            })),
+          consent,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? 'Something went wrong. Please try again.');
+        setSubmitting(false);
+        return;
+      }
+      setSent(true);
+      window.scrollTo({ top: 0 });
+    } catch {
+      setError('Something went wrong. Please check your internet and try again.');
+      setSubmitting(false);
+    }
+  }
+
+  if (sent) {
+    return (
+      <>
+        <Nav />
+        <main className="flex-1 flex items-center justify-center px-6 py-16">
+          <div className="w-full max-w-[420px] text-center">
+            <h1 className="font-display font-light text-2xl mb-3">Thank you</h1>
+            <p className="text-stone text-sm">
+              We have your details. Our team will check them and set up your (kalm) listing, and
+              we will contact you on the phone number you gave us.
+            </p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Nav />
+      <main className="flex-1 flex justify-center px-4 sm:px-6 py-12">
+        <div className="w-full max-w-[520px]">
+          <h1 className="font-display font-light text-3xl mb-2">Join (kalm)</h1>
+          <p className="text-stone text-sm mb-8">
+            Tell us about your business and the projects you have done. Our team will check the
+            details and set up your listing for you. No account or password needed.
+          </p>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            <fieldset className="flex flex-col gap-4">
+              <legend className="font-display text-base mb-3">Your business</legend>
+              <div>
+                <label htmlFor="join-name" className="block text-sm font-medium mb-1.5">Business name</label>
+                <input id="join-name" type="text" required maxLength={200} value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label htmlFor="join-phone" className="block text-sm font-medium mb-1.5">Phone</label>
+                <input id="join-phone" type="tel" required maxLength={20} value={phone}
+                  onChange={(e) => setPhone(e.target.value)} placeholder="+91XXXXXXXXXX" className={inputClass} />
+              </div>
+              <div>
+                <label htmlFor="join-email" className="block text-sm font-medium mb-1.5">Email</label>
+                <input id="join-email" type="email" required maxLength={320} value={email}
+                  onChange={(e) => setEmail(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label htmlFor="join-area" className="block text-sm font-medium mb-1.5">Area in Mumbai</label>
+                <AreaPicker id="join-area" value={area} onChange={setArea} className={inputClass} />
+                <p className="text-xs text-stone mt-1">Where your business is based.</p>
+              </div>
+              <div>
+                <label htmlFor="join-bio" className="block text-sm font-medium mb-1.5">
+                  About your business <span className="text-stone font-normal">(optional)</span>
+                </label>
+                <textarea id="join-bio" rows={4} maxLength={JOIN_MAX_BIO} value={bio}
+                  onChange={(e) => setBio(e.target.value)} className={inputClass}
+                  placeholder="What you do, how long you have been doing it, the kind of projects you take on" />
+              </div>
+              <ImageUpload label="Logo (optional)" value={logoUrl} onChange={setLogoUrl}
+                onUploadStateChange={onUploadState} uploadUrl={UPLOAD_URL} />
+            </fieldset>
+
+            <fieldset className="pt-6 border-t border-line">
+              <legend className="font-display text-base mb-1">Your trade</legend>
+              <p className="text-xs text-stone mb-3">Pick your trade, then tick the work you do.</p>
+              <TradeTypePicker selected={tradeTypes} onChange={setTradeTypes} />
+            </fieldset>
+
+            <fieldset className="flex flex-col gap-4 pt-6 border-t border-line">
+              <legend className="font-display text-base mb-1">Registration</legend>
+              <p className="text-xs text-stone -mt-2">
+                Optional, but we check these before we mark a listing Verified.
+              </p>
+              <div>
+                <label htmlFor="join-gst" className="block text-sm font-medium mb-1.5">GST number</label>
+                <input id="join-gst" type="text" maxLength={20} value={gstNumber}
+                  onChange={(e) => setGstNumber(e.target.value)} placeholder="27ABCDE1234F1Z5"
+                  autoCapitalize="characters" className={inputClass} />
+              </div>
+              <div>
+                <label htmlFor="join-licence" className="block text-sm font-medium mb-1.5">Licence number</label>
+                <input id="join-licence" type="text" maxLength={100} value={licenceNumber}
+                  onChange={(e) => setLicenceNumber(e.target.value)} className={inputClass} />
+              </div>
+            </fieldset>
+
+            <fieldset className="flex flex-col gap-4 pt-6 border-t border-line">
+              <legend className="font-display text-base mb-1">Your projects</legend>
+              <p className="text-xs text-stone -mt-2">
+                Projects with photos get more enquiries. Add the developer you did it for, unless
+                they asked not to be named.
+              </p>
+
+              {projects.map((project, index) => (
+                <div key={index} className="border border-line rounded-md p-4 flex flex-col gap-3 bg-paper">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Project {index + 1}</span>
+                    {projects.length > 1 && (
+                      <button type="button" onClick={() => setProjects((p) => p.filter((_, i) => i !== index))}
+                        className="text-xs font-medium text-danger">
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <input type="text" maxLength={200} value={project.name} aria-label={`Project ${index + 1} name`}
+                    onChange={(e) => updateProject(index, 'name', e.target.value)}
+                    placeholder="Project name" className={inputClass} />
+                  <input type="text" maxLength={200} value={project.developerName}
+                    aria-label={`Project ${index + 1} developer`}
+                    onChange={(e) => updateProject(index, 'developerName', e.target.value)}
+                    placeholder="Developer you worked with" className={inputClass} />
+
+                  {project.imageUrls.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {project.imageUrls.map((url) => (
+                        <div key={url} className="relative">
+                          <Image src={url} alt="" width={72} height={72}
+                            className="w-[72px] h-[72px] rounded-md object-cover border border-line" />
+                          <button type="button" onClick={() => removePhoto(index, url)} aria-label="Remove photo"
+                            className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-ink text-paper text-xs leading-none">
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {project.imageUrls.length < JOIN_MAX_PHOTOS_PER_PROJECT && (
+                    <ImageUpload
+                      key={project.imageUrls.length}
+                      label={project.imageUrls.length === 0 ? 'Add photo' : 'Add another photo'}
+                      value={null}
+                      onChange={(url) => url && addPhoto(index, url)}
+                      onUploadStateChange={onUploadState}
+                      uploadUrl={UPLOAD_URL}
+                    />
+                  )}
+                </div>
+              ))}
+
+              {projects.length < JOIN_MAX_PROJECTS && (
+                <button type="button" onClick={() => setProjects((p) => [...p, emptyProject()])}
+                  className="self-start text-sm font-medium border border-line rounded-full px-4 py-2 hover:border-ink">
+                  + Add another project
+                </button>
+              )}
+            </fieldset>
+
+            <label className="flex items-start gap-2.5 text-sm pt-6 border-t border-line">
+              <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)}
+                className="mt-0.5" />
+              <span>
+                I agree that (kalm) may use these details and photos to set up my business listing,
+                and may contact me about it. See our{' '}
+                <Link href="/privacy" className="underline underline-offset-2">Privacy Policy</Link>.
+              </span>
+            </label>
+
+            {error && <p className="text-sm text-danger">{error}</p>}
+
+            <button type="submit" disabled={submitting || uploading > 0}
+              className="bg-ink text-paper font-medium text-sm py-3 rounded-full hover:bg-stone transition-colors disabled:opacity-60">
+              {uploading > 0 ? 'Waiting for photos to upload…' : submitting ? 'Sending…' : 'Send my details'}
+            </button>
+          </form>
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}

@@ -536,6 +536,53 @@ export async function sendContactFormEmail(input: {
   }
 }
 
+// Tells the admin inbox that a contractor sent in the onboarding form at
+// /join. Carries only the business name, area, trades count and project
+// count, plus a link to the admin page: phone, email, GST and photos stay
+// behind the admin login rather than sitting in a mailbox.
+export async function sendContractorApplicationEmail(input: {
+  businessName: string;
+  area: string;
+  tradeCount: number;
+  projectCount: number;
+  adminUrl: string;
+}): Promise<boolean> {
+  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+  if (!notifyAddress) {
+    console.error('QUOTE_NOTIFICATION_EMAIL is not set, cannot send onboarding form email');
+    return false;
+  }
+
+  try {
+    const { error } = await getResendClient().emails.send({
+      from: EMAIL_FROM,
+      to: notifyAddress,
+      subject: `New contractor form: ${sanitizeSubject(input.businessName)}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 560px;">
+          <h2 style="margin-bottom: 4px;">New contractor onboarding form</h2>
+          <p style="color: #666; margin-top: 0;">Nothing is public yet. Check it and add the listing from admin.</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <tr><td style="padding: 8px 0; color: #666; width: 140px;">Business</td><td style="padding: 8px 0;">${escapeHtml(input.businessName)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Area</td><td style="padding: 8px 0;">${escapeHtml(input.area)}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Specialities</td><td style="padding: 8px 0;">${input.tradeCount}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Projects</td><td style="padding: 8px 0;">${input.projectCount}</td></tr>
+          </table>
+          <p><a href="${escapeHtml(input.adminUrl)}">Open the onboarding forms in admin</a></p>
+        </div>
+      `,
+    });
+    if (error) {
+      await recordEmailFailure('contractor onboarding form', notifyAddress, error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    await recordEmailFailure('contractor onboarding form', notifyAddress, err);
+    return false;
+  }
+}
+
 // Tells a developer that a contractor has moved their quote request along
 // (accepted / quote sent / declined). Goes to the developer's own address,
 // so like the verification and reset emails above, it only actually

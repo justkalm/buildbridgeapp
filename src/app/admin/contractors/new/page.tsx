@@ -1,8 +1,13 @@
 // src/app/admin/contractors/new/page.tsx
+//
+// Opened with ?from=<id> from /admin/applications ("Add as contractor"),
+// the form starts filled in from that contractor's /join form, and once the
+// listing is saved the form is marked Added. Everything stays editable, and
+// nothing is saved until admin presses the button, same as a blank form.
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import ImageUpload from '@/components/ImageUpload';
 import AdminTabs from '@/components/AdminTabs';
@@ -52,10 +57,50 @@ export default function NewContractorPage() {
   const [bio, setBio] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectDraft[]>([]);
-
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // The /join form this listing is being made from, if any.
+  const [fromApplication, setFromApplication] = useState<{ id: string; businessName: string; gstNumber: string | null } | null>(null);
+
+  useEffect(() => {
+    const fromId = new URLSearchParams(window.location.search).get('from');
+    if (!fromId) return;
+    fetch(`/api/admin/applications/${encodeURIComponent(fromId)}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then(
+        (a: {
+          id: string;
+          businessName: string;
+          phone: string;
+          email: string;
+          area: string;
+          bio: string | null;
+          logoUrl: string | null;
+          tradeTypes: string[];
+          gstNumber: string | null;
+          licenceNumber: string | null;
+          projects: { name: string; developerName?: string; imageUrls: string[] }[];
+        }) => {
+          setName(a.businessName);
+          setPhone(a.phone);
+          setEmail(a.email);
+          setArea(a.area);
+          setBio(a.bio ?? '');
+          setLogoUrl(a.logoUrl);
+          setTradeTypes(a.tradeTypes);
+          setPickerKey((k) => k + 1); // the picker reads `selected` only when it mounts
+          setGstRegistered(!!a.gstNumber);
+          setLicenseNumber(a.licenceNumber ?? '');
+          setProjects(
+            a.projects.map((p) => ({ ...emptyProject(), title: p.name, developerName: p.developerName ?? '', imageUrls: p.imageUrls }))
+          );
+          setFromApplication({ id: a.id, businessName: a.businessName, gstNumber: a.gstNumber });
+        }
+      )
+      .catch(() => setError('Could not load that join form. Your admin session may have expired.'));
+  }, []);
+
 
   function addProjectRow() {
     setProjects((p) => [...p, emptyProject()]);
@@ -161,7 +206,20 @@ export default function NewContractorPage() {
         return;
       }
 
-      setSuccess(`Added ${data.name}. You can add another below.`);
+      let addedNote = '';
+      if (fromApplication) {
+        const marked = await fetch(`/api/admin/applications/${fromApplication.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'ADDED' }),
+        }).then((r) => r.ok, () => false);
+        addedNote = marked
+          ? ' Its join form is marked Added.'
+          : ' Could not mark its join form as Added: do that on the Join forms page.';
+        setFromApplication(null);
+        window.history.replaceState(null, '', '/admin/contractors/new');
+      }
+      setSuccess(`Added ${data.name}.${addedNote} You can add another below.`);
       setName('');
       setArea('');
       setTradeTypes([]);
@@ -206,6 +264,15 @@ export default function NewContractorPage() {
           Only set status to Verified once the documents, GSTIN and a direct conversation are done. A licence number is optional.
         </p>
 
+        {fromApplication && (
+          <div className="bg-white border border-line text-sm rounded-md p-3.5 mb-5">
+            Filled in from the join form of <span className="font-medium">{fromApplication.businessName}</span>.
+            Check every field before saving.
+            {fromApplication.gstNumber && (
+              <> GST number they gave, for the GSTIN check: <span className="font-medium">{fromApplication.gstNumber}</span>.</>
+            )}
+          </div>
+        )}
         {success && (
           <div className="bg-sage-soft border border-sage/25 text-sage text-sm rounded-md p-3.5 mb-5">
             {success}

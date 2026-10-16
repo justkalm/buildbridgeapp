@@ -44,6 +44,16 @@ export default async function AdminPage() {
           </Link>
 
           <Link
+            href="/admin/applications"
+            className="block bg-white border border-line rounded-md p-6 hover:border-ink transition-colors"
+          >
+            <h2 className="font-display font-semibold text-lg mb-1">Join forms</h2>
+            <p className="text-stone text-sm">
+              Contractor details sent in through the /join link. Check them and add the listing.
+            </p>
+          </Link>
+
+          <Link
             href="/admin/contractors"
             className="block bg-white border border-line rounded-md p-6 hover:border-ink transition-colors"
           >

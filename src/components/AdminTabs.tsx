@@ -19,6 +19,7 @@ import Link from 'next/link';
 const TABS = [
   { key: 'contractors', label: 'Contractors', href: '/admin/contractors' },
   { key: 'developers', label: 'Developers', href: '/admin/developers' },
+  { key: 'applications', label: 'Join forms', href: '/admin/applications' },
   { key: 'project-posts', label: 'Project Posts', href: '/admin/project-posts' },
   { key: 'review', label: 'Review', href: '/admin/review' },
   { key: 'reports', label: 'Reports', href: '/admin/reports' },
