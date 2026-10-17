@@ -15,7 +15,10 @@
 //   - Never for a contractor who already has a password: a login link
 //     must not become a way for admin (or a stolen admin session) to take
 //     over a working account. They use "Forgot password" instead.
-//   - The link only ever goes to the email on the listing.
+//   - The link only ever goes to the email on the listing. A /join email
+//     is whatever the sender typed, so admin confirms it with the business
+//     (a phone call) before ticking the box: otherwise someone could send
+//     a form in a real firm's name and get its dashboard.
 //   - 72 hours, not the 1 hour of a reset link: this email arrives
 //     unasked, often while the contractor is on site. Sending again (the
 //     admin list's "Send login link") replaces the old link.
@@ -40,13 +43,17 @@ export async function sendContractorInvite(contractorId: string): Promise<Invite
   if (contractor.passwordHash) return 'has-login';
 
   const token = crypto.randomBytes(32).toString('hex');
-  await prisma.contractor.update({
-    where: { id: contractor.id },
+  // Conditional on "still no password" in the same write, so a contractor
+  // who finishes a claim link between the check above and here can't end
+  // up with a live 72-hour token on a working login.
+  const written = await prisma.contractor.updateMany({
+    where: { id: contractor.id, passwordHash: null },
     data: {
       passwordResetToken: token,
       passwordResetTokenExpiresAt: new Date(Date.now() + INVITE_LINK_HOURS * 60 * 60 * 1000),
     },
   });
+  if (written.count === 0) return 'has-login';
 
   const sent = await sendListingReadyEmail({
     toEmail: contractor.email,

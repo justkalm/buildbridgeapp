@@ -58,8 +58,9 @@ export default function NewContractorPage() {
   const [bio, setBio] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectDraft[]>([]);
-  // Email them a "set your password" link once saved. Ticked for a /join
-  // form (they asked to be listed); left to admin for anyone else.
+  // Email them a "set your password" link once saved. Always starts
+  // unticked: admin ticks it once the email is confirmed with the business,
+  // because a /join email is only what the sender typed.
   const [sendInvite, setSendInvite] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -119,7 +120,6 @@ export default function NewContractorPage() {
               imageUrls: p.imageUrls,
             }))
           );
-          setSendInvite(true);
           setFromApplication({ id: a.id, businessName: a.businessName, gstNumber: a.gstNumber, hasInsurance: a.hasInsurance });
         }
       )
@@ -511,7 +511,9 @@ export default function NewContractorPage() {
             <span>
               Email them a link to set their password
               <span className="block text-xs text-stone">
-                Goes to the email above once saved. The link works for 3 days.
+                Goes to the email above once saved, and works for 3 days. Tick only after you have
+                confirmed with the business (a phone call) that this email is really theirs: whoever
+                reads it gets the dashboard.
               </span>
             </span>
           </label>

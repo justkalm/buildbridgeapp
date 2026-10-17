@@ -127,13 +127,27 @@ export async function POST(req: NextRequest) {
     // the existing reset-password flow), which proves inbox ownership.
     // city/area from the form are deliberately NOT written here: the
     // admin-entered location stays as it is (see file header).
-    const passwordResetToken = crypto.randomBytes(32).toString('hex');
-    const passwordResetTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1h
+    // If admin already emailed a longer "set your password" link
+    // (src/lib/contractor-invite.ts) that is still live, send that same
+    // link again rather than replacing it with a 1-hour one: otherwise
+    // anyone who knows the email could keep breaking the invite. It goes
+    // to the same inbox either way.
+    const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+    const keepExisting =
+      !!existing.passwordResetToken &&
+      !!existing.passwordResetTokenExpiresAt &&
+      existing.passwordResetTokenExpiresAt > oneHourFromNow;
+    const passwordResetToken = keepExisting
+      ? existing.passwordResetToken!
+      : crypto.randomBytes(32).toString('hex');
+    const passwordResetTokenExpiresAt = keepExisting ? existing.passwordResetTokenExpiresAt! : oneHourFromNow; // 1h
 
-    await prisma.contractor.update({
-      where: { id: existing.id },
-      data: { passwordResetToken, passwordResetTokenExpiresAt },
-    });
+    if (!keepExisting) {
+      await prisma.contractor.update({
+        where: { id: existing.id },
+        data: { passwordResetToken, passwordResetTokenExpiresAt },
+      });
+    }
 
     const baseUrl = process.env.NEXTAUTH_URL ?? '';
     await sendClaimAccountEmail({

@@ -37,6 +37,12 @@ function ResetPasswordInner() {
       const data = await res.json();
 
       if (!res.ok) {
+        // A run-out welcome link: say what the email promised.
+        if (welcome && res.status === 400 && /invalid or has expired/.test(data.error ?? '')) {
+          setError('This link has run out. Reply to the (kalm) email and we will send you a new one.');
+          setSubmitting(false);
+          return;
+        }
         setError(data.error ?? 'Something went wrong');
         setSubmitting(false);
         return;
