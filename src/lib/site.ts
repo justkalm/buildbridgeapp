@@ -13,7 +13,19 @@
 //
 // Launch day: buy and connect the real domain, replace the demo
 // contractors, then set this to true and redeploy (task sheet G).
+// 17 Oct 2026: the domain is done (app.justkalm.in, and the old address
+// now redirects there, see proxy.ts), the sitemap and per-page noindex for
+// private pages are in. Still waiting on: the only public contractors are
+// five that look like test accounts, which would go into Google under the
+// (kalm) name. Turn this on once they are hidden or confirmed real.
 export const SEARCH_ENGINES_ALLOWED = false;
+
+// For pages that must never be in search results, whatever the switch
+// above says: sign-in, password and email links, dashboards, messages,
+// the report form and /join (17 Oct 2026). Public pages (home, browse,
+// contractor profiles, about, contact, sign-up, post a project, terms,
+// privacy) follow the switch. Admin has its own copy in admin/layout.tsx.
+export const NEVER_INDEX = { index: false, follow: false } as const;
 
 // The address used to build full links in previews. NEXTAUTH_URL is set
 // per environment (the live site's address on Vercel, localhost on the

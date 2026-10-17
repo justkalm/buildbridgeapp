@@ -1,18 +1,37 @@
 // src/app/robots.ts
 //
-// /robots.txt. Only fences off private areas. (/admin is deliberately not
-// listed: naming it only advertises the login; it has its own noindex in
-// src/app/admin/layout.tsx.) It deliberately does NOT
-// block the whole site before launch: a crawler that's blocked never reads
-// the "noindex" tag on the page (see SEARCH_ENGINES_ALLOWED in
-// src/lib/site.ts), so Google could still list bare links it found
-// elsewhere, and some link-preview apps also obey robots.txt. The noindex
-// tag and header are what keep the site out of search results.
+// /robots.txt: points crawlers at the sitemap and fences off the signed-in
+// areas. (/admin is deliberately not listed: naming it only advertises the
+// login; it has its own noindex in src/app/admin/layout.tsx.)
+//
+// The private pages a crawler CAN reach (sign-in, password links, /join,
+// the report form) are kept out of results by their own "noindex" tag
+// (NEVER_INDEX in src/lib/site.ts) rather than listed here, because a
+// crawler that's blocked never reads that tag and can still list a bare
+// link it found elsewhere. /contractor/signup is open on purpose: it's how
+// contractors find us.
+//
+// Whether PUBLIC pages appear in search is the SEARCH_ENGINES_ALLOWED
+// switch in src/lib/site.ts, not this file.
 
 import type { MetadataRoute } from 'next';
+import { SITE_URL } from '@/lib/site';
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: { userAgent: '*', allow: '/', disallow: ['/api/', '/dashboard', '/contractor/', '/messages'] },
+    rules: {
+      userAgent: '*',
+      allow: '/',
+      disallow: [
+        '/api/',
+        '/dashboard',
+        '/messages',
+        '/contractor/dashboard',
+        '/contractor/profile',
+        '/contractor/projects',
+        '/contractor/consent',
+      ],
+    },
+    sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }
