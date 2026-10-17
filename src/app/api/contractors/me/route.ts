@@ -55,6 +55,7 @@ import { applyLeadVisibility, getMonthStart, LISTED_MONTHLY_LEAD_CAP } from '@/l
 import { monthLeadsFor } from '@/lib/month-leads';
 import { sendReverifyRequestEmail } from '@/lib/email';
 import { normalizeLocation } from '@/lib/location';
+import { WELL_PHOTOGRAPHED_MIN } from '@/lib/project-fields';
 import { insuranceCoverLakhField, teamSizeField, teamSizeRangeError, tradeTypesField } from '@/lib/project-validation';
 
 // The ONLY contractor columns this endpoint ever returns, for both GET and
@@ -253,9 +254,21 @@ export async function GET() {
           conversationId: conversationByPost.get(a.projectPost.id) ?? null,
         }));
 
+  // For the dashboard checklist's photos step (OnboardingPanel): how many
+  // of their projects have at least WELL_PHOTOGRAPHED_MIN photos. Counts
+  // photos still in review too: the contractor has done their part.
+  const projectPhotoCounts = await prisma.project.findMany({
+    where: { contractorId },
+    select: { imageUrls: true },
+  });
+  const wellPhotographedProjectCount = projectPhotoCounts.filter(
+    (p) => p.imageUrls.length >= WELL_PHOTOGRAPHED_MIN
+  ).length;
+
   return NextResponse.json({
     ...safe,
     projectCount: _count.projects,
+    wellPhotographedProjectCount,
     // Only real quote requests are listed on the dashboard; enquiries and
     // project conversations live in Messages. (They still counted toward
     // the lead cap above, since every kind is a lead.)

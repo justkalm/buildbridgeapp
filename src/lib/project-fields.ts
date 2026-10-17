@@ -28,3 +28,9 @@ export function formatArea(sqft: number | null | undefined): string | null {
 export function formatTrades(trades: readonly string[] | null | undefined): string {
   return trades && trades.length > 0 ? trades.join(', ') : '';
 }
+
+// A project "has enough photos" for the dashboard checklist at this many
+// (17 Oct 2026): the /join form asks for one, and the checklist nudges
+// contractors towards two or more, since projects with more photos get
+// more enquiries.
+export const WELL_PHOTOGRAPHED_MIN = 2;

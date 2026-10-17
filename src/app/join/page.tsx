@@ -6,7 +6,7 @@
 // /admin/applications. The fields are the ones the owner listed: business
 // name, phone, email, bio, logo, trades, GST, licence (optional), an
 // insurance yes/no, and 3 to 5 projects, each with its name, the developer
-// it was for and 2 to 6 photos (owner's rule, 16 Oct 2026). Area is asked as well,
+// it was for and 1 to 6 photos (owner's rules, 16 and 17 Oct 2026). Area is asked as well,
 // because a listing can't go live or be verified without one.
 //
 // Photos upload as soon as they are picked (ImageUpload, pointed at
@@ -168,7 +168,7 @@ export default function JoinPage() {
     }
     const fewPhotosIndex = projects.findIndex((p) => p.imageUrls.length < JOIN_MIN_PHOTOS_PER_PROJECT);
     if (fewPhotosIndex !== -1) {
-      setError(`Add at least ${JOIN_MIN_PHOTOS_PER_PROJECT} photos to project ${fewPhotosIndex + 1}.`);
+      setError(`Add a photo to project ${fewPhotosIndex + 1}.`);
       return;
     }
 
@@ -314,10 +314,10 @@ export default function JoinPage() {
             <fieldset className="flex flex-col gap-4 pt-6 border-t border-line">
               <legend className="font-display text-base mb-1">Your projects</legend>
               <p className="text-xs text-stone -mt-2">
-                List {JOIN_MIN_PROJECTS} to {JOIN_MAX_PROJECTS} projects you have done. For each one add at
-                least {JOIN_MIN_PHOTOS_PER_PROJECT} photos (up to {JOIN_MAX_PHOTOS_PER_PROJECT}): one of the
-                finished work and one taken during the work is ideal. Add the developer you did it for,
-                unless they asked not to be named.
+                List {JOIN_MIN_PROJECTS} to {JOIN_MAX_PROJECTS} projects you have done. Each one needs at
+                least one photo of the finished work (you can add up to {JOIN_MAX_PHOTOS_PER_PROJECT}). Add
+                the developer you did it for, unless they asked not to be named. You can add more photos
+                later from your dashboard.
               </p>
 
               {projects.map((project, index) => (
@@ -377,7 +377,7 @@ export default function JoinPage() {
                   )}
                   <p className={`text-xs ${project.imageUrls.length >= JOIN_MIN_PHOTOS_PER_PROJECT ? 'text-sage' : 'text-stone'}`}>
                     {project.imageUrls.length} of {JOIN_MAX_PHOTOS_PER_PROJECT} photos
-                    {project.imageUrls.length < JOIN_MIN_PHOTOS_PER_PROJECT && `, at least ${JOIN_MIN_PHOTOS_PER_PROJECT} needed`}
+                    {project.imageUrls.length < JOIN_MIN_PHOTOS_PER_PROJECT && ', at least 1 needed'}
                   </p>
                   {project.imageUrls.length < JOIN_MAX_PHOTOS_PER_PROJECT && (
                     <ImageUpload

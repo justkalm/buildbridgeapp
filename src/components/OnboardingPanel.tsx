@@ -14,6 +14,7 @@
 
 import Link from 'next/link';
 import { VERIFICATION_EMAIL, VERIFICATION_WHATSAPP } from '@/lib/site';
+import { WELL_PHOTOGRAPHED_MIN } from '@/lib/project-fields';
 
 export type OnboardingData = {
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
@@ -23,6 +24,8 @@ export type OnboardingData = {
   teamSizeMin: number | null;
   teamSizeMax: number | null;
   projectCount: number;
+  // Projects with at least WELL_PHOTOGRAPHED_MIN photos (17 Oct 2026).
+  wellPhotographedProjectCount: number;
   checkDocumentsAt: string | null;
   checkGstinAt: string | null;
   checkContactAt: string | null;
@@ -60,6 +63,17 @@ export default function OnboardingPanel({ data }: { data: OnboardingData }) {
       href: '/contractor/projects',
       action: 'Add project',
     },
+    // Only once there is a project to add photos to.
+    ...(data.projectCount > 0
+      ? [
+          {
+            label: `Add ${WELL_PHOTOGRAPHED_MIN} or more photos to each project (${data.wellPhotographedProjectCount} of ${data.projectCount} done). Projects with more photos get more enquiries`,
+            done: data.wellPhotographedProjectCount >= data.projectCount,
+            href: '/contractor/projects',
+            action: 'Add photos',
+          },
+        ]
+      : []),
   ];
   const checks = [
     { label: 'We review copies of your licence, GST and registration documents', done: !!data.checkDocumentsAt },

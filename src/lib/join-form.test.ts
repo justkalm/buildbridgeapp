@@ -73,9 +73,9 @@ describe('joinFormSchema', () => {
     const many = Array.from({ length: JOIN_MAX_PROJECTS + 1 }, (_, i) => ({ ...DETAILS, name: `P${i}`, imageUrls: [BLOB, BLOB2] }));
     expect(joinFormSchema.safeParse({ ...valid, projects: many }).success).toBe(false);
   });
-  it('needs at least 3 projects, each with at least 2 photos', () => {
+  it('needs at least 3 projects, each with at least 1 photo', () => {
     expect(joinFormSchema.safeParse({ ...valid, projects: valid.projects.slice(0, JOIN_MIN_PROJECTS - 1) }).success).toBe(false);
-    const onePhoto = [...valid.projects.slice(1), { ...DETAILS, name: 'Tower D', imageUrls: [BLOB] }];
+    const onePhoto = [...valid.projects.slice(1), { ...DETAILS, name: 'Tower D', imageUrls: [] }];
     expect(joinFormSchema.safeParse({ ...valid, projects: onePhoto }).success).toBe(false);
   });
   it('needs each project location, built-up area and site visit answer', () => {

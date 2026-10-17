@@ -88,6 +88,7 @@ type ContractorMe = {
   teamSizeMin: number | null;
   teamSizeMax: number | null;
   projectCount: number;
+  wellPhotographedProjectCount: number;
   checkDocumentsAt: string | null;
   checkGstinAt: string | null;
   checkContactAt: string | null;
