@@ -182,7 +182,7 @@ export default function JoinPage() {
           phone,
           email,
           area: normalizeLocation(area),
-          bio: bio || undefined,
+          bio,
           logoUrl: logoUrl || undefined,
           tradeTypes,
           gstNumber,
@@ -267,9 +267,9 @@ export default function JoinPage() {
               </div>
               <div>
                 <label htmlFor="join-bio" className="block text-sm font-medium mb-1.5">
-                  About your business <span className="text-stone font-normal">(optional)</span>
+                  About your business
                 </label>
-                <textarea id="join-bio" rows={4} maxLength={JOIN_MAX_BIO} value={bio}
+                <textarea id="join-bio" rows={4} required minLength={30} maxLength={JOIN_MAX_BIO} value={bio}
                   onChange={(e) => setBio(e.target.value)} className={inputClass}
                   placeholder="What you do, how long you have been doing it, the kind of projects you take on" />
               </div>

@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       phone: data.phone,
       email: data.email,
       area: data.area,
-      bio: data.bio ?? null,
+      bio: data.bio,
       logoUrl: data.logoUrl ?? null,
       tradeTypes: data.tradeTypes,
       gstNumber: data.gstNumber,

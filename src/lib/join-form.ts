@@ -91,7 +91,12 @@ export const joinFormSchema = z.object({
     }),
   email: z.string().trim().email('Enter a valid email address').max(320),
   area: z.string().trim().min(1, 'Area is required').max(100).transform(normalizeLocation),
-  bio: optionalText(JOIN_MAX_BIO),
+  // Required (owner, 17 Oct 2026). 30 characters is about one real sentence.
+  bio: z
+    .string()
+    .trim()
+    .min(30, 'Tell us a little more about your business (a sentence or two)')
+    .max(JOIN_MAX_BIO),
   logoUrl: blobUrl.optional(),
   tradeTypes: tradeTypesField().refine((types) => types.length > 0, {
     message: 'Pick your trade and at least one speciality',

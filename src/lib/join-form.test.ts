@@ -13,6 +13,7 @@ const valid = {
   tradeTypes: ['Demolition'],
   hasInsurance: true,
   gstNumber: '27ABCDE1234F1Z5',
+  bio: 'We do piling and excavation for residential towers in Thane.',
   projects: [
     { ...DETAILS, name: 'Tower A', developerName: 'Some Developer', imageUrls: [BLOB, BLOB2] },
     { ...DETAILS, name: 'Tower B', imageUrls: [BLOB, BLOB2] },
@@ -28,10 +29,9 @@ describe('joinFormSchema', () => {
     if (r.success) expect(r.data.gstNumber).toBe('27ABCDE1234F1Z5');
   });
   it('treats blank optional fields as not given', () => {
-    const r = joinFormSchema.safeParse({ ...valid, bio: '  ', licenceNumber: '' });
+    const r = joinFormSchema.safeParse({ ...valid, licenceNumber: '' });
     expect(r.success).toBe(true);
     if (r.success) {
-      expect(r.data.bio).toBeUndefined();
       expect(r.data.licenceNumber).toBeUndefined();
     }
   });
@@ -49,6 +49,10 @@ describe('joinFormSchema', () => {
     };
     expect(joinFormSchema.safeParse(outside).success).toBe(false);
     expect(joinFormSchema.safeParse({ ...valid, logoUrl: 'https://example.com/logo.png' }).success).toBe(false);
+  });
+  it('needs a real bio', () => {
+    expect(joinFormSchema.safeParse({ ...valid, bio: '' }).success).toBe(false);
+    expect(joinFormSchema.safeParse({ ...valid, bio: 'Contractor' }).success).toBe(false);
   });
   it('needs the consent tick, a trade and a business name', () => {
     expect(joinFormSchema.safeParse({ ...valid, consent: false }).success).toBe(false);
