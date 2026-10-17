@@ -14,6 +14,7 @@ import AdminTabs from '@/components/AdminTabs';
 import TradeTypePicker from '@/components/TradeTypePicker';
 import { MUMBAI_CITY } from '@/lib/mumbai-areas';
 import AreaPicker from '@/components/AreaPicker';
+import { inviteResultMessage, type InviteResult } from '@/lib/contractor-invite-text';
 import { MAX_INSURANCE_COVER_LAKH, MAX_TEAM_SIZE, teamSizeRangeError } from '@/lib/project-validation';
 
 type ProjectDraft = {
@@ -57,6 +58,9 @@ export default function NewContractorPage() {
   const [bio, setBio] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectDraft[]>([]);
+  // Email them a "set your password" link once saved. Ticked for a /join
+  // form (they asked to be listed); left to admin for anyone else.
+  const [sendInvite, setSendInvite] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -115,6 +119,7 @@ export default function NewContractorPage() {
               imageUrls: p.imageUrls,
             }))
           );
+          setSendInvite(true);
           setFromApplication({ id: a.id, businessName: a.businessName, gstNumber: a.gstNumber, hasInsurance: a.hasInsurance });
         }
       )
@@ -197,6 +202,7 @@ export default function NewContractorPage() {
       email,
       bio: bio || undefined,
       logoUrl: logoUrl || undefined,
+      sendInvite,
       projects: projects
         .filter((p) => p.title.trim())
         .map((p) => ({
@@ -243,7 +249,9 @@ export default function NewContractorPage() {
         setFromApplication(null);
         window.history.replaceState(null, '', '/admin/contractors/new');
       }
-      setSuccess(`Added ${data.name}.${addedNote} You can add another below.`);
+      const inviteNote = data.inviteResult ? ` ${inviteResultMessage(data.inviteResult as InviteResult)}` : '';
+      setSuccess(`Added ${data.name}.${addedNote}${inviteNote} You can add another below.`);
+      setSendInvite(false);
       setName('');
       setArea('');
       setTradeTypes([]);
@@ -497,6 +505,16 @@ export default function NewContractorPage() {
               ))}
             </div>
           </div>
+
+          <label className="flex items-start gap-2.5 text-sm pt-2">
+            <input type="checkbox" checked={sendInvite} onChange={(e) => setSendInvite(e.target.checked)} className="mt-0.5" />
+            <span>
+              Email them a link to set their password
+              <span className="block text-xs text-stone">
+                Goes to the email above once saved. The link works for 3 days.
+              </span>
+            </span>
+          </label>
 
           <button
             type="submit"

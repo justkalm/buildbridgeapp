@@ -27,6 +27,7 @@ import {
 } from '@/lib/project-validation';
 import { uniqueContractorSlug } from '@/lib/slugify';
 import { rejectCrossOrigin } from '@/lib/same-origin';
+import { sendContractorInvite } from '@/lib/contractor-invite';
 
 const projectSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -77,6 +78,8 @@ const contractorSchema = z.object({
   bio: z.string().trim().max(2000).optional(),
   logoUrl: z.string().url().optional(),
   projects: z.array(projectSchema).default([]),
+  // Email them a link to set their password (src/lib/contractor-invite.ts).
+  sendInvite: z.boolean().default(false),
 });
 
 export async function GET() {
@@ -98,7 +101,16 @@ export async function GET() {
     select: { ...ADMIN_SAFE_CONTRACTOR_SELECT, _count: { select: { projects: true, quoteRequests: true } } },
   });
 
-  return NextResponse.json(contractors);
+  // Whether each one can sign in yet, for the "Send login link" button.
+  // Only ids are read here: the password hash itself never leaves the
+  // database.
+  const withLogin = await prisma.contractor.findMany({
+    where: { passwordHash: { not: null } },
+    select: { id: true },
+  });
+  const hasLogin = new Set(withLogin.map((c) => c.id));
+
+  return NextResponse.json(contractors.map((c) => ({ ...c, hasLogin: hasLogin.has(c.id) })));
 }
 
 export async function POST(req: NextRequest) {
@@ -187,5 +199,6 @@ export async function POST(req: NextRequest) {
   });
 
   syncContractorToOps(contractor.id, 'contractor.updated');
-  return NextResponse.json(contractor);
+  const inviteResult = data.sendInvite ? await sendContractorInvite(contractor.id) : null;
+  return NextResponse.json({ ...contractor, inviteResult });
 }

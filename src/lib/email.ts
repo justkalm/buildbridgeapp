@@ -536,6 +536,45 @@ export async function sendContactFormEmail(input: {
   }
 }
 
+// "Your listing is ready" email with a one-time link to set the first
+// password (see src/lib/contractor-invite.ts, which makes the link).
+export async function sendListingReadyEmail(input: {
+  toEmail: string;
+  toName: string;
+  setPasswordUrl: string;
+  linkHours: number;
+}): Promise<boolean> {
+  const days = Math.round(input.linkHours / 24);
+  try {
+    const { error } = await getResendClient().emails.send({
+      from: EMAIL_FROM,
+      to: input.toEmail,
+      subject: 'Your (kalm) listing is ready: set your password',
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px;">
+          <h2>Your listing is ready</h2>
+          <p>Hi ${escapeHtml(input.toName)}, thank you for sending us your details. We have set up
+          your (kalm) contractor listing.</p>
+          <p>Set a password to open your dashboard, where you can see enquiries from developers,
+          reply to messages and keep your projects up to date:</p>
+          <p><a href="${escapeHtml(input.setPasswordUrl)}" style="display:inline-block;background:#1c1e22;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;">Set my password</a></p>
+          <p style="color:#666;font-size:13px;">This link works for ${days} days and can be used once.
+          If it has run out, reply to this email and we will send a new one. If you did not ask to be
+          listed on (kalm), reply and tell us, and we will remove the listing.</p>
+        </div>
+      `,
+    });
+    if (error) {
+      await recordEmailFailure('listing ready', input.toEmail, error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    await recordEmailFailure('listing ready', input.toEmail, err);
+    return false;
+  }
+}
+
 // Tells the admin inbox that a contractor sent in the onboarding form at
 // /join. Carries only the business name, area, trades count and project
 // count, plus a link to the admin page: phone, email, GST and photos stay

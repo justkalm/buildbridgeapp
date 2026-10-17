@@ -15,6 +15,9 @@ function ResetPasswordInner() {
   const router = useRouter();
   const token = searchParams.get('token');
   const role = searchParams.get('role') === 'contractor' ? 'contractor' : 'developer';
+  // Set by the "your listing is ready" email (src/lib/contractor-invite.ts):
+  // a first password, not a reset, so the words say so. Wording only.
+  const welcome = searchParams.get('welcome') === '1';
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -66,16 +69,22 @@ function ResetPasswordInner() {
       <div className="w-full max-w-[420px]">
         {success ? (
           <>
-            <h1 className="font-display font-light text-2xl mb-3">Password updated</h1>
+            <h1 className="font-display font-light text-2xl mb-3">{welcome ? 'Password set' : 'Password updated'}</h1>
             <p className="text-stone text-sm">Redirecting you to sign in…</p>
           </>
         ) : (
           <>
-            <h1 className="font-display font-light text-3xl mb-2">Set a new password</h1>
-            <p className="text-stone text-sm mb-8">Choose a new password for your account.</p>
+            <h1 className="font-display font-light text-3xl mb-2">
+              {welcome ? 'Set your password' : 'Set a new password'}
+            </h1>
+            <p className="text-stone text-sm mb-8">
+              {welcome
+                ? 'Choose a password for your (kalm) dashboard. You will sign in with your email and this password.'
+                : 'Choose a new password for your account.'}
+            </p>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5">New password</label>
+                <label className="block text-sm font-medium mb-1.5">{welcome ? 'Password' : 'New password'}</label>
                 <PasswordInput
                   autoComplete="new-password"
                   required
@@ -92,7 +101,7 @@ function ResetPasswordInner() {
                 disabled={submitting}
                 className="mt-2 bg-ink text-paper font-medium text-sm py-3 rounded-full hover:bg-stone transition-colors disabled:opacity-60"
               >
-                {submitting ? 'Updating…' : 'Update password'}
+                {submitting ? 'Saving…' : welcome ? 'Set password' : 'Update password'}
               </button>
             </form>
           </>

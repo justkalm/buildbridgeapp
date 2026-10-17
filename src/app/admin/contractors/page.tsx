@@ -46,6 +46,8 @@ type ContractorRow = {
   checkGstinAt: string | null;
   checkContactAt: string | null;
   _count: { projects: number; quoteRequests: number };
+  // Has set a password, so can sign in (no "Send login link" for them).
+  hasLogin: boolean;
 };
 
 // Admin-facing names for the fields in reverifyFields (the keys match
@@ -178,6 +180,26 @@ export default function AdminContractorsPage() {
   const [noteOpenId, setNoteOpenId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
+  // The answer to the last "Send login link", shown under that row.
+  const [inviteNotice, setInviteNotice] = useState<{ id: string; message: string } | null>(null);
+
+  async function sendLoginLink(contractor: ContractorRow) {
+    setInvitingId(contractor.id);
+    setInviteNotice(null);
+    try {
+      const res = await fetch(`/api/admin/contractors/${contractor.id}/invite`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      setInviteNotice({
+        id: contractor.id,
+        message: data.message ?? data.error ?? (res.status === 401 ? 'Your admin session has expired.' : 'Something went wrong.'),
+      });
+    } catch {
+      setInviteNotice({ id: contractor.id, message: 'Something went wrong. Please try again.' });
+    } finally {
+      setInvitingId(null);
+    }
+  }
 
   function openNote(contractor: ContractorRow) {
     if (noteOpenId === contractor.id) {
@@ -763,6 +785,19 @@ export default function AdminContractorsPage() {
                     </td>
                     <td className="px-4 py-4 text-stone">{c._count.quoteRequests}</td>
                     <td className="px-4 py-4 text-right">
+                      {!c.hasLogin && (
+                        <button
+                          onClick={() => sendLoginLink(c)}
+                          disabled={invitingId === c.id}
+                          title={`Email ${c.email} a link to set their password`}
+                          className="block ml-auto mb-2 text-xs font-medium text-ink underline underline-offset-2 disabled:opacity-50 whitespace-nowrap"
+                        >
+                          {invitingId === c.id ? 'Sending…' : 'Send login link'}
+                        </button>
+                      )}
+                      {inviteNotice?.id === c.id && (
+                        <p className="text-[11px] text-stone mb-2 max-w-[180px] ml-auto">{inviteNotice.message}</p>
+                      )}
                       <button
                         onClick={() => handleDelete(c)}
                         disabled={deletingId === c.id}

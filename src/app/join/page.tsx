@@ -221,8 +221,8 @@ export default function JoinPage() {
           <div className="w-full max-w-[420px] text-center">
             <h1 className="font-display font-light text-2xl mb-3">Thank you</h1>
             <p className="text-stone text-sm">
-              We have your details. Our team will check them and set up your (kalm) listing, and
-              we will contact you on the phone number you gave us.
+              We have your details. Our team will check them and set up your (kalm) listing. When
+              it is ready, we will email you a link to set your password and open your dashboard.
             </p>
           </div>
         </main>
