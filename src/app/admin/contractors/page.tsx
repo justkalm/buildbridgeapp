@@ -20,7 +20,7 @@ import Link from 'next/link';
 import AdminTabs from '@/components/AdminTabs';
 import { isPlaceholderLicense } from '@/lib/license';
 import { formatLocation } from '@/lib/location';
-import { whatsappLink } from '@/lib/whatsapp';
+import { loginLinkWhatsappText, whatsappLink, whatsappMessageLink } from '@/lib/whatsapp';
 
 type ContractorRow = {
   id: string;
@@ -195,6 +195,46 @@ export default function AdminContractorsPage() {
         message: data.message ?? data.error ?? (res.status === 401 ? 'Your admin session has expired.' : 'Something went wrong.'),
       });
     } catch {
+      setInviteNotice({ id: contractor.id, message: 'Something went wrong. Please try again.' });
+    } finally {
+      setInvitingId(null);
+    }
+  }
+
+  // "Send on WhatsApp": emails the login link as usual, then opens WhatsApp
+  // with the same link typed into a chat to their phone; admin presses send.
+  // The tab is opened before the request, while the click still counts, or
+  // phone browsers block it as a pop-up.
+  async function sendLoginLinkOnWhatsapp(contractor: ContractorRow) {
+    const tab = window.open('', '_blank');
+    setInvitingId(contractor.id);
+    setInviteNotice(null);
+    try {
+      const res = await fetch(`/api/admin/contractors/${contractor.id}/invite?via=whatsapp`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      const link =
+        typeof data.setPasswordUrl === 'string'
+          ? whatsappMessageLink(
+              contractor.phone,
+              loginLinkWhatsappText(contractor.name, data.setPasswordUrl, data.result === 'sent')
+            )
+          : null;
+      if (link && tab) {
+        tab.opener = null;
+        tab.location.href = link;
+      } else {
+        tab?.close();
+      }
+      setInviteNotice({
+        id: contractor.id,
+        message: link
+          ? data.result === 'sent'
+            ? 'WhatsApp opened with the login link. Press send there. The same link was emailed too and works for 3 days. Sending again cancels it.'
+            : 'WhatsApp opened with the login link. Press send there. The email did not go (see Failed emails). Sending again cancels it.'
+          : data.message ?? data.error ?? (res.status === 401 ? 'Your admin session has expired.' : 'Something went wrong.'),
+      });
+    } catch {
+      tab?.close();
       setInviteNotice({ id: contractor.id, message: 'Something went wrong. Please try again.' });
     } finally {
       setInvitingId(null);
@@ -789,10 +829,20 @@ export default function AdminContractorsPage() {
                         <button
                           onClick={() => sendLoginLink(c)}
                           disabled={invitingId === c.id}
-                          title={`Email ${c.email} a link to set their password`}
+                          title={`Email ${c.email} a link to set their password. Any link sent earlier stops working.`}
                           className="block ml-auto mb-2 text-xs font-medium text-ink underline underline-offset-2 disabled:opacity-50 whitespace-nowrap"
                         >
                           {invitingId === c.id ? 'Sending…' : 'Send login link'}
+                        </button>
+                      )}
+                      {!c.hasLogin && waLink && (
+                        <button
+                          onClick={() => sendLoginLinkOnWhatsapp(c)}
+                          disabled={invitingId === c.id}
+                          title={`Email the login link and open WhatsApp to ${c.phone} with it filled in. Any link sent earlier stops working.`}
+                          className="block ml-auto mb-2 text-xs font-medium text-ink underline underline-offset-2 disabled:opacity-50 whitespace-nowrap"
+                        >
+                          Send on WhatsApp
                         </button>
                       )}
                       {inviteNotice?.id === c.id && (
