@@ -7,6 +7,12 @@
 //
 // An area saved earlier that isn't on the list (older profiles) opens
 // straight in "Other area" with its text filled in, so nothing is lost.
+//
+// allowTyping (the /join form, owner 19 Oct 2026): one text box instead of
+// the dropdown. The listed areas pop up as suggestions while typing, and
+// anything typed is accepted. On leaving the box a listed area is put back
+// in its one spelling ("andheri w" stays as typed, "andheri west" becomes
+// "Andheri West").
 
 'use client';
 
@@ -17,6 +23,48 @@ import { normalizeLocation } from '@/lib/location';
 const OTHER = '__other__';
 
 export default function AreaPicker({
+  id,
+  value,
+  onChange,
+  className,
+  allowTyping = false,
+}: {
+  id?: string;
+  value: string;
+  onChange: (area: string) => void;
+  className: string;
+  allowTyping?: boolean;
+}) {
+  if (allowTyping) {
+    const listId = `${id ?? 'area'}-suggestions`;
+    return (
+      <>
+        <input
+          id={id}
+          type="text"
+          required
+          maxLength={100}
+          list={listId}
+          autoComplete="off"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={(e) => onChange(canonicalArea(e.target.value) ?? normalizeLocation(e.target.value))}
+          placeholder="Type or pick an area, e.g. Andheri West"
+          className={className}
+        />
+        <datalist id={listId}>
+          {MUMBAI_AREAS.map((a) => (
+            <option key={a} value={a} />
+          ))}
+        </datalist>
+      </>
+    );
+  }
+
+  return <AreaSelect id={id} value={value} onChange={onChange} className={className} />;
+}
+
+function AreaSelect({
   id,
   value,
   onChange,

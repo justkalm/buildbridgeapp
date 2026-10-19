@@ -10,7 +10,9 @@
 // because a listing can't go live or be verified without one.
 //
 // Photos upload as soon as they are picked (ImageUpload, pointed at
-// /api/join/upload), so pressing Send only carries the photo URLs. Send is
+// /api/join/upload; several can be picked at once, 19 Oct 2026) and the
+// area boxes take typing with the Mumbai list as suggestions. As before,
+// pressing Send only carries the photo URLs. Send is
 // disabled while any upload is still running, otherwise that photo would be
 // dropped. Field rules match src/lib/join-form.ts, which the API applies.
 
@@ -153,7 +155,7 @@ export default function JoinPage() {
     }
     const noAreaIndex = projects.findIndex((p) => !p.area.trim());
     if (noAreaIndex !== -1) {
-      setError(`Pick where project ${noAreaIndex + 1} is.`);
+      setError(`Enter where project ${noAreaIndex + 1} is.`);
       return;
     }
     const noSqftIndex = projects.findIndex((p) => !(sqftOf(p.builtUpArea) > 0));
@@ -262,7 +264,7 @@ export default function JoinPage() {
               </div>
               <div>
                 <label htmlFor="join-area" className="block text-sm font-medium mb-1.5">Area in Mumbai</label>
-                <AreaPicker id="join-area" value={area} onChange={setArea} className={inputClass} />
+                <AreaPicker id="join-area" value={area} onChange={setArea} className={inputClass} allowTyping />
                 <p className="text-xs text-stone mt-1">Where your business is based.</p>
               </div>
               <div>
@@ -343,7 +345,7 @@ export default function JoinPage() {
                       Where is it?
                     </label>
                     <AreaPicker id={`join-project-area-${index}`} value={project.area}
-                      onChange={(v) => updateProject(index, 'area', v)} className={inputClass} />
+                      onChange={(v) => updateProject(index, 'area', v)} className={inputClass} allowTyping />
                   </div>
                   <div>
                     <label htmlFor={`join-project-sqft-${index}`} className="block text-xs text-stone mb-1">
@@ -381,12 +383,14 @@ export default function JoinPage() {
                   </p>
                   {project.imageUrls.length < JOIN_MAX_PHOTOS_PER_PROJECT && (
                     <ImageUpload
-                      key={project.imageUrls.length}
-                      label={project.imageUrls.length === 0 ? 'Add photo' : 'Add another photo'}
+                      label={project.imageUrls.length === 0
+                        ? 'Add photos (you can pick several at once)'
+                        : 'Add more photos'}
                       value={null}
                       onChange={(url) => url && addPhoto(index, url)}
                       onUploadStateChange={onUploadState}
                       uploadUrl={UPLOAD_URL} shrinkLargePhotos
+                      multiple maxFiles={JOIN_MAX_PHOTOS_PER_PROJECT - project.imageUrls.length}
                     />
                   )}
                 </div>
