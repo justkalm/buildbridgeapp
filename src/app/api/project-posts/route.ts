@@ -19,11 +19,12 @@
 // notification email however the developer typed it. It stays a single
 // free-text "Area, City" field; the rule copes with the comma.
 
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendProjectPostAdminEmail } from '@/lib/email';
+import { sendAdminPush } from '@/lib/push';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { requireVerifiedDeveloperEmail } from '@/lib/require-verified-email';
 import { normalizeLocation } from '@/lib/location';
@@ -124,6 +125,15 @@ export async function POST(req: NextRequest) {
     trades,
     neededBy,
   });
+
+  // And a pop-up on every admin phone, after the response.
+  after(() =>
+    sendAdminPush({
+      title: 'New project posted',
+      body: `${projectType} in ${location}`,
+      url: '/admin/project-posts',
+    })
+  );
 
   if (emailSent) {
     await prisma.projectPost.update({

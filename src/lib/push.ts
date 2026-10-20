@@ -117,3 +117,40 @@ export async function sendPush(
     console.error('Web push failed:', err);
   }
 }
+
+// Sends to every phone/browser that turned on admin alerts (see
+// AdminPushSubscription in schema.prisma and the admin home). Same rules as
+// sendPush above: never throws, drops devices the push service says are
+// gone, and only notifies devices registered on this kind of site (live or
+// dev). Keep the text short and free of contact details: it shows on a
+// lock screen.
+export async function sendAdminPush(payload: PushPayload): Promise<void> {
+  try {
+    if (!ensureConfigured()) return;
+    const subs = (await prisma.adminPushSubscription.findMany()).filter((s) => belongsToThisSite(s.origin));
+    if (subs.length === 0) return;
+
+    const json = JSON.stringify(payload);
+    await Promise.all(
+      subs.map(async (s) => {
+        try {
+          await webpush.sendNotification(
+            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+            json,
+            { TTL: 60 * 60 * 24 }
+          );
+          await prisma.adminPushSubscription.update({ where: { id: s.id }, data: { lastUsedAt: new Date() } });
+        } catch (err) {
+          const status = (err as { statusCode?: number }).statusCode;
+          if (status === 404 || status === 410) {
+            await prisma.adminPushSubscription.delete({ where: { id: s.id } }).catch(() => {});
+          } else {
+            console.error('Admin web push send failed:', status ?? '', (err as { body?: string }).body ?? err);
+          }
+        }
+      })
+    );
+  } catch (err) {
+    console.error('Admin web push failed:', err);
+  }
+}

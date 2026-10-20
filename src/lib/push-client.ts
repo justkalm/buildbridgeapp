@@ -70,6 +70,13 @@ export async function syncPush(): Promise<boolean> {
 }
 
 export async function enablePush(): Promise<PushState> {
+  return subscribeAndSave('/api/push/subscribe');
+}
+
+// Asks permission, subscribes this browser (or reuses its existing
+// subscription) and saves it at saveUrl: /api/push/subscribe for a
+// developer or contractor, /api/admin/push for admin alerts.
+async function subscribeAndSave(saveUrl: string): Promise<PushState> {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   if (!publicKey) throw new Error('Notifications are not set up on this site yet.');
 
@@ -82,7 +89,7 @@ export async function enablePush(): Promise<PushState> {
     (await reg.pushManager.getSubscription()) ??
     (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) }));
 
-  const res = await fetch('/api/push/subscribe', {
+  const res = await fetch(saveUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(sub.toJSON()),
@@ -103,4 +110,38 @@ export async function disablePush(): Promise<PushState> {
     await sub.unsubscribe().catch(() => {});
   }
   return 'off';
+}
+
+// Admin alerts (20 Oct 2026): the same browser subscription, saved to the
+// admin list instead. See src/app/api/admin/push/route.ts.
+
+export async function enableAdminPush(): Promise<PushState> {
+  return subscribeAndSave('/api/admin/push');
+}
+
+// True when this browser is subscribed AND on the admin list.
+export async function adminPushIsOn(): Promise<boolean> {
+  try {
+    if (Notification.permission !== 'granted') return false;
+    const reg = await navigator.serviceWorker.getRegistration('/');
+    const sub = await reg?.pushManager.getSubscription();
+    if (!sub) return false;
+    const res = await fetch(`/api/admin/push?endpoint=${encodeURIComponent(sub.endpoint)}`);
+    return res.ok && (await res.json()).on === true;
+  } catch {
+    return false;
+  }
+}
+
+// Takes this device off the admin list only. The browser subscription
+// stays, in case the same phone also gets personal notifications.
+export async function disableAdminPush(): Promise<void> {
+  const reg = await navigator.serviceWorker.getRegistration('/');
+  const sub = await reg?.pushManager.getSubscription();
+  if (!sub) return;
+  await fetch('/api/admin/push', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint: sub.endpoint }),
+  }).catch(() => {});
 }

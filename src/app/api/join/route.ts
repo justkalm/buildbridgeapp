@@ -13,12 +13,13 @@
 // The admin email is best effort: a failed email is logged (Failed emails
 // tab) and the form still counts as sent, because the row is already saved.
 
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { isSameOrigin } from '@/lib/same-origin';
 import { joinFormSchema } from '@/lib/join-form';
 import { sendContractorApplicationEmail } from '@/lib/email';
+import { sendAdminPush } from '@/lib/push';
 import { SITE_URL } from '@/lib/site';
 
 const HOUR = 60 * 60 * 1000;
@@ -83,6 +84,14 @@ export async function POST(req: NextRequest) {
     projectCount: data.projects.length,
     adminUrl: `${SITE_URL}/admin/applications`,
   });
+  // And a pop-up on every admin phone, after the response.
+  after(() =>
+    sendAdminPush({
+      title: 'New contractor join form',
+      body: data.businessName,
+      url: '/admin/applications',
+    })
+  );
 
   return NextResponse.json({ ok: true });
 }

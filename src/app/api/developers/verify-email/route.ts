@@ -9,6 +9,7 @@ import { syncDeveloperToOps } from '@/lib/ops-sync';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendNewSignupAdminEmail } from '@/lib/email';
+import { sendAdminPush } from '@/lib/push';
 import { SITE_URL } from '@/lib/site';
 
 export async function POST(req: NextRequest) {
@@ -56,6 +57,14 @@ export async function POST(req: NextRequest) {
       kind: 'developer',
       name: developer.name,
       adminUrl: `${SITE_URL}/admin/developers`,
+    })
+  );
+  after(() =>
+    sendAdminPush({
+      title: 'New developer sign-up',
+      body: developer.name,
+      url: '/admin/developers',
+      tag: `admin-developer-${developer.id}`,
     })
   );
   return NextResponse.json({ ok: true });

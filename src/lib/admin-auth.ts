@@ -101,6 +101,8 @@ export async function clearAdminSession({ everywhere = false }: { everywhere?: b
 
   if (everywhere) {
     await prisma.adminSession.updateMany({ where: { revokedAt: null }, data: { revokedAt: now } });
+    // A lost phone must stop getting admin alerts too (20 Oct 2026).
+    await prisma.adminPushSubscription.deleteMany({});
   } else if (sessionId) {
     await prisma.adminSession.updateMany({
       where: { id: sessionId, revokedAt: null },

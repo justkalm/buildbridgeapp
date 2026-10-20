@@ -7,6 +7,7 @@ import { syncContractorToOps } from '@/lib/ops-sync';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendNewSignupAdminEmail } from '@/lib/email';
+import { sendAdminPush } from '@/lib/push';
 import { isDemoLicense } from '@/lib/license';
 import { SITE_URL } from '@/lib/site';
 
@@ -57,6 +58,14 @@ export async function POST(req: NextRequest) {
         name: contractor.name,
         area: contractor.area,
         adminUrl: `${SITE_URL}/admin/contractors`,
+      })
+    );
+    after(() =>
+      sendAdminPush({
+        title: 'New contractor sign-up',
+        body: contractor.name,
+        url: '/admin/contractors',
+        tag: `admin-contractor-${contractor.id}`,
       })
     );
   }

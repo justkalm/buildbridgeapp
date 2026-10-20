@@ -10,6 +10,7 @@ import { isAdminAuthenticated } from '@/lib/admin-auth';
 import AdminLoginForm from './login-form';
 import AdminSignOutButtons from './sign-out-buttons';
 import WhatsNew from './whats-new';
+import AdminPushToggle from './admin-push-toggle';
 
 export default async function AdminPage() {
   const authenticated = await isAdminAuthenticated();
@@ -35,6 +36,7 @@ export default async function AdminPage() {
           </Link>
         </div>
 
+        <AdminPushToggle />
         <WhatsNew />
 
         <div className="grid gap-4">

@@ -725,6 +725,25 @@ model PushSubscription {
   @@index([ownerRole, ownerId])
 }
 
+// A phone or browser that turned on admin alerts ("Turn on alerts on this
+// phone" on the admin home, 20 Oct 2026): it gets a notification for every
+// confirmed sign-up, join form and project post. Kept apart from
+// PushSubscription because admin has no user account (one shared login),
+// and so one device can hold both a personal and an admin alert. "Sign out
+// everywhere" in admin deletes every row here, so a lost phone stops
+// receiving alerts. origin works as on PushSubscription (see src/lib/push.ts).
+model AdminPushSubscription {
+  id String @id @default(cuid())
+
+  endpoint String @unique
+  p256dh   String
+  auth     String
+  origin   String?
+
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+}
+
 
 // One row per admin login. The admin cookie carries this row's id (signed
 // with ADMIN_SESSION_SECRET); every admin API call checks the row still
