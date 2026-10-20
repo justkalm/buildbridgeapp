@@ -36,6 +36,11 @@
 //    the real address (SITE_URL, app.justkalm.in on the live site). That
 //    way Google only ever learns one address, and old links and bookmarks
 //    still work. API calls are not redirected (the matcher skips /api).
+//    20 Oct 2026: the site moves to the bare domain justkalm.in (Moiz and
+//    owner), so app.justkalm.in becomes an old address too. Links already
+//    sent on WhatsApp keep working: they land on the same page on
+//    justkalm.in. Until NEXTAUTH_URL says justkalm.in, the loop guard below
+//    leaves app.justkalm.in alone.
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
@@ -62,7 +67,7 @@ function buildCsp(nonce: string): string {
   ].join('; ');
 }
 
-const OLD_HOSTS = new Set(['kalm-gold.vercel.app']);
+const OLD_HOSTS = new Set(['kalm-gold.vercel.app', 'app.justkalm.in', 'www.justkalm.in']);
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
