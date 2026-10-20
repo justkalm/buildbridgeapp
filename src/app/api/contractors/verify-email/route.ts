@@ -4,8 +4,11 @@
 // the Contractor table instead.
 
 import { syncContractorToOps } from '@/lib/ops-sync';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { sendNewSignupAdminEmail } from '@/lib/email';
+import { isDemoLicense } from '@/lib/license';
+import { SITE_URL } from '@/lib/site';
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -46,5 +49,16 @@ export async function POST(req: NextRequest) {
 
   // Announced to the Operations app only now that the email is proven.
   syncContractorToOps(contractor.id, 'contractor.signed_up');
+  // And to the team's inboxes, after the response so the visitor never waits.
+  if (!isDemoLicense(contractor.licenseNumber)) {
+    after(() =>
+      sendNewSignupAdminEmail({
+        kind: 'contractor',
+        name: contractor.name,
+        area: contractor.area,
+        adminUrl: `${SITE_URL}/admin/contractors`,
+      })
+    );
+  }
   return NextResponse.json({ ok: true });
 }

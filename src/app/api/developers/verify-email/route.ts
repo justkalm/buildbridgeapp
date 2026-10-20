@@ -6,8 +6,10 @@
 // distinguish "expired" from "never existed" for the person clicking it.
 
 import { syncDeveloperToOps } from '@/lib/ops-sync';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { sendNewSignupAdminEmail } from '@/lib/email';
+import { SITE_URL } from '@/lib/site';
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -48,5 +50,13 @@ export async function POST(req: NextRequest) {
 
   // Announced to the Operations app only now that the email is proven.
   syncDeveloperToOps(developer.id, 'developer.signed_up');
+  // And to the team's inboxes, after the response so the visitor never waits.
+  after(() =>
+    sendNewSignupAdminEmail({
+      kind: 'developer',
+      name: developer.name,
+      adminUrl: `${SITE_URL}/admin/developers`,
+    })
+  );
   return NextResponse.json({ ok: true });
 }

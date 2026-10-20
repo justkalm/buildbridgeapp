@@ -63,6 +63,19 @@ export async function recordEmailFailure(
   }
 }
 
+// Who gets the admin alerts (new forms, sign-ups, project posts, quote
+// requests, reports). QUOTE_NOTIFICATION_EMAIL in Vercel can hold one
+// address or several separated by commas, e.g. the work inbox plus each
+// partner (20 Oct 2026: Hassan, Moiz, Shaheer, Anas), so changing who is
+// told needs no code change. Returns null when nothing usable is set.
+function adminAlertTo(): string[] | null {
+  const list = (process.env.QUOTE_NOTIFICATION_EMAIL ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.includes('@'));
+  return list.length ? list : null;
+}
+
 type QuoteRequestEmailInput = {
   contractorName: string;
   developerName: string;
@@ -80,7 +93,7 @@ type QuoteRequestEmailInput = {
 // a silently dropped notification defeats the entire point of this feature,
 // so failures need to be visible, not swallowed.
 export async function sendQuoteRequestEmail(input: QuoteRequestEmailInput): Promise<boolean> {
-  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+  const notifyAddress = adminAlertTo();
 
   if (!notifyAddress) {
     console.error('QUOTE_NOTIFICATION_EMAIL is not set — cannot send quote request email');
@@ -149,7 +162,7 @@ type ProjectPostEmailInput = {
 // that via sendProjectPostAlertEmail below — a completely separate,
 // later, manual step.
 export async function sendProjectPostAdminEmail(input: ProjectPostEmailInput): Promise<boolean> {
-  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+  const notifyAddress = adminAlertTo();
 
   if (!notifyAddress) {
     console.error('QUOTE_NOTIFICATION_EMAIL is not set — cannot send project post email');
@@ -208,7 +221,7 @@ export async function sendProjectForReviewEmail(input: {
   kind: 'new' | 'edited';
   reviewUrl: string;
 }): Promise<boolean> {
-  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+  const notifyAddress = adminAlertTo();
 
   if (!notifyAddress) {
     console.error('QUOTE_NOTIFICATION_EMAIL is not set, cannot send project review email');
@@ -260,7 +273,7 @@ export async function sendReportEmail(input: {
   reporterRole: string | null;
   reportsUrl: string;
 }): Promise<boolean> {
-  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+  const notifyAddress = adminAlertTo();
 
   if (!notifyAddress) {
     console.error('QUOTE_NOTIFICATION_EMAIL is not set, cannot send report email');
@@ -505,7 +518,7 @@ export async function sendContactFormEmail(input: {
   email: string;
   message: string;
 }): Promise<boolean> {
-  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+  const notifyAddress = adminAlertTo();
   if (!notifyAddress) {
     console.error('QUOTE_NOTIFICATION_EMAIL is not set — cannot send contact form email');
     return false;
@@ -586,7 +599,7 @@ export async function sendContractorApplicationEmail(input: {
   projectCount: number;
   adminUrl: string;
 }): Promise<boolean> {
-  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+  const notifyAddress = adminAlertTo();
   if (!notifyAddress) {
     console.error('QUOTE_NOTIFICATION_EMAIL is not set, cannot send onboarding form email');
     return false;
@@ -618,6 +631,52 @@ export async function sendContractorApplicationEmail(input: {
     return true;
   } catch (err) {
     await recordEmailFailure('contractor onboarding form', notifyAddress, err);
+    return false;
+  }
+}
+
+// Tells the admin inbox that a contractor or developer signed up on the site
+// and confirmed their email (sent from the two verify-email routes, so a
+// typed-in fake address never reaches the team). Like the onboarding form
+// email above, it carries only the name and area plus a link to admin:
+// the person's email and phone stay behind the admin login.
+export async function sendNewSignupAdminEmail(input: {
+  kind: 'contractor' | 'developer';
+  name: string;
+  area?: string | null;
+  adminUrl: string;
+}): Promise<boolean> {
+  const notifyAddress = adminAlertTo();
+  if (!notifyAddress) {
+    console.error('QUOTE_NOTIFICATION_EMAIL is not set, cannot send sign-up email');
+    return false;
+  }
+
+  const label = input.kind === 'contractor' ? 'Contractor' : 'Developer';
+  try {
+    const { error } = await getResendClient().emails.send({
+      from: EMAIL_FROM,
+      to: notifyAddress,
+      subject: `New ${input.kind} sign-up: ${sanitizeSubject(input.name)}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 560px;">
+          <h2 style="margin-bottom: 4px;">New ${input.kind} sign-up</h2>
+          <p style="color: #666; margin-top: 0;">They confirmed their email. Reach out while they are warm.</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <tr><td style="padding: 8px 0; color: #666; width: 140px;">${label}</td><td style="padding: 8px 0;">${escapeHtml(input.name)}</td></tr>
+            ${input.area ? `<tr><td style="padding: 8px 0; color: #666;">Area</td><td style="padding: 8px 0;">${escapeHtml(input.area)}</td></tr>` : ''}
+          </table>
+          <p><a href="${escapeHtml(input.adminUrl)}">Open in admin</a></p>
+        </div>
+      `,
+    });
+    if (error) {
+      await recordEmailFailure(`${input.kind} sign-up`, notifyAddress, error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    await recordEmailFailure(`${input.kind} sign-up`, notifyAddress, err);
     return false;
   }
 }
@@ -860,7 +919,7 @@ export async function sendReverifyRequestEmail(input: {
   changedFields: string[];
   adminUrl: string;
 }): Promise<boolean> {
-  const notifyAddress = process.env.QUOTE_NOTIFICATION_EMAIL;
+  const notifyAddress = adminAlertTo();
   if (!notifyAddress) {
     console.error('QUOTE_NOTIFICATION_EMAIL is not set, cannot send re-verification email');
     return false;

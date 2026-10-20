@@ -2,13 +2,14 @@
 //
 // Server component. Checks the admin session cookie directly (no client
 // round-trip, no flash of the wrong content) and renders either the login
-// form or the dashboard with the three admin actions: add a contractor,
-// manage existing contractors, and view current users.
+// form or the dashboard: the What's new panel (whats-new.tsx), then the
+// admin sections.
 
 import Link from 'next/link';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 import AdminLoginForm from './login-form';
 import AdminSignOutButtons from './sign-out-buttons';
+import WhatsNew from './whats-new';
 
 export default async function AdminPage() {
   const authenticated = await isAdminAuthenticated();
@@ -33,6 +34,8 @@ export default async function AdminPage() {
             View live site →
           </Link>
         </div>
+
+        <WhatsNew />
 
         <div className="grid gap-4">
           <Link
