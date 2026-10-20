@@ -18,7 +18,10 @@
 // private pages are in. Still waiting on: the only public contractors are
 // five that look like test accounts, which would go into Google under the
 // (kalm) name. Turn this on once they are hidden or confirmed real.
-export const SEARCH_ENGINES_ALLOWED = false;
+// 20 Oct 2026: ON (owner). The three public contractors (S.M. Enterprise,
+// Giriraj Electricals, ce Becho) are confirmed real. Private pages keep
+// their own noindex (NEVER_INDEX below), whatever this switch says.
+export const SEARCH_ENGINES_ALLOWED = true;
 
 // For pages that must never be in search results, whatever the switch
 // above says: sign-in, password and email links, dashboards, messages,
