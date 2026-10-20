@@ -40,14 +40,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await prisma.developer.update({
-    where: { id: developer.id },
+  // Only the request that actually uses up the token goes on, so two
+  // clicks at the same moment can't send the team two alerts.
+  const used = await prisma.developer.updateMany({
+    where: { id: developer.id, emailVerifyToken: token },
     data: {
       emailVerified: true,
       emailVerifyToken: null,
       emailVerifyTokenExpiresAt: null,
     },
   });
+  if (used.count === 0) return NextResponse.json({ ok: true });
 
   // Announced to the Operations app only now that the email is proven.
   syncDeveloperToOps(developer.id, 'developer.signed_up');

@@ -88,7 +88,8 @@ export async function POST(req: NextRequest) {
   after(() =>
     sendAdminPush({
       title: 'New contractor join form',
-      body: data.businessName,
+      // Anyone can type this name, so keep it short on a lock screen.
+      body: data.businessName.slice(0, 60),
       url: '/admin/applications',
     })
   );
