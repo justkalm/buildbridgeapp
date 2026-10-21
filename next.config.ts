@@ -90,6 +90,13 @@ const nextConfig: NextConfig = {
         source: '/:path*',
         headers: securityHeaders,
       },
+      // Crawlers may fetch the public contractor API to render /browse and
+      // the profiles (src/app/robots.ts), but the raw JSON must never be
+      // listed as a search result of its own.
+      {
+        source: '/api/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex' }],
+      },
     ];
   },
 };
