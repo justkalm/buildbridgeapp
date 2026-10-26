@@ -8,6 +8,11 @@
 // Far above any real building in Mumbai; stops absurd input.
 export const MAX_BUILT_UP_AREA_SQFT = 10_000_000;
 
+// The join form has no business cap on built-up area (owner's call, 26 Oct
+// 2026): only the largest whole number the database's Int column can hold,
+// since admin copies the figure into Project.squareFeet.
+export const MAX_DB_INT = 2_147_483_647;
+
 // "When do you need the contractor?" on Post a project. The stored value is
 // the text shown, so old rows (null) simply show nothing.
 export const NEEDED_BY_OPTIONS = [

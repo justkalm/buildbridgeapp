@@ -15,7 +15,7 @@ import { z } from 'zod';
 import { tradeTypesField } from '@/lib/project-validation';
 import { normalizeLocation } from '@/lib/location';
 import { isOwnBlobImageUrl } from '@/lib/validate-image-url';
-import { MAX_BUILT_UP_AREA_SQFT } from '@/lib/project-fields';
+import { MAX_DB_INT } from '@/lib/project-fields';
 
 // Owner's rule (16 Oct 2026): every contractor lists 3 to 5 projects, each
 // with photos. 1 photo minimum (17 Oct: was 2; photos were the main reason
@@ -71,7 +71,7 @@ export const joinProjectSchema = z.object({
     .number({ message: 'Enter the built-up area of each project in sq ft' })
     .int('Built-up area must be a whole number of sq ft')
     .positive('Enter the built-up area of each project in sq ft')
-    .max(MAX_BUILT_UP_AREA_SQFT, 'That built-up area looks too large. Check for extra zeros.'),
+    .max(MAX_DB_INT, 'That built-up area looks too large. Check for extra zeros.'),
   siteVisitPossible: z.boolean({ message: 'Tell us for each project whether you can arrange a site visit' }),
   imageUrls: z
     .array(blobUrl)

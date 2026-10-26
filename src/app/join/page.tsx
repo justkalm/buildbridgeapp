@@ -351,7 +351,7 @@ export default function JoinPage() {
                     <label htmlFor={`join-project-sqft-${index}`} className="block text-xs text-stone mb-1">
                       Built-up area in sq ft (a rough figure is fine)
                     </label>
-                    <input id={`join-project-sqft-${index}`} type="text" inputMode="numeric" maxLength={12}
+                    <input id={`join-project-sqft-${index}`} type="text" inputMode="numeric" maxLength={16}
                       value={project.builtUpArea} placeholder="e.g. 45000"
                       onChange={(e) => updateProject(index, 'builtUpArea', e.target.value)} className={inputClass} />
                   </div>
