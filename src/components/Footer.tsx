@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Wordmark from '@/components/Wordmark';
 import { useSession } from 'next-auth/react';
 import { SHOW_PLANS } from '@/lib/plans';
+import { GOOGLE_REVIEW_URL } from '@/lib/site';
 
 export default function Footer() {
   const { status, data: session } = useSession();
@@ -25,6 +26,7 @@ export default function Footer() {
             <h4 className="text-xs text-stone mb-4">Platform</h4>
             <ul className="flex flex-col gap-3">
               <li><Link href="/browse" className="text-sm hover:text-ink transition-colors">Browse Contractors</Link></li>
+              <li><Link href="/trades" className="text-sm hover:text-ink transition-colors">All Trades</Link></li>
               {status !== 'authenticated' || role === 'developer' ? (
                 <li><Link href="/post-project" className="text-sm hover:text-ink transition-colors">Post a Project</Link></li>
               ) : null}
@@ -48,6 +50,13 @@ export default function Footer() {
               <li><Link href="/terms" className="text-sm hover:text-ink transition-colors">Terms</Link></li>
               <li><Link href="/privacy" className="text-sm hover:text-ink transition-colors">Privacy</Link></li>
               <li><Link href="/report" className="text-sm hover:text-ink transition-colors">Report content</Link></li>
+              {GOOGLE_REVIEW_URL && (
+                <li>
+                  <a href={GOOGLE_REVIEW_URL} target="_blank" rel="noopener noreferrer" className="text-sm hover:text-ink transition-colors">
+                    Review us on Google
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
         </div>

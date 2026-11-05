@@ -47,6 +47,7 @@ export async function generateMetadata({ params }: LayoutProps<'/contractors/[sl
   return {
     title: c.name,
     description,
+    alternates: { canonical: `/contractors/${slug}` },
     openGraph: { type: 'profile', title: `${c.name} | (kalm)`, description, images: [image], url: `/contractors/${slug}` },
     twitter: { card: 'summary', title: `${c.name} | (kalm)`, description, images: [image.url] },
   };

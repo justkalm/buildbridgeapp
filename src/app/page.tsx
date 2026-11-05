@@ -5,13 +5,23 @@
 // manifest.ts) takes a developer to /dashboard and a contractor to
 // /contractor/dashboard. Only signed-out visitors get the landing page.
 
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import KalmTrace from '@/components/KalmTrace';
+import JsonLd from '@/components/JsonLd';
 import { ALL_TRADES, HOMEPAGE_TRADES } from '@/lib/trade-types';
+import { organizationLd, websiteLd } from '@/lib/structured-data';
+
+// Search title (SEO, 5 Nov 2026): the old "(kalm) | Kaam. Connected." had no
+// words anyone searches for. The tagline stays on the page and in previews.
+export const metadata: Metadata = {
+  title: { absolute: 'Verified Contractors in Mumbai | (kalm)' },
+  alternates: { canonical: '/' },
+};
 
 export default async function Home() {
   const session = await auth();
@@ -21,6 +31,8 @@ export default async function Home() {
 
   return (
     <>
+      <JsonLd data={organizationLd()} />
+      <JsonLd data={websiteLd()} />
       <Nav />
 
       <header className="pt-10 md:pt-12 pb-20 md:pb-24">
@@ -81,7 +93,7 @@ export default async function Home() {
               </Link>
             ))}
             <Link
-              href="/browse"
+              href="/trades"
               className="text-sm px-5 py-2.5 rounded-full text-stone underline underline-offset-2 hover:text-ink transition-colors"
             >
               All {ALL_TRADES.length} trades

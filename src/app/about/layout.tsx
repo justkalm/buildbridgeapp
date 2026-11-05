@@ -3,6 +3,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/about' },
   title: 'About',
   description: 'Who is behind (kalm), and why we built it.',
 };
