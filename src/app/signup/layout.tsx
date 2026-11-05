@@ -3,6 +3,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/signup' },
   title: 'Sign up as a developer',
   description: 'Find verified contractors, message them, visit their finished sites and request quotes.',
 };

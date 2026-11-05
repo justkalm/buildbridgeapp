@@ -474,3 +474,24 @@ export function groupByTrade(values: readonly string[]): { trade: string; specia
   if (unknown.length > 0) groups.push({ trade: 'Other', specialities: unknown });
   return groups;
 }
+
+// ---------------------------------------------------------------------------
+// Trade page addresses (/trades/<slug>), SEO 5 Nov 2026. Built from the
+// trade name, so renaming a trade changes its address: add the old slug to
+// a redirect if that ever happens to a trade Google already lists.
+// "Waterproofing & Roofing" -> "waterproofing-and-roofing".
+// ---------------------------------------------------------------------------
+
+export function tradeSlug(trade: string): string {
+  return trade
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+const TRADE_BY_SLUG = new Map<string, TradeDef>(TRADES.map((t) => [tradeSlug(t.trade), t]));
+
+export function tradeFromSlug(slug: string): TradeDef | null {
+  return TRADE_BY_SLUG.get(slug) ?? null;
+}

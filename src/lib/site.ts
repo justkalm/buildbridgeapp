@@ -48,3 +48,13 @@ export const SITE_DESCRIPTION =
 // WhatsApp: digits with country code, no plus or spaces, e.g. '919800000000'.
 export const VERIFICATION_WHATSAPP = '';
 export const VERIFICATION_EMAIL = 'connect@justkalm.in';
+
+// Google Business Profile (5 Nov 2026). Both stay EMPTY until the owner
+// sends the links; each feature switches itself on once its link is set.
+// GOOGLE_BUSINESS_URL: the profile's public link (Share > copy link). Tells
+//   Google the site and the profile are the same company (sameAs in
+//   src/lib/structured-data.ts).
+// GOOGLE_REVIEW_URL: the "Ask for reviews" link from the profile. Shows a
+//   "Review us on Google" link in the footer.
+export const GOOGLE_BUSINESS_URL = '';
+export const GOOGLE_REVIEW_URL = '';

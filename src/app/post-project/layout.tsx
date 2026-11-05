@@ -3,6 +3,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/post-project' },
   title: 'Post a project',
   description: 'Tell (kalm) what you need and get connected with the right contractor.',
 };

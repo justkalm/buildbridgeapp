@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { NEVER_INDEX, SEARCH_ENGINES_ALLOWED } from '@/lib/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/contractor/signup' },
   title: 'List your business',
   description: 'List your contracting business on (kalm) and get enquiries from developers.',
   // The contractor section is kept out of search (contractor/layout.tsx),

@@ -13,15 +13,14 @@
 // slugs are derived from business names (see the signup route's
 // slugify()), so they're guessable/predictable, not secret; a PENDING or
 // REJECTED contractor's full profile was reachable by anyone who guessed
-// or found the slug, even though browse correctly hid them. findFirst
-// instead of findUnique here specifically because Prisma's findUnique only
-// accepts genuinely unique fields/compound-unique keys in `where` — slug
-// alone is unique, but slug + verificationStatus together isn't a declared
-// compound unique index, so findFirst is the correct tool for "unique
-// slug, filtered by a non-unique condition".
+// or found the slug, even though browse correctly hid them.
+//
+// The query itself lives in src/lib/public-contractor.ts, shared with the
+// profile page (which now loads it on the server), so both always apply
+// the same rules.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getPublicContractor } from '@/lib/public-contractor';
 
 export async function GET(
   req: NextRequest,
@@ -29,62 +28,10 @@ export async function GET(
 ) {
   const { slug } = await params;
 
-  const contractor = await prisma.contractor.findFirst({
-    where: { slug, verificationStatus: 'VERIFIED' },
-        select: {
-      id: true,
-      slug: true,
-      name: true,
-      logoUrl: true,
-      city: true,
-      area: true,
-      tradeTypes: true,
-      verificationStatus: true,
-      reverifyPending: true, // shows "Verified · update in review"; see VerifiedBadge
-      tier: true,
-      yearsInBusiness: true,
-      teamSizeMin: true,
-      teamSizeMax: true,
-      gstRegistered: true,
-      insuranceCoverLakh: true,
-      rating: true,
-      reviewCount: true,
-      licenseNumber: true,
-      bio: true,
-      // Only used to derive acceptsSiteVisits below, then stripped. The
-      // hash itself must never reach the response.
-      passwordHash: true,
-      projects: {
-        // Only approved projects are public (KALM-252).
-        where: { approvalStatus: 'APPROVED' },
-        select: {
-          id: true,
-          title: true,
-          developerName: true,
-          projectType: true,
-          squareFeet: true,
-          elevationFloors: true,
-          committedDurationMonths: true,
-          actualDurationMonths: true,
-          imageUrls: true,
-          reviewRating: true,
-          reviewText: true,
-        },
-        // Newest-added first. Used to sort by completedYear, which the
-        // project forms no longer ask for (the owner prefers the committed
-        // and actual durations); the column still exists in the database.
-        orderBy: { createdAt: 'desc' },
-      },
-    },
-  });
-
+  const contractor = await getPublicContractor(slug);
   if (!contractor) {
     return NextResponse.json({ error: 'Contractor not found' }, { status: 404 });
   }
 
-  // acceptsSiteVisits: whether this contractor has claimed their account
-  // and can therefore answer a site visit request (see
-  // src/app/api/site-visits/route.ts). A boolean, never the hash.
-  const { passwordHash, ...publicFields } = contractor;
-  return NextResponse.json({ ...publicFields, acceptsSiteVisits: passwordHash !== null });
+  return NextResponse.json(contractor);
 }
