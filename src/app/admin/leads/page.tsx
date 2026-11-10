@@ -9,7 +9,8 @@
 // Each quote form lead also has "Send on WhatsApp" (10 Nov 2026): it opens
 // WhatsApp to the contractor with the message typed in, and admin presses
 // send there. Free contractors get a short pointer to the dashboard; Plus and
-// Pro get the full request. See api/admin/quote-requests/[id]/whatsapp.
+// Pro also get budget and details. Never the developer's name, phone or
+// email. See api/admin/quote-requests/[id]/whatsapp.
 
 'use client';
 
@@ -112,9 +113,9 @@ export default function AdminLeadsPage() {
           id: lead.id,
           failed: false,
           message:
-            json.level === 'full'
-              ? 'WhatsApp opened with the full request. Press send there. (kalm) does not record that it was sent.'
-              : 'WhatsApp opened with a short note and the dashboard link (free plan: no developer details). Press send there. (kalm) does not record that it was sent.',
+            json.level === 'details'
+              ? 'WhatsApp opened with the work, budget and details, and the dashboard link. No developer contact details. Press send there. (kalm) does not record that it was sent.'
+              : 'WhatsApp opened with a short note and the dashboard link (free plan). Press send there. (kalm) does not record that it was sent.',
         });
       } else {
         tab?.close();
@@ -295,8 +296,8 @@ export default function AdminLeadsPage() {
                                           disabled={sendingId === d.id}
                                           title={
                                             r.tier === 'LISTED'
-                                              ? 'Opens WhatsApp to the contractor with a short note and the dashboard link. No developer details (free plan).'
-                                              : 'Opens WhatsApp to the contractor with the full request typed in.'
+                                              ? 'Opens WhatsApp to the contractor with a short note and the dashboard link (free plan).'
+                                              : 'Opens WhatsApp to the contractor with the work, budget, details and dashboard link. No developer contact details.'
                                           }
                                           className="text-sage font-medium underline underline-offset-2 whitespace-nowrap disabled:opacity-50"
                                         >

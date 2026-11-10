@@ -21,9 +21,7 @@ describe('loginLinkWhatsappText', () => {
 });
 
 describe('quoteRequestWhatsappText', () => {
-  const lead = {
-    developerPhone: '98200 12345',
-    developerEmail: 'asha@example.com',
+  const request = {
     budgetRangeLabel: 'Rs. 12,50,000',
     builtUpArea: '30,000 sq ft',
     details: 'Terrace waterproofing for two wings.',
@@ -35,40 +33,40 @@ describe('quoteRequestWhatsappText', () => {
     dashboardUrl: 'https://justkalm.in/contractor/dashboard',
   };
 
-  it('gives a free contractor the work, the area and the dashboard link, and nothing about the developer', () => {
-    const text = quoteRequestWhatsappText({ ...base, tier: 'LISTED', lead });
+  it('gives a free contractor the work, the area and the dashboard link only', () => {
+    const text = quoteRequestWhatsappText({ ...base, tier: 'LISTED', request });
     expect(text).toContain('Work: Waterproofing');
     expect(text).toContain('Area: Andheri West');
     expect(text).toContain(base.dashboardUrl);
-    for (const hidden of [lead.developerPhone, lead.developerEmail, lead.budgetRangeLabel, lead.builtUpArea, lead.details]) {
+    for (const hidden of [request.budgetRangeLabel, request.builtUpArea, request.details]) {
       expect(text).not.toContain(hidden);
     }
   });
 
-  it('gives Plus and Pro the full request', () => {
+  it('gives Plus and Pro the budget, area and details too', () => {
     for (const tier of ['PLUS', 'PRO'] as const) {
-      const text = quoteRequestWhatsappText({ ...base, tier, lead });
-      expect(text).not.toContain('From:');
-      for (const shown of [lead.developerPhone, lead.developerEmail, lead.budgetRangeLabel, lead.builtUpArea, lead.details, base.dashboardUrl]) {
+      const text = quoteRequestWhatsappText({ ...base, tier, request });
+      for (const shown of [request.budgetRangeLabel, request.builtUpArea, request.details, base.dashboardUrl]) {
         expect(text).toContain(shown);
       }
     }
   });
 
-  it('falls back to the short message when no lead details are passed', () => {
-    expect(quoteRequestWhatsappText({ ...base, tier: 'PRO' })).not.toContain('Phone:');
+  it('never has a line for the developer name, phone or email, on any plan', () => {
+    for (const tier of ['LISTED', 'PLUS', 'PRO'] as const) {
+      const text = quoteRequestWhatsappText({ ...base, tier, request });
+      expect(text).not.toMatch(/^(From|Phone|Email):/m);
+    }
   });
 
-  it('leaves out the dashboard line when the contractor has no login yet', () => {
-    const text = quoteRequestWhatsappText({ ...base, tier: 'PRO', lead, dashboardUrl: null });
-    expect(text).not.toContain('dashboard:');
-    expect(text).toContain(lead.developerPhone);
+  it('falls back to the short message when no request details are passed', () => {
+    expect(quoteRequestWhatsappText({ ...base, tier: 'PRO' })).not.toContain('Details:');
   });
 
   it('shortens very long details and uses no long dash', () => {
-    const text = quoteRequestWhatsappText({ ...base, tier: 'PRO', lead: { ...lead, details: 'x'.repeat(2000) } });
+    const text = quoteRequestWhatsappText({ ...base, tier: 'PRO', request: { ...request, details: 'x'.repeat(2000) } });
     expect(text).not.toContain('x'.repeat(WHATSAPP_DETAILS_MAX + 1));
-    expect(text).toContain('the rest is in your email and dashboard');
+    expect(text).toContain('the rest is in your dashboard');
     expect(text).not.toMatch(/[\u2013\u2014]/);
   });
 });

@@ -37,17 +37,14 @@ export function loginLinkWhatsappText(name: string, setPasswordUrl: string, emai
 }
 
 // The message for the admin "Send on WhatsApp" button on a quote request
-// (Admin > Leads). Two levels, decided by the contractor's plan (10 Nov 2026):
-//  - Listed (free): a nudge only. Work and area, then the dashboard link. No
-//    developer name, phone, email, budget or details, so a WhatsApp can never
-//    show more than the free-plan lead cap allows. The caller passes work and
-//    area already masked (maskContactDetails), so a number typed there cannot
-//    slip through either.
-//  - Plus and Pro: the full request with the developer's phone and email.
-//    These plans have no lead cap. The developer's name is left out (Hassan,
-//    10 Nov 2026).
-// dashboardUrl is null when the contractor has no login yet: the line about
-// the dashboard is then left out.
+// (Admin > Leads). It NEVER carries the developer's name, phone or email
+// (Hassan, 10 Nov 2026): the contractor opens the dashboard for those, where
+// the free-plan lead cap applies as usual. Two levels, by the contractor's plan:
+//  - Listed (free): work and area, then the dashboard link.
+//  - Plus and Pro: also built-up area, budget and the details the developer
+//    typed.
+// The caller passes every free-text field already masked
+// (maskContactDetails), so a number or email typed there cannot slip through.
 export const WHATSAPP_DETAILS_MAX = 600;
 
 export type QuoteWhatsappInput = {
@@ -55,11 +52,9 @@ export type QuoteWhatsappInput = {
   tier: 'LISTED' | 'PLUS' | 'PRO';
   projectType: string;
   location: string;
-  dashboardUrl: string | null;
+  dashboardUrl: string;
   // Used for Plus and Pro only.
-  lead?: {
-    developerPhone: string;
-    developerEmail: string;
+  request?: {
     budgetRangeLabel: string;
     builtUpArea: string | null;
     details: string;
@@ -70,31 +65,22 @@ export function quoteRequestWhatsappText(input: QuoteWhatsappInput): string {
   const opening = `Hi ${input.contractorName}, you have a new quote request on (kalm).`;
   const work = [`Work: ${input.projectType}`, `Area: ${input.location}`];
 
-  if (input.tier === 'LISTED' || !input.lead) {
-    return [
-      opening,
-      work.join('\n'),
-      input.dashboardUrl ? `Open your dashboard to see it and reply: ${input.dashboardUrl}` : null,
-    ]
-      .filter(Boolean)
-      .join('\n\n');
+  if (input.tier === 'LISTED' || !input.request) {
+    return [opening, work.join('\n'), `Open your dashboard to see it and reply: ${input.dashboardUrl}`].join('\n\n');
   }
 
-  const { lead } = input;
+  const { request } = input;
   const details =
-    lead.details.length > WHATSAPP_DETAILS_MAX
-      ? `${lead.details.slice(0, WHATSAPP_DETAILS_MAX).trimEnd()}... (the rest is in your email and dashboard)`
-      : lead.details;
-  if (lead.builtUpArea) work.push(`Built-up area: ${lead.builtUpArea}`);
-  work.push(`Budget: ${lead.budgetRangeLabel}`);
+    request.details.length > WHATSAPP_DETAILS_MAX
+      ? `${request.details.slice(0, WHATSAPP_DETAILS_MAX).trimEnd()}... (the rest is in your dashboard)`
+      : request.details;
+  if (request.builtUpArea) work.push(`Built-up area: ${request.builtUpArea}`);
+  work.push(`Budget: ${request.budgetRangeLabel}`);
 
   return [
     opening,
     work.join('\n'),
     `Details: ${details}`,
-    [`Phone: ${lead.developerPhone}`, `Email: ${lead.developerEmail}`].join('\n'),
-    input.dashboardUrl ? `You can also reply from your dashboard: ${input.dashboardUrl}` : null,
-  ]
-    .filter(Boolean)
-    .join('\n\n');
+    `Open your dashboard for the developer's contact details and to reply: ${input.dashboardUrl}`,
+  ].join('\n\n');
 }

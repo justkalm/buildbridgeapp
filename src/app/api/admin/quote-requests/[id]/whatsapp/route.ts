@@ -6,11 +6,12 @@
 // in WhatsApp. Nothing is sent from here and nothing is written to the
 // database, so the site keeps no record that a WhatsApp went.
 //
-// What the message carries depends on the contractor's plan today (see
-// quoteRequestWhatsappText in src/lib/whatsapp.ts): Listed (free) gets the
-// work and area only, with contact details masked, plus the dashboard link;
-// Plus and Pro get the full request. The developer's details are read only
-// when one request is opened this way, never for the whole Leads list.
+// The message never carries the developer's name, phone or email (Hassan,
+// 10 Nov 2026); this route does not even read them. What it does carry
+// depends on the contractor's plan today (see quoteRequestWhatsappText in
+// src/lib/whatsapp.ts): Listed (free) gets the work and area plus the
+// dashboard link; Plus and Pro also get built-up area, budget and details.
+// Free text is masked, so a number typed into the details stays out too.
 //
 // Quote form requests only (kind QUOTE). The contractor's number never goes
 // to a developer: this route is admin only.
@@ -38,8 +39,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       budgetRangeLabel: true,
       builtUpAreaSqft: true,
       details: true,
-      contactPhone: true,
-      developer: { select: { email: true } },
       contractor: { select: { name: true, phone: true, tier: true, passwordHash: true } },
     },
   });
@@ -51,13 +50,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'Send on WhatsApp is for quote form requests only.' }, { status: 400 });
   }
 
-  const { contractor, developer } = request;
+  const { contractor } = request;
   const free = contractor.tier === 'LISTED';
-  const hasLogin = !!contractor.passwordHash;
 
-  // A free contractor's message is only a pointer to the dashboard, so with
-  // no login there is nothing useful to send yet.
-  if (free && !hasLogin) {
+  // The message points to the dashboard for the developer's contact details,
+  // so with no login there is nothing the contractor can act on yet.
+  if (!contractor.passwordHash) {
     return NextResponse.json(
       { error: `${contractor.name} has no login yet, so they cannot open the dashboard. Send the login link first (Contractors page).` },
       { status: 409 }
@@ -68,17 +66,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const text = quoteRequestWhatsappText({
     contractorName: contractor.name,
     tier: contractor.tier,
-    projectType: free ? maskContactDetails(request.projectType) : request.projectType,
-    location: free ? maskContactDetails(request.location) : request.location,
-    dashboardUrl: hasLogin ? `${baseUrl}/contractor/dashboard` : null,
-    lead: free
+    projectType: maskContactDetails(request.projectType),
+    location: maskContactDetails(request.location),
+    dashboardUrl: `${baseUrl}/contractor/dashboard`,
+    request: free
       ? undefined
       : {
-          developerPhone: request.contactPhone,
-          developerEmail: developer.email,
           budgetRangeLabel: request.budgetRangeLabel,
           builtUpArea: formatArea(request.builtUpAreaSqft),
-          details: request.details,
+          details: maskContactDetails(request.details),
         },
   });
 
@@ -91,7 +87,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   return NextResponse.json(
-    { url, level: free ? 'short' : 'full', contractorName: contractor.name },
+    { url, level: free ? 'short' : 'details', contractorName: contractor.name },
     { headers: { 'Cache-Control': 'no-store' } }
   );
 }
