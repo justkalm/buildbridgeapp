@@ -39,7 +39,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       builtUpAreaSqft: true,
       details: true,
       contactPhone: true,
-      developer: { select: { name: true, email: true } },
+      developer: { select: { email: true } },
       contractor: { select: { name: true, phone: true, tier: true, passwordHash: true } },
     },
   });
@@ -74,7 +74,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     lead: free
       ? undefined
       : {
-          developerName: developer.name,
           developerPhone: request.contactPhone,
           developerEmail: developer.email,
           budgetRangeLabel: request.budgetRangeLabel,

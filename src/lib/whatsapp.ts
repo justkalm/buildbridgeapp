@@ -43,7 +43,9 @@ export function loginLinkWhatsappText(name: string, setPasswordUrl: string, emai
 //    show more than the free-plan lead cap allows. The caller passes work and
 //    area already masked (maskContactDetails), so a number typed there cannot
 //    slip through either.
-//  - Plus and Pro: the full request. These plans have no lead cap.
+//  - Plus and Pro: the full request with the developer's phone and email.
+//    These plans have no lead cap. The developer's name is left out (Hassan,
+//    10 Nov 2026).
 // dashboardUrl is null when the contractor has no login yet: the line about
 // the dashboard is then left out.
 export const WHATSAPP_DETAILS_MAX = 600;
@@ -56,7 +58,6 @@ export type QuoteWhatsappInput = {
   dashboardUrl: string | null;
   // Used for Plus and Pro only.
   lead?: {
-    developerName: string;
     developerPhone: string;
     developerEmail: string;
     budgetRangeLabel: string;
@@ -91,7 +92,7 @@ export function quoteRequestWhatsappText(input: QuoteWhatsappInput): string {
     opening,
     work.join('\n'),
     `Details: ${details}`,
-    [`From: ${lead.developerName}`, `Phone: ${lead.developerPhone}`, `Email: ${lead.developerEmail}`].join('\n'),
+    [`Phone: ${lead.developerPhone}`, `Email: ${lead.developerEmail}`].join('\n'),
     input.dashboardUrl ? `You can also reply from your dashboard: ${input.dashboardUrl}` : null,
   ]
     .filter(Boolean)

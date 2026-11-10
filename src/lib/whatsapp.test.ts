@@ -22,7 +22,6 @@ describe('loginLinkWhatsappText', () => {
 
 describe('quoteRequestWhatsappText', () => {
   const lead = {
-    developerName: 'Asha Developers',
     developerPhone: '98200 12345',
     developerEmail: 'asha@example.com',
     budgetRangeLabel: 'Rs. 12,50,000',
@@ -41,7 +40,7 @@ describe('quoteRequestWhatsappText', () => {
     expect(text).toContain('Work: Waterproofing');
     expect(text).toContain('Area: Andheri West');
     expect(text).toContain(base.dashboardUrl);
-    for (const hidden of [lead.developerName, lead.developerPhone, lead.developerEmail, lead.budgetRangeLabel, lead.builtUpArea, lead.details]) {
+    for (const hidden of [lead.developerPhone, lead.developerEmail, lead.budgetRangeLabel, lead.builtUpArea, lead.details]) {
       expect(text).not.toContain(hidden);
     }
   });
@@ -49,14 +48,15 @@ describe('quoteRequestWhatsappText', () => {
   it('gives Plus and Pro the full request', () => {
     for (const tier of ['PLUS', 'PRO'] as const) {
       const text = quoteRequestWhatsappText({ ...base, tier, lead });
-      for (const shown of [lead.developerName, lead.developerPhone, lead.developerEmail, lead.budgetRangeLabel, lead.builtUpArea, lead.details, base.dashboardUrl]) {
+      expect(text).not.toContain('From:');
+      for (const shown of [lead.developerPhone, lead.developerEmail, lead.budgetRangeLabel, lead.builtUpArea, lead.details, base.dashboardUrl]) {
         expect(text).toContain(shown);
       }
     }
   });
 
   it('falls back to the short message when no lead details are passed', () => {
-    expect(quoteRequestWhatsappText({ ...base, tier: 'PRO' })).not.toContain('From:');
+    expect(quoteRequestWhatsappText({ ...base, tier: 'PRO' })).not.toContain('Phone:');
   });
 
   it('leaves out the dashboard line when the contractor has no login yet', () => {
