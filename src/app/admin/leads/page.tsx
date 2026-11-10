@@ -5,6 +5,11 @@
 // could not see in full. Month picker (India-time months) and a CSV download.
 // Counts in-app activity only: replies by email or WhatsApp outside the app
 // are invisible here, and email delivery is not tracked.
+//
+// Each quote form lead also has "Send on WhatsApp" (10 Nov 2026): it opens
+// WhatsApp to the contractor with the message typed in, and admin presses
+// send there. Free contractors get a short pointer to the dashboard; Plus and
+// Pro get the full request. See api/admin/quote-requests/[id]/whatsapp.
 
 'use client';
 
@@ -87,6 +92,45 @@ export default function AdminLeadsPage() {
   const [data, setData] = useState<LedgerData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [whatsappNotice, setWhatsappNotice] = useState<{ id: string; message: string; failed: boolean } | null>(null);
+
+  // The tab is opened before the request, while the click still counts, or
+  // phone browsers block it as a pop-up (same as the login link button on
+  // the Contractors page).
+  async function sendOnWhatsapp(lead: Detail) {
+    const tab = window.open('', '_blank');
+    setSendingId(lead.id);
+    setWhatsappNotice(null);
+    try {
+      const res = await fetch(`/api/admin/quote-requests/${lead.id}/whatsapp`);
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && typeof json.url === 'string' && tab) {
+        tab.opener = null;
+        tab.location.href = json.url;
+        setWhatsappNotice({
+          id: lead.id,
+          failed: false,
+          message:
+            json.level === 'full'
+              ? 'WhatsApp opened with the full request. Press send there. (kalm) does not record that it was sent.'
+              : 'WhatsApp opened with a short note and the dashboard link (free plan: no developer details). Press send there. (kalm) does not record that it was sent.',
+        });
+      } else {
+        tab?.close();
+        setWhatsappNotice({
+          id: lead.id,
+          failed: true,
+          message: json.error ?? (res.ok ? 'The browser blocked the new tab. Allow pop-ups for this site and try again.' : 'Something went wrong. Please try again.'),
+        });
+      }
+    } catch {
+      tab?.close();
+      setWhatsappNotice({ id: lead.id, failed: true, message: 'Something went wrong. Please try again.' });
+    } finally {
+      setSendingId(null);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -229,7 +273,8 @@ export default function AdminLeadsPage() {
                                   <th className="py-1 pr-3 font-normal">Developer</th>
                                   <th className="py-1 pr-3 font-normal">How it arrived</th>
                                   <th className="py-1 pr-3 font-normal">Status</th>
-                                  <th className="py-1 font-normal">Replied in app</th>
+                                  <th className="py-1 pr-3 font-normal">Replied in app</th>
+                                  <th className="py-1 font-normal">WhatsApp</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -242,7 +287,30 @@ export default function AdminLeadsPage() {
                                     </td>
                                     <td className="py-1.5 pr-3 whitespace-nowrap">{d.medium}</td>
                                     <td className="py-1.5 pr-3 whitespace-nowrap">{d.statusLabel ?? STATUS_WORDS[d.status]}</td>
-                                    <td className="py-1.5">{d.repliedInApp ? 'Yes' : 'No'}</td>
+                                    <td className="py-1.5 pr-3">{d.repliedInApp ? 'Yes' : 'No'}</td>
+                                    <td className="py-1.5">
+                                      {d.medium === 'Quote form' ? (
+                                        <button
+                                          onClick={() => sendOnWhatsapp(d)}
+                                          disabled={sendingId === d.id}
+                                          title={
+                                            r.tier === 'LISTED'
+                                              ? 'Opens WhatsApp to the contractor with a short note and the dashboard link. No developer details (free plan).'
+                                              : 'Opens WhatsApp to the contractor with the full request typed in.'
+                                          }
+                                          className="text-sage font-medium underline underline-offset-2 whitespace-nowrap disabled:opacity-50"
+                                        >
+                                          {sendingId === d.id ? 'Opening…' : 'Send on WhatsApp'}
+                                        </button>
+                                      ) : (
+                                        <span className="text-stone">Quote form only</span>
+                                      )}
+                                      {whatsappNotice?.id === d.id && (
+                                        <p role="status" className={`mt-1 max-w-[260px] ${whatsappNotice.failed ? 'text-danger' : 'text-stone'}`}>
+                                          {whatsappNotice.message}
+                                        </p>
+                                      )}
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>

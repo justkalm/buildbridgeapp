@@ -35,3 +35,65 @@ export function loginLinkWhatsappText(name: string, setPasswordUrl: string, emai
     `The link works for 3 days and can be used once.${emailed ? ' We have also sent it to your email.' : ''}`,
   ].join('\n\n');
 }
+
+// The message for the admin "Send on WhatsApp" button on a quote request
+// (Admin > Leads). Two levels, decided by the contractor's plan (10 Nov 2026):
+//  - Listed (free): a nudge only. Work and area, then the dashboard link. No
+//    developer name, phone, email, budget or details, so a WhatsApp can never
+//    show more than the free-plan lead cap allows. The caller passes work and
+//    area already masked (maskContactDetails), so a number typed there cannot
+//    slip through either.
+//  - Plus and Pro: the full request. These plans have no lead cap.
+// dashboardUrl is null when the contractor has no login yet: the line about
+// the dashboard is then left out.
+export const WHATSAPP_DETAILS_MAX = 600;
+
+export type QuoteWhatsappInput = {
+  contractorName: string;
+  tier: 'LISTED' | 'PLUS' | 'PRO';
+  projectType: string;
+  location: string;
+  dashboardUrl: string | null;
+  // Used for Plus and Pro only.
+  lead?: {
+    developerName: string;
+    developerPhone: string;
+    developerEmail: string;
+    budgetRangeLabel: string;
+    builtUpArea: string | null;
+    details: string;
+  };
+};
+
+export function quoteRequestWhatsappText(input: QuoteWhatsappInput): string {
+  const opening = `Hi ${input.contractorName}, you have a new quote request on (kalm).`;
+  const work = [`Work: ${input.projectType}`, `Area: ${input.location}`];
+
+  if (input.tier === 'LISTED' || !input.lead) {
+    return [
+      opening,
+      work.join('\n'),
+      input.dashboardUrl ? `Open your dashboard to see it and reply: ${input.dashboardUrl}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+  }
+
+  const { lead } = input;
+  const details =
+    lead.details.length > WHATSAPP_DETAILS_MAX
+      ? `${lead.details.slice(0, WHATSAPP_DETAILS_MAX).trimEnd()}... (the rest is in your email and dashboard)`
+      : lead.details;
+  if (lead.builtUpArea) work.push(`Built-up area: ${lead.builtUpArea}`);
+  work.push(`Budget: ${lead.budgetRangeLabel}`);
+
+  return [
+    opening,
+    work.join('\n'),
+    `Details: ${details}`,
+    [`From: ${lead.developerName}`, `Phone: ${lead.developerPhone}`, `Email: ${lead.developerEmail}`].join('\n'),
+    input.dashboardUrl ? `You can also reply from your dashboard: ${input.dashboardUrl}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
